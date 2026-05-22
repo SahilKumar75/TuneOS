@@ -1,0 +1,38 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: .
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1
+    volumes:
+      - .:/app
+      - ./models_cache:/app/models_cache
+      - ./outputs:/app/outputs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - HF_HOME=/app/models_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]   # remove if no GPU
+
+  app:
+    build: .
+    command: reflex run --env prod
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - worker

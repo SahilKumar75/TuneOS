@@ -4,7 +4,7 @@ from app.state.model_state import ModelState
 def model_card(name: str, hf_id: str, description: str) -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.heading(name, size="md"),
+            rx.heading(name, size="4"),
             rx.text(hf_id, font_size="sm", color="gray"),
             rx.text(description, font_size="sm"),
             rx.button(

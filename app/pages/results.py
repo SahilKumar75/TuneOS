@@ -4,7 +4,7 @@ from app.state.job_state import JobState
 def results_page() -> rx.Component:
     return rx.container(
         rx.vstack(
-            rx.heading("Training Completed", size="xl"),
+            rx.heading("Training Completed", size="8"),
             rx.text("Your LoRA adapter is ready."),
             
             rx.card(
@@ -18,7 +18,7 @@ def results_page() -> rx.Component:
                         ),
                         rx.button(
                             "Merge and Export Full Model",
-                            color_scheme="violet"
+                            color_scheme="blue"
                         ),
                         spacing="4"
                     )

@@ -39,7 +39,7 @@ class UploadState(rx.State):
 def upload_page() -> rx.Component:
     return rx.container(
         rx.vstack(
-            rx.heading("Upload Dataset", size="xl"),
+            rx.heading("Upload Dataset", size="8"),
             rx.text("Upload a JSONL or CSV file with 'instruction' and 'output' columns."),
             
             rx.upload(
@@ -84,9 +84,9 @@ def upload_page() -> rx.Component:
             rx.button(
                 "Next: Configure Training",
                 on_click=rx.redirect("/configure"),
-                size="lg",
+                size="3",
                 margin_top="2em",
-                color_scheme="violet",
+                color_scheme="blue",
                 disabled=UploadState.file_path == ""
             ),
             

@@ -10,14 +10,14 @@ def config_form() -> rx.Component:
                 rx.slider(min_=4, max_=64, step=4,
                           value=ModelState.lora_r,
                           on_change=ModelState.set_lora_r),
-                rx.text(ModelState.lora_r),
+                rx.text(ModelState.lora_r[0]),
             ),
             rx.vstack(
                 rx.text("Alpha"),
                 rx.slider(min_=8, max_=128, step=8,
                           value=ModelState.lora_alpha,
                           on_change=ModelState.set_lora_alpha),
-                rx.text(ModelState.lora_alpha),
+                rx.text(ModelState.lora_alpha[0]),
             ),
         ),
 
@@ -25,10 +25,11 @@ def config_form() -> rx.Component:
         rx.hstack(
             rx.vstack(
                 rx.text("Epochs"),
-                rx.number_input(
-                    value=ModelState.epochs,
+                rx.input(
+                    type="number",
+                    value=ModelState.epochs.to(str),
                     on_change=ModelState.set_epochs,
-                    min_=1, max_=20,
+                    min="1", max="20",
                 ),
             ),
             rx.vstack(

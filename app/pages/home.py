@@ -4,10 +4,10 @@ from app.components.model_card import model_card
 def home_page() -> rx.Component:
     return rx.container(
         rx.vstack(
-            rx.heading("Open Source LLM Fine-Tuning", size="xl"),
+            rx.heading("Open Source LLM Fine-Tuning", size="8"),
             rx.text("Bring your dataset, pick a base model, and train an adapter in the cloud."),
             
-            rx.heading("Select a Base Model", size="lg", margin_top="2em"),
+            rx.heading("Select a Base Model", size="6", margin_top="2em"),
             
             rx.grid(
                 model_card(
@@ -38,9 +38,9 @@ def home_page() -> rx.Component:
             rx.button(
                 "Next: Upload Dataset",
                 on_click=rx.redirect("/upload"),
-                size="lg",
+                size="3",
                 margin_top="2em",
-                color_scheme="violet"
+                color_scheme="blue"
             ),
             align_items="center",
             padding="2em"

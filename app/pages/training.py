@@ -5,7 +5,7 @@ from app.components.loss_chart import loss_chart
 def training_page() -> rx.Component:
     return rx.container(
         rx.vstack(
-            rx.heading("Training in progress", size="lg"),
+            rx.heading("Training in progress", size="6"),
             rx.badge(
                 JobState.status,
                 color_scheme=rx.cond(

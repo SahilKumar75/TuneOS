@@ -8,20 +8,39 @@ class ModelState(rx.State):
     model_name: str = "mistralai/Mistral-7B-v0.1"
     
     # LoRA parameters
-    lora_r: int = 16
-    lora_alpha: int = 32
+    lora_r: list[int] = [16]
+    lora_alpha: list[int] = [32]
     
     # Training parameters
     epochs: int = 3
     learning_rate: str = "2e-4"
     dataset_path: str = ""
 
+    @rx.event
     def set_dataset_path(self, path: str):
         self.dataset_path = path
         
+    @rx.event
     def set_model_name(self, name: str):
         self.model_name = name
 
+    @rx.event
+    def set_lora_r(self, value: list[int]):
+        self.lora_r = value
+
+    @rx.event
+    def set_lora_alpha(self, value: list[int]):
+        self.lora_alpha = value
+
+    @rx.event
+    def set_epochs(self, value: str):
+        self.epochs = int(value)
+
+    @rx.event
+    def set_learning_rate(self, value: str):
+        self.learning_rate = value
+
+    @rx.event
     def start_training(self):
         if not self.dataset_path:
             # Need to handle no dataset selected
@@ -39,8 +58,8 @@ class ModelState(rx.State):
         }
         
         lora_cfg = {
-            "r": self.lora_r,
-            "lora_alpha": self.lora_alpha,
+            "r": self.lora_r[0],
+            "lora_alpha": self.lora_alpha[0],
             "lora_dropout": 0.05,
             "bias": "none",
             "task_type": "CAUSAL_LM",

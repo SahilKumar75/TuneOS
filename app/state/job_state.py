@@ -1,22 +1,17 @@
 import reflex as rx
 import redis, json, os, asyncio
-from typing import List
+from typing import List, Dict, Any
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-class LossPoint(rx.Base):
-    step: int
-    loss: float
-    epoch: float
 
 class JobState(rx.State):
     job_id: str = ""
     status: str = "idle"          # idle | running | done | failed
-    loss_history: List[LossPoint] = []
+    loss_history: List[Dict[str, Any]] = []
     output_path: str = ""
     error_msg: str = ""
 
-    @rx.background
+    @rx.event(background=True)
     async def poll_job(self, job_id: str):
         """
         Subscribe to Redis pub/sub channel for live loss updates.
@@ -38,11 +33,11 @@ class JobState(rx.State):
                 data = json.loads(msg["data"])
                 async with self:
                     self.loss_history.append(
-                        LossPoint(
-                            step=data["step"],
-                            loss=data["loss"],
-                            epoch=data["epoch"],
-                        )
+                        {
+                            "step": data["step"],
+                            "loss": data["loss"],
+                            "epoch": data["epoch"],
+                        }
                     )
             # Check if job finished
             status_raw = r.get(status_key)

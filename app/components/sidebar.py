@@ -5,7 +5,8 @@ from app.state.app_state import AppState
 from app.styles import c
 
 
-def _nav_item(icon_name: str, label: str, active: bool = False) -> rx.Component:
+def _nav_item(icon_name: str, label: str, active: bool = False, on_click=None) -> rx.Component:
+    click_props = {"on_click": on_click} if on_click is not None else {}
     return rx.hstack(
         rx.icon(icon_name, size=18, color=c("text_secondary")),
         rx.text(label, font_size="0.95rem", color=c("text_primary")),
@@ -18,6 +19,7 @@ def _nav_item(icon_name: str, label: str, active: bool = False) -> rx.Component:
         background=rx.cond(active, c("hover_strong"), "transparent"),
         cursor="pointer",
         _hover={"background": c("hover")},
+        **click_props,
     )
 
 
@@ -91,7 +93,7 @@ def _expanded_sidebar() -> rx.Component:
             padding="14px",
         ),
         rx.vstack(
-            _nav_item("square-pen", "New chat", active=True),
+            _nav_item("square-pen", "New chat", active=True, on_click=AppState.new_project),
             _nav_item("search", "Search"),
             _nav_item("database", "Datasets"),
             _nav_item("flask-conical", "Techniques"),

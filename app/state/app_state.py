@@ -2,6 +2,9 @@
 TuneOS — Application state for the landing page UI.
 Manages sidebar projects, input forms, and theme.
 """
+import re
+
+import httpx
 import reflex as rx
 from typing import List
 from pydantic import BaseModel
@@ -37,6 +40,19 @@ class AppState(rx.State):
     permission_mode: str = "training"
     sidebar_collapsed: bool = False
     tree_n: str = "3"
+
+    # ── Link preview / workspace state ───────────────────────────
+    preview_loading: bool = False
+    preview_ready: bool = False
+    preview_error: str = ""
+    workspace_active: bool = False
+    preview_kind: str = ""
+    preview_url: str = ""
+    preview_title: str = ""
+    preview_owner: str = ""
+    preview_summary: str = ""
+    preview_meta: str = ""
+    chat_input: str = ""
 
     # ── Mock project history ──────────────────────────────────────
     projects: List[ProjectItem] = [
@@ -125,6 +141,15 @@ class AppState(rx.State):
         return self.local_model_path
 
     @rx.var
+    def preview_source_label(self) -> str:
+        labels = {
+            "huggingface": "Hugging Face model",
+            "github": "GitHub repository",
+            "local": "Local model",
+        }
+        return labels.get(self.preview_kind, "Model")
+
+    @rx.var
     def tab_label(self) -> str:
         labels = {
             "huggingface": "Hugging Face",
@@ -181,6 +206,9 @@ class AppState(rx.State):
 
     @rx.event
     def handle_input_change(self, value: str):
+        self.preview_ready = False
+        self.preview_error = ""
+        self.workspace_active = False
         if self.active_tab == "huggingface":
             self.huggingface_model_id = value
         elif self.active_tab == "github":
@@ -222,6 +250,17 @@ class AppState(rx.State):
         self.active_tab = "huggingface"
         self.show_model_selector = False
         self.show_permission_selector = False
+        self.preview_loading = False
+        self.preview_ready = False
+        self.preview_error = ""
+        self.workspace_active = False
+        self.preview_kind = ""
+        self.preview_url = ""
+        self.preview_title = ""
+        self.preview_owner = ""
+        self.preview_summary = ""
+        self.preview_meta = ""
+        self.chat_input = ""
 
     @rx.event
     def toggle_sidebar(self):
@@ -232,7 +271,156 @@ class AppState(rx.State):
         self.huggingface_model_id = model_id
         self.active_tab = "huggingface"
 
+    def _input_text(self) -> str:
+        if self.active_tab == "huggingface":
+            return self.huggingface_model_id.strip()
+        if self.active_tab == "github":
+            return self.github_url.strip()
+        return self.local_model_path.strip()
+
+    def _extract_hf_repo(self, text: str) -> tuple[str, str]:
+        cleaned = text.strip()
+        match = re.search(r"huggingface\.co/(?:models/)?([^/\s]+/[^/\s?#]+)", cleaned)
+        if match:
+            repo_id = match.group(1).rstrip("/")
+            return repo_id, f"https://huggingface.co/{repo_id}"
+        if re.fullmatch(r"[\w.-]+/[\w.-]+", cleaned):
+            return cleaned, f"https://huggingface.co/{cleaned}"
+        return "", cleaned
+
+    def _extract_github_repo(self, text: str) -> tuple[str, str]:
+        cleaned = text.strip()
+        match = re.search(r"github\.com[:/]([^/\s]+)/([^/\s?#.]+)", cleaned)
+        if not match:
+            return "", cleaned
+        repo = f"{match.group(1)}/{match.group(2).replace('.git', '')}".rstrip("/")
+        return repo, f"https://github.com/{repo}"
+
+    async def _fetch_hf_preview(self, text: str) -> dict[str, str]:
+        repo_id, url = self._extract_hf_repo(text)
+        if not repo_id:
+            raise ValueError("Paste a Hugging Face model link or model id like owner/model.")
+
+        data: dict = {}
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"https://huggingface.co/api/models/{repo_id}")
+                if response.status_code == 200:
+                    data = response.json()
+        except Exception:
+            data = {}
+
+        tags = data.get("tags") or []
+        pipeline = data.get("pipeline_tag") or "model"
+        downloads = data.get("downloads")
+        likes = data.get("likes")
+        meta_parts = [pipeline]
+        if downloads is not None:
+            meta_parts.append(f"{downloads:,} downloads")
+        if likes is not None:
+            meta_parts.append(f"{likes:,} likes")
+
+        summary_bits = []
+        if tags:
+            summary_bits.append("Tags: " + ", ".join(tags[:6]))
+        card_data = data.get("cardData") or {}
+        if card_data.get("license"):
+            summary_bits.append(f"License: {card_data['license']}")
+
+        return {
+            "kind": "huggingface",
+            "url": url,
+            "title": data.get("modelId") or repo_id,
+            "owner": repo_id.split("/")[0],
+            "summary": ". ".join(summary_bits) or "Hugging Face model repository ready for fine-tuning setup.",
+            "meta": " • ".join(meta_parts),
+        }
+
+    async def _fetch_github_preview(self, text: str) -> dict[str, str]:
+        repo, url = self._extract_github_repo(text)
+        if not repo:
+            raise ValueError("Paste a GitHub repository link like https://github.com/owner/repo.")
+
+        data: dict = {}
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"https://api.github.com/repos/{repo}",
+                    headers={"Accept": "application/vnd.github+json"},
+                )
+                if response.status_code == 200:
+                    data = response.json()
+        except Exception:
+            data = {}
+
+        stars = data.get("stargazers_count")
+        forks = data.get("forks_count")
+        language = data.get("language") or "repository"
+        branch = data.get("default_branch") or "main"
+        meta_parts = [language, f"default branch {branch}"]
+        if stars is not None:
+            meta_parts.append(f"{stars:,} stars")
+        if forks is not None:
+            meta_parts.append(f"{forks:,} forks")
+
+        return {
+            "kind": "github",
+            "url": url,
+            "title": data.get("full_name") or repo,
+            "owner": repo.split("/")[0],
+            "summary": data.get("description") or "GitHub repository ready for import and training setup.",
+            "meta": " • ".join(meta_parts),
+        }
+
+    def _set_preview(self, preview: dict[str, str]):
+        self.preview_kind = preview["kind"]
+        self.preview_url = preview["url"]
+        self.preview_title = preview["title"]
+        self.preview_owner = preview["owner"]
+        self.preview_summary = preview["summary"]
+        self.preview_meta = preview["meta"]
+        self.preview_ready = True
+
     @rx.event
-    def start_project(self):
-        # Will be wired to the actual training pipeline later
-        pass
+    async def start_project(self):
+        text = self._input_text()
+        if not text:
+            self.preview_error = "Paste a Hugging Face or GitHub link first."
+            return
+
+        self.preview_loading = True
+        self.preview_ready = False
+        self.preview_error = ""
+        self.workspace_active = False
+        self.show_model_selector = False
+        self.show_permission_selector = False
+        yield
+
+        try:
+            if "github.com" in text or self.active_tab == "github":
+                preview = await self._fetch_github_preview(text)
+            else:
+                preview = await self._fetch_hf_preview(text)
+            self._set_preview(preview)
+        except ValueError as exc:
+            self.preview_error = str(exc)
+        finally:
+            self.preview_loading = False
+
+    @rx.event
+    def confirm_preview(self):
+        if not self.preview_ready:
+            return
+        self.workspace_active = True
+        self.sidebar_collapsed = True
+
+    @rx.event
+    def cancel_preview(self):
+        self.preview_loading = False
+        self.preview_ready = False
+        self.preview_error = ""
+        self.workspace_active = False
+
+    @rx.event
+    def set_chat_input(self, value: str):
+        self.chat_input = value

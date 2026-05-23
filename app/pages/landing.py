@@ -179,7 +179,217 @@ def _composer() -> rx.Component:
     )
 
 
-def landing_content() -> rx.Component:
+def _preview_panel() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
+                rx.spacer(),
+                rx.button(
+                    "Change",
+                    on_click=AppState.cancel_preview,
+                    variant="ghost",
+                    size="2",
+                    color=c("text_secondary"),
+                    cursor="pointer",
+                ),
+                spacing="3",
+                align="center",
+                width="100%",
+            ),
+            rx.heading(AppState.preview_title, font_size="1.2rem", font_weight="600", color=c("text_primary")),
+            rx.text(AppState.preview_meta, font_size="0.88rem", color=c("text_secondary")),
+            rx.text(
+                AppState.preview_summary,
+                font_size="0.95rem",
+                line_height="1.55",
+                color=c("text_primary"),
+            ),
+            rx.text(AppState.preview_url, font_size="0.82rem", color=c("text_muted")),
+            rx.hstack(
+                rx.button(
+                    "Yes, use this",
+                    on_click=AppState.confirm_preview,
+                    size="2",
+                    background=rx.color_mode_cond(light="#171717", dark="#ededed"),
+                    color=rx.color_mode_cond(light="#ffffff", dark="#171717"),
+                    border_radius="999px",
+                    cursor="pointer",
+                ),
+                rx.button(
+                    "Cancel",
+                    on_click=AppState.cancel_preview,
+                    variant="outline",
+                    size="2",
+                    border_radius="999px",
+                    cursor="pointer",
+                ),
+                spacing="3",
+                align="center",
+            ),
+            spacing="3",
+            align_items="flex-start",
+            width="100%",
+        ),
+        width="min(780px, calc(100vw - 80px))",
+        padding="18px",
+        background=c("bg_card"),
+        border="1px solid",
+        border_color=c("border"),
+        border_radius="16px",
+        box_shadow=rx.color_mode_cond(
+            light="0 8px 28px rgba(0,0,0,0.06)",
+            dark="0 8px 28px rgba(0,0,0,0.22)",
+        ),
+    )
+
+
+def _preview_status() -> rx.Component:
+    return rx.cond(
+        AppState.preview_loading,
+        rx.hstack(
+            rx.spinner(size="2"),
+            rx.text("Fetching link information...", font_size="0.92rem", color=c("text_secondary")),
+            spacing="3",
+            align="center",
+            justify="center",
+            width="min(780px, calc(100vw - 80px))",
+            padding="14px",
+        ),
+        rx.cond(
+            AppState.preview_ready,
+            _preview_panel(),
+            rx.cond(
+                AppState.preview_error != "",
+                rx.text(
+                    AppState.preview_error,
+                    font_size="0.92rem",
+                    color=c("error"),
+                    width="min(780px, calc(100vw - 80px))",
+                    text_align="center",
+                ),
+                rx.fragment(),
+            ),
+        ),
+    )
+
+
+def _chat_panel() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.text("Chat", font_size="1rem", font_weight="600", color=c("text_primary")),
+                rx.spacer(),
+                rx.icon("message-square", size=17, color=c("text_secondary")),
+                align="center",
+                width="100%",
+            ),
+            rx.vstack(
+                rx.box(
+                    rx.text(
+                        "I can help configure datasets, techniques, LoRA settings, and training runs for this model.",
+                        font_size="0.9rem",
+                        color=c("text_primary"),
+                        line_height="1.45",
+                    ),
+                    padding="12px",
+                    background=c("hover"),
+                    border_radius="12px",
+                    width="100%",
+                ),
+                spacing="3",
+                width="100%",
+                flex="1",
+                overflow_y="auto",
+            ),
+            rx.hstack(
+                rx.input(
+                    placeholder="Ask about this model...",
+                    value=AppState.chat_input,
+                    on_change=AppState.set_chat_input,
+                    size="2",
+                    width="100%",
+                    background=c("bg_input"),
+                    border="1px solid",
+                    border_color=c("border"),
+                ),
+                rx.icon_button(
+                    rx.icon("arrow-up", size=17),
+                    variant="solid",
+                    size="2",
+                    border_radius="999px",
+                    background=rx.color_mode_cond(light="#171717", dark="#ededed"),
+                    color=rx.color_mode_cond(light="#ffffff", dark="#171717"),
+                ),
+                spacing="2",
+                align="center",
+                width="100%",
+            ),
+            spacing="4",
+            height="100%",
+            width="100%",
+        ),
+        width="340px",
+        min_width="320px",
+        height="100vh",
+        padding="18px",
+        background=c("bg_sidebar"),
+        border_left="1px solid",
+        border_color=c("border"),
+    )
+
+
+def _workspace_content() -> rx.Component:
+    return rx.hstack(
+        rx.box(
+            rx.vstack(
+                rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
+                rx.heading(
+                    AppState.preview_title,
+                    font_size="2rem",
+                    font_weight="600",
+                    line_height="1.15",
+                    color=c("text_primary"),
+                    text_align="center",
+                ),
+                rx.text(AppState.preview_meta, font_size="0.95rem", color=c("text_secondary"), text_align="center"),
+                rx.box(
+                    rx.text(
+                        AppState.preview_summary,
+                        font_size="1rem",
+                        line_height="1.6",
+                        color=c("text_primary"),
+                        text_align="center",
+                    ),
+                    width="min(680px, calc(100vw - 520px))",
+                    padding="20px",
+                    background=c("bg_card"),
+                    border="1px solid",
+                    border_color=c("border"),
+                    border_radius="16px",
+                ),
+                rx.text(AppState.preview_url, font_size="0.82rem", color=c("text_muted"), text_align="center"),
+                spacing="4",
+                align="center",
+                justify="center",
+                min_height="100vh",
+                width="100%",
+                padding="48px",
+            ),
+            flex="1",
+            height="100vh",
+            overflow_y="auto",
+            background=c("bg_primary"),
+        ),
+        _chat_panel(),
+        spacing="0",
+        width="100%",
+        height="100vh",
+        overflow="hidden",
+    )
+
+
+def _start_content() -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.heading(
@@ -191,6 +401,7 @@ def landing_content() -> rx.Component:
                 text_align="center",
             ),
             _composer(),
+            _preview_status(),
             spacing="6",
             align="center",
             justify="center",
@@ -203,4 +414,12 @@ def landing_content() -> rx.Component:
         min_height="100vh",
         width="100%",
         overflow_y="auto",
+    )
+
+
+def landing_content() -> rx.Component:
+    return rx.cond(
+        AppState.workspace_active,
+        _workspace_content(),
+        _start_content(),
     )

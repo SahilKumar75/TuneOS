@@ -158,15 +158,6 @@ def _composer() -> rx.Component:
                     _hover={"background": c("hover"), "color": c("text_primary")},
                 ),
                 rx.icon_button(
-                    rx.icon("mic", size=17),
-                    variant="ghost",
-                    size="2",
-                    color=c("text_secondary"),
-                    border_radius="999px",
-                    cursor="pointer",
-                    _hover={"background": c("hover"), "color": c("text_primary")},
-                ),
-                rx.icon_button(
                     rx.icon("arrow-up", size=20),
                     on_click=AppState.start_project,
                     variant="solid",

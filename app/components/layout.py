@@ -2,6 +2,7 @@
 import reflex as rx
 from app.components.sidebar import sidebar
 from app.pages.landing import landing_content
+from app.state.app_state import AppState
 from app.styles import c
 
 
@@ -20,9 +21,9 @@ def two_panel_layout() -> rx.Component:
     return rx.hstack(
         rx.box(
             sidebar(),
-            width="280px",
-            min_width="240px",
-            max_width="340px",
+            width=rx.cond(AppState.sidebar_collapsed, "56px", "280px"),
+            min_width=rx.cond(AppState.sidebar_collapsed, "56px", "240px"),
+            max_width=rx.cond(AppState.sidebar_collapsed, "56px", "340px"),
             height="100vh",
             flex_shrink="0",
             overflow="hidden",

@@ -5,7 +5,7 @@ from app.state.app_state import AppState
 from app.styles import c
 
 
-def _action_menu_item(icon_name: str, label: str, tab: str) -> rx.Component:
+def _dropdown_item(icon_name: str, label: str, on_click) -> rx.Component:
     return rx.hstack(
         rx.icon(icon_name, size=16, color=c("text_secondary")),
         rx.text(label, font_size="0.875rem", color=c("text_primary")),
@@ -17,27 +17,27 @@ def _action_menu_item(icon_name: str, label: str, tab: str) -> rx.Component:
         border_radius="8px",
         cursor="pointer",
         _hover={"background": c("hover")},
-        on_click=AppState.select_tab_from_menu(tab),
+        on_click=on_click,
     )
 
 
-def _action_menu() -> rx.Component:
+def _permission_selector() -> rx.Component:
     return rx.cond(
-        AppState.show_action_menu,
+        AppState.show_permission_selector,
         rx.box(
             rx.vstack(
-                _action_menu_item("upload", "Upload dataset", "huggingface"),
-                _action_menu_item("globe", "Use Hugging Face model", "huggingface"),
-                _action_menu_item("git-branch", "Import from GitHub", "github"),
-                _action_menu_item("folder-open", "Use local model", "local"),
+                _dropdown_item("chart-no-axes-column", "Analytics", AppState.select_permission_mode("analytics")),
+                _dropdown_item("activity", "Training", AppState.select_permission_mode("training")),
+                _dropdown_item("sliders-horizontal", "Fine-tuning", AppState.select_permission_mode("finetuning")),
                 spacing="1",
                 width="100%",
             ),
             position="absolute",
-            bottom="48px",
-            left="14px",
+            top="100%",
+            left="12px",
+            margin_top="8px",
             z_index="20",
-            width="236px",
+            width="210px",
             padding="6px",
             background=c("menu_bg"),
             border="1px solid",
@@ -81,8 +81,9 @@ def _model_selector() -> rx.Component:
                 width="100%",
             ),
             position="absolute",
-            bottom="48px",
+            top="100%",
             right="96px",
+            margin_top="8px",
             z_index="20",
             width="190px",
             padding="6px",
@@ -100,7 +101,7 @@ def _model_selector() -> rx.Component:
 
 def _composer() -> rx.Component:
     return rx.box(
-        _action_menu(),
+        _permission_selector(),
         _model_selector(),
         rx.vstack(
             rx.input(
@@ -120,24 +121,11 @@ def _composer() -> rx.Component:
                 _focus={"outline": "none", "box_shadow": "none"},
             ),
             rx.hstack(
-                rx.icon_button(
-                    rx.cond(
-                        AppState.show_action_menu,
-                        rx.icon("x", size=18),
-                        rx.icon("plus", size=18),
-                    ),
-                    on_click=AppState.toggle_action_menu,
-                    variant="ghost",
-                    size="2",
-                    color=c("text_secondary"),
-                    border_radius="999px",
-                    cursor="pointer",
-                    _hover={"background": c("hover"), "color": c("text_primary")},
-                ),
                 rx.button(
                     rx.icon("hand", size=16),
-                    rx.text("Default permissions", font_size="0.88rem"),
+                    rx.text(AppState.permission_label, font_size="0.88rem"),
                     rx.icon("chevron-down", size=15),
+                    on_click=AppState.toggle_permission_selector,
                     variant="ghost",
                     size="2",
                     color=c("text_secondary"),
@@ -203,19 +191,6 @@ def landing_content() -> rx.Component:
                 text_align="center",
             ),
             _composer(),
-            rx.hstack(
-                rx.icon("folder", size=16, color=c("text_secondary")),
-                rx.text("TuneOS", font_size="0.9rem", color=c("text_secondary")),
-                rx.icon("chevron-down", size=15, color=c("text_muted")),
-                spacing="2",
-                align="center",
-                width="min(780px, calc(100vw - 80px))",
-                padding_x="16px",
-                padding_y="12px",
-                background=c("hover"),
-                border_bottom_radius="22px",
-                margin_top="-8px",
-            ),
             spacing="6",
             align="center",
             justify="center",

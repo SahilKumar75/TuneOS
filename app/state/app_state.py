@@ -32,8 +32,10 @@ class AppState(rx.State):
 
     # ── Sidebar controls ──────────────────────────────────────────
     search_query: str = ""
-    show_action_menu: bool = False
     show_model_selector: bool = False
+    show_permission_selector: bool = False
+    permission_mode: str = "training"
+    sidebar_collapsed: bool = False
     tree_n: str = "3"
 
     # ── Mock project history ──────────────────────────────────────
@@ -132,6 +134,15 @@ class AppState(rx.State):
         return labels.get(self.active_tab, "Hugging Face")
 
     @rx.var
+    def permission_label(self) -> str:
+        labels = {
+            "analytics": "Analytics",
+            "training": "Training",
+            "finetuning": "Fine-tuning",
+        }
+        return labels.get(self.permission_mode, "Training")
+
+    @rx.var
     def balanced_tree_count(self) -> str:
         try:
             n = int(self.tree_n)
@@ -166,7 +177,7 @@ class AppState(rx.State):
     def set_active_tab(self, tab: str):
         self.active_tab = tab
         self.show_model_selector = False
-        self.show_action_menu = False
+        self.show_permission_selector = False
 
     @rx.event
     def handle_input_change(self, value: str):
@@ -178,25 +189,30 @@ class AppState(rx.State):
             self.local_model_path = value
 
     @rx.event
-    def toggle_action_menu(self):
-        self.show_action_menu = not self.show_action_menu
-        self.show_model_selector = False
-
-    @rx.event
     def toggle_model_selector(self):
         self.show_model_selector = not self.show_model_selector
-        self.show_action_menu = False
+        self.show_permission_selector = False
+
+    @rx.event
+    def toggle_permission_selector(self):
+        self.show_permission_selector = not self.show_permission_selector
+        self.show_model_selector = False
 
     @rx.event
     def close_menus(self):
-        self.show_action_menu = False
         self.show_model_selector = False
+        self.show_permission_selector = False
 
     @rx.event
     def select_tab_from_menu(self, tab: str):
         self.active_tab = tab
-        self.show_action_menu = False
         self.show_model_selector = False
+        self.show_permission_selector = False
+
+    @rx.event
+    def select_permission_mode(self, mode: str):
+        self.permission_mode = mode
+        self.show_permission_selector = False
 
     @rx.event
     def new_project(self):
@@ -204,8 +220,12 @@ class AppState(rx.State):
         self.github_url = ""
         self.huggingface_model_id = ""
         self.active_tab = "huggingface"
-        self.show_action_menu = False
         self.show_model_selector = False
+        self.show_permission_selector = False
+
+    @rx.event
+    def toggle_sidebar(self):
+        self.sidebar_collapsed = not self.sidebar_collapsed
 
     @rx.event
     def set_hf_model(self, model_id: str):

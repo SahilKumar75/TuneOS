@@ -1,6 +1,7 @@
 """Neutral TuneOS sidebar."""
 import reflex as rx
 
+from app.state.app_state import AppState
 from app.styles import c
 
 
@@ -66,91 +67,95 @@ def _section_label(label: str) -> rx.Component:
     )
 
 
+def _panel_button() -> rx.Component:
+    return rx.icon_button(
+        rx.icon("panel-left", size=17),
+        on_click=AppState.toggle_sidebar,
+        variant="ghost",
+        size="2",
+        color=c("text_secondary"),
+        border_radius="8px",
+        cursor="pointer",
+        _hover={"background": c("hover"), "color": c("text_primary")},
+    )
+
+
+def _expanded_sidebar() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            _panel_button(),
+            rx.text("TuneOS", font_size="0.98rem", font_weight="600", color=c("text_primary")),
+            spacing="3",
+            align="center",
+            width="100%",
+            padding="14px",
+        ),
+        rx.vstack(
+            _nav_item("square-pen", "New chat", active=True),
+            _nav_item("search", "Search"),
+            _nav_item("database", "Datasets"),
+            _nav_item("flask-conical", "Techniques"),
+            _nav_item("smartphone", "TuneOS mobile"),
+            spacing="1",
+            width="100%",
+            padding_x="8px",
+        ),
+        rx.vstack(
+            _section_label("Projects"),
+            _project_row("Mistral-7B Customer Support", "2 hours ago"),
+            _project_row("Phi-3 Summarizer", "1 day ago"),
+            _project_row("Gemma-2B Chatbot", "2 days ago"),
+            _project_row("Mistral-7B Legal QA", "3 days ago"),
+            _project_row("Phi-3 Email Drafter", "1 week ago"),
+            _project_row("Gemma-2B Translator", "1 week ago"),
+            _project_row("Llama-3 Code Assistant", "5 hours ago"),
+            _project_row("Llama-3 Medical Notes", "4 days ago"),
+            spacing="1",
+            width="100%",
+            overflow_y="auto",
+            flex="1",
+            padding_x="8px",
+            padding_bottom="12px",
+        ),
+        rx.hstack(
+            rx.icon("settings", size=19, color=c("text_secondary")),
+            rx.text("Settings", font_size="0.95rem", color=c("text_primary")),
+            spacing="3",
+            align="center",
+            width="100%",
+            padding="14px",
+            border_top="1px solid",
+            border_color=c("border"),
+        ),
+        spacing="0",
+        height="100%",
+        width="100%",
+    )
+
+
+def _collapsed_sidebar() -> rx.Component:
+    return rx.vstack(
+        _panel_button(),
+        rx.icon("square-pen", size=18, color=c("text_secondary")),
+        rx.icon("search", size=18, color=c("text_secondary")),
+        rx.icon("database", size=18, color=c("text_secondary")),
+        rx.icon("flask-conical", size=18, color=c("text_secondary")),
+        rx.spacer(),
+        rx.icon("settings", size=18, color=c("text_secondary")),
+        spacing="4",
+        align="center",
+        height="100%",
+        width="100%",
+        padding_y="14px",
+    )
+
+
 def sidebar() -> rx.Component:
     return rx.box(
-        rx.vstack(
-            rx.hstack(
-                rx.icon_button(
-                    rx.icon("panel-left", size=17),
-                    variant="ghost",
-                    size="2",
-                    color=c("text_secondary"),
-                    border_radius="8px",
-                    _hover={"background": c("hover"), "color": c("text_primary")},
-                ),
-                rx.icon_button(
-                    rx.icon("arrow-left", size=18),
-                    variant="ghost",
-                    size="2",
-                    color=c("text_secondary"),
-                    border_radius="8px",
-                    _hover={"background": c("hover"), "color": c("text_primary")},
-                ),
-                rx.icon_button(
-                    rx.icon("arrow-right", size=18),
-                    variant="ghost",
-                    size="2",
-                    color=c("text_muted"),
-                    border_radius="8px",
-                    _hover={"background": c("hover"), "color": c("text_primary")},
-                ),
-                spacing="2",
-                align="center",
-                width="100%",
-                padding="14px",
-            ),
-            rx.vstack(
-                _nav_item("square-pen", "New chat", active=True),
-                _nav_item("search", "Search"),
-                _nav_item("blocks", "Plugins"),
-                _nav_item("clock-3", "Automations"),
-                _nav_item("smartphone", "TuneOS mobile"),
-                spacing="1",
-                width="100%",
-                padding_x="8px",
-            ),
-            rx.vstack(
-                _section_label("Projects"),
-                rx.hstack(
-                    rx.icon("folder", size=17, color=c("text_secondary")),
-                    rx.text("TuneOS", font_size="0.94rem", color=c("text_primary")),
-                    spacing="3",
-                    align="center",
-                    padding_x="14px",
-                    padding_y="8px",
-                    width="100%",
-                ),
-                rx.text(
-                    "No chats",
-                    font_size="0.9rem",
-                    color=c("text_muted"),
-                    padding_left="44px",
-                    padding_y="5px",
-                ),
-                _project_row("Mistral-7B Customer Support", "2 hours ago"),
-                _project_row("Phi-3 Summarizer", "1 day ago"),
-                _project_row("Gemma-2B Chatbot", "2 days ago"),
-                _project_row("Mistral-7B Legal QA", "3 days ago"),
-                _project_row("Phi-3 Email Drafter", "1 week ago"),
-                _project_row("Gemma-2B Translator", "1 week ago"),
-                spacing="1",
-                width="100%",
-                overflow_y="auto",
-                flex="1",
-                padding_x="8px",
-            ),
-            rx.spacer(),
-            rx.hstack(
-                rx.icon("settings", size=19, color=c("text_secondary")),
-                rx.text("Settings", font_size="0.95rem", color=c("text_primary")),
-                spacing="3",
-                align="center",
-                width="100%",
-                padding="14px",
-            ),
-            spacing="0",
-            height="100%",
-            width="100%",
+        rx.cond(
+            AppState.sidebar_collapsed,
+            _collapsed_sidebar(),
+            _expanded_sidebar(),
         ),
         background=c("bg_sidebar"),
         height="100vh",

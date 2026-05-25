@@ -118,12 +118,12 @@ class DockerRequiredDialog(QDialog):
         layout.addLayout(btn_row)
 
     # ── Handlers ─────────────────────────────────────────────────
-    def _on_download(self) -> None:
+    def _on_download(self, checked: bool = False) -> None:
         """Open the Docker download page for the current platform."""
         url = _DOCKER_URLS.get(platform.system(), _DOCKER_URLS["Linux"])
         webbrowser.open(url)
 
-    def _on_continue(self) -> None:
+    def _on_continue(self, checked: bool = False) -> None:
         """Close dialog without Docker — caller will get *False*."""
         self._docker_available = False
         self.accept()

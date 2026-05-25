@@ -76,12 +76,12 @@ class TitleBar(QWidget):
         layout.addWidget(self._btn_close)
 
     # ── Window Actions ────────────────────────────────────────────
-    def _on_minimize(self):
+    def _on_minimize(self, checked: bool = False):
         window = self.window()
         if window:
             window.showMinimized()
 
-    def _on_maximize(self):
+    def _on_maximize(self, checked: bool = False):
         window = self.window()
         if not window:
             return
@@ -94,7 +94,7 @@ class TitleBar(QWidget):
             self._btn_maximize.setText("❐")
             self._btn_maximize.setToolTip("Restore")
 
-    def _on_close(self):
+    def _on_close(self, checked: bool = False):
         window = self.window()
         if window:
             window.close()

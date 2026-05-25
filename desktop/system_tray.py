@@ -105,16 +105,18 @@ class SystemTray(QObject):
             else:
                 self._show_window()
 
-    def _show_window(self) -> None:
-        self._window.showNormal()
-        self._window.activateWindow()
-        self._window.raise_()
+    def _show_window(self, checked: bool = False) -> None:
+        if self._window:
+            self._window.showNormal()
+            self._window.activateWindow()
+            self._window.raise_()
 
-    def _hide_window(self) -> None:
-        self._window.hide()
+    def _hide_window(self, checked: bool = False) -> None:
+        if self._window:
+            self._window.hide()
 
     @staticmethod
-    def _quit_app() -> None:
+    def _quit_app(checked: bool = False) -> None:
         QApplication.quit()
 
     # ── Public API ───────────────────────────────────────────────

@@ -1,7 +1,9 @@
-[project]
+[tool.poetry]
 name = "finetune-platform"
 version = "0.1.0"
-requires-python = ">=3.10"
+description = "TuneOS"
+authors = ["Author <author@example.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"

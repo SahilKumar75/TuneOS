@@ -28,6 +28,11 @@ poetry run python build_desktop.py
 open dist/TuneOS.app
 ```
 
+**Upcoming Desktop Features:**
+- **Cross-platform Support:** Packaging for Windows (`.exe`) and Linux (AppImage/Snap).
+- **Native Notifications:** System tray alerts for when model training finishes.
+- **Offline Mode:** Tools to process datasets offline and manage the Hugging Face local cache.
+
 ## Quickstart
 
 ```bash

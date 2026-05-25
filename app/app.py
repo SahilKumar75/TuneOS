@@ -32,3 +32,7 @@ app.add_page(upload_page, route="/upload", title="Upload Dataset — TuneOS")
 app.add_page(configure_page, route="/configure", title="Configure — TuneOS")
 app.add_page(training_page, route="/training", title="Training — TuneOS")
 app.add_page(results_page, route="/results", title="Results — TuneOS")
+
+# Mount REST API endpoints
+from app.api import router as api_router
+app.api.include_router(api_router)

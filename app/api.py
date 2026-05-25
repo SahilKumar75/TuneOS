@@ -12,11 +12,11 @@ import subprocess
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 # ── Router ───────────────────────────────────────────────────────
-router = APIRouter(prefix="/api", tags=["tuneos"])
+app_api = FastAPI(title="TuneOS API")
 
 # ── Constants ────────────────────────────────────────────────────
 _VERSION = "0.1.0"
@@ -139,32 +139,32 @@ def _detect_gpu() -> GpuInfo:
 
 
 # ── Endpoints ────────────────────────────────────────────────────
-@router.get("/health", response_model=HealthResponse)
+@app_api.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     """Basic liveness / readiness check."""
     return HealthResponse()
 
 
-@router.get("/gpu", response_model=GpuInfo)
+@app_api.get("/gpu", response_model=GpuInfo)
 async def gpu_info() -> GpuInfo:
     """Detect and return GPU information."""
     return _detect_gpu()
 
 
-@router.get("/models", response_model=list[ModelInfo])
+@app_api.get("/models", response_model=list[ModelInfo])
 async def list_models() -> list[ModelInfo]:
     """Return the list of supported base models."""
     return [ModelInfo(**m) for m in _SUPPORTED_MODELS]
 
 
 # ── Job CRUD Placeholders ────────────────────────────────────────
-@router.get("/jobs", response_model=list[JobStatus])
+@app_api.get("/jobs", response_model=list[JobStatus])
 async def list_jobs() -> list[JobStatus]:
     """List all fine-tuning jobs (placeholder — returns empty list)."""
     return []
 
 
-@router.post("/jobs", response_model=JobCreated, status_code=201)
+@app_api.post("/jobs", response_model=JobCreated, status_code=201)
 async def create_job(config: JobConfig) -> JobCreated:
     """Create a new fine-tuning job (placeholder — returns mock ID)."""
     job_id = str(uuid.uuid4())
@@ -172,7 +172,7 @@ async def create_job(config: JobConfig) -> JobCreated:
     return JobCreated(job_id=job_id)
 
 
-@router.get("/jobs/{job_id}", response_model=JobStatus)
+@app_api.get("/jobs/{job_id}", response_model=JobStatus)
 async def get_job(job_id: str) -> JobStatus:
     """Get status of a specific job (placeholder)."""
     # TODO: Look up real job state from Redis / DB.
@@ -183,7 +183,7 @@ async def get_job(job_id: str) -> JobStatus:
     )
 
 
-@router.delete("/jobs/{job_id}", response_model=JobStatus)
+@app_api.delete("/jobs/{job_id}", response_model=JobStatus)
 async def cancel_job(job_id: str) -> JobStatus:
     """Cancel a running job (placeholder)."""
     # TODO: Revoke the Celery task and update state.

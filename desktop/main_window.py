@@ -11,7 +11,7 @@ user can freely resize the frameless window.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal, QUrl
 from PyQt6.QtGui import QMouseEvent, QCursor
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
@@ -74,7 +74,7 @@ class MainWindow(QMainWindow):
 
         # Web view
         self._web_view = QWebEngineView()
-        self._web_view.setUrl(_DEFAULT_URL)  # type: ignore[arg-type]
+        self._web_view.setUrl(QUrl(_DEFAULT_URL))
         layout.addWidget(self._web_view, stretch=1)
 
         # Status bar
@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
     # ── Public API ───────────────────────────────────────────────
     def load_url(self, url: str) -> None:
         """Navigate the embedded browser to *url*."""
-        self._web_view.setUrl(url)  # type: ignore[arg-type]
+        self._web_view.setUrl(QUrl(url))
 
     @property
     def title_bar(self) -> TitleBar:

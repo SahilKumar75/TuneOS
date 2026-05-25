@@ -182,6 +182,7 @@ def main() -> None:
     app.setApplicationName("TuneOS")
     app.setOrganizationName("TuneOS")
     app.setWindowIcon(_build_app_icon())
+    app.setQuitOnLastWindowClosed(False)
 
     launcher = _Launcher(app)
     launcher.start()

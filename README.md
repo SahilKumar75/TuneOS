@@ -17,11 +17,22 @@ User (Browser)
             (Saves Output)
 ```
 
+## Desktop App (New!)
+
+TuneOS now includes a native desktop application powered by PyQt6, offering a clean, frameless interface that embeds the Reflex UI and automatically manages the background Docker services (Redis + Celery worker). 
+
+**To build the desktop app on macOS:**
+```bash
+poetry install -E desktop
+poetry run python build_desktop.py
+open dist/TuneOS.app
+```
+
 ## Quickstart
 
 ```bash
-git clone https://github.com/yourname/finetune-platform
-cd finetune-platform
+git clone https://github.com/SahilKumar75/TuneOS
+cd TuneOS
 cp .env.example .env    # add HF_TOKEN
 docker-compose up
 # open http://localhost:3000

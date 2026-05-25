@@ -34,5 +34,5 @@ app.add_page(training_page, route="/training", title="Training — TuneOS")
 app.add_page(results_page, route="/results", title="Results — TuneOS")
 
 # Mount REST API endpoints
-from app.api import router as api_router
-app.api.include_router(api_router)
+from app.api import app_api
+app._api.mount("/api", app_api)

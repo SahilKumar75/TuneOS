@@ -20,3 +20,11 @@ python-dotenv = ">=1.0.0"
 evaluate = ">=0.4.0"
 nltk = ">=3.8.0"
 pandas = ">=2.0.0"
+
+[tool.poetry.group.desktop.dependencies]
+PyQt6 = ">=6.6.0"
+PyQt6-WebEngine = ">=6.6.0"
+httpx = ">=0.27.0"
+
+[tool.poetry.scripts]
+tuneos = "main:main"

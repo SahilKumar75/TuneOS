@@ -1,6 +1,53 @@
+# Python
 __pycache__/
-assets/external/
-*.db
 *.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Build artifacts
+build/
+dist/
+TuneOS.spec
+tuneos.spec
+*.spec
+
+# Reflex
 .states
 .web
+
+# App data (local only)
+models_cache/
+outputs/
+uploaded_files/
+storage/
+assets/external/
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# Lock files (optional — uncomment if you want contributors to regenerate)
+# poetry.lock
+# reflex.lock

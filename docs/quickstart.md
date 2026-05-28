@@ -2,8 +2,8 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourname/finetune-platform
-   cd finetune-platform
+   git clone https://github.com/yourname/TuneOS
+   cd TuneOS
    ```
 
 2. **Set up Environment Variables:**

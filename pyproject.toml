@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "finetune-platform"
+name = "tuneos"
 version = "0.1.0"
 description = "TuneOS"
 authors = ["Author <author@example.com>"]

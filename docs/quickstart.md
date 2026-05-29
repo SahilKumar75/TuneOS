@@ -2,7 +2,7 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourname/TuneOS
+   git clone https://github.com/SahilKumar75/TuneOS
    cd TuneOS
    ```
 

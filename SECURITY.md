@@ -12,7 +12,7 @@ Currently, the following versions of TuneOS are supported with security updates.
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-If you believe you have found a security vulnerability in TuneOS, please report it to us by email at `security@example.com`. 
+If you believe you have found a security vulnerability in TuneOS, please report it to us by email at `shekhar59324@gmail.com`. 
 
 We will investigate all legitimate reports and do our best to quickly fix the problem.
 

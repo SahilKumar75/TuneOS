@@ -2,7 +2,7 @@
 name = "tuneos"
 version = "0.1.0"
 description = "TuneOS"
-authors = ["Author <author@example.com>"]
+authors = ["Shekhar <shekhar59324@gmail.com>"]
 package-mode = false
 
 [tool.poetry.dependencies]

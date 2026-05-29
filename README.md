@@ -1,5 +1,9 @@
 # TuneOS
 
+[![CI](https://github.com/SahilKumar75/TuneOS/actions/workflows/ci.yml/badge.svg)](https://github.com/SahilKumar75/TuneOS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+
 TuneOS is an open-source, full-stack **desktop application** designed to give you complete local control over the lifecycle of Large Language Models. 
 
 Unlike traditional web-based platforms, TuneOS runs entirely as a native application on your machine, orchestrating complex machine learning tasks in the background while providing a clean, distraction-free GUI.

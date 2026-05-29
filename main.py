@@ -2,13 +2,14 @@
 TuneOS Desktop — Application entry point.
 
 Orchestrates the startup sequence:
-  1. Show splash screen
-  2. Check Docker availability (prompt if missing)
-  3. Start backend services (docker-compose + Reflex)
-  4. Wait for the server to become ready
-  5. Show the main window and system tray
-  6. Close the splash
-  7. Cleanup on exit
+  1. Enforce single-instance via QLockFile
+  2. Show splash screen
+  3. Check Docker availability (prompt if missing)
+  4. Start backend services (docker-compose + Reflex) in a QThread
+  5. Wait for the server to become ready
+  6. Show the main window and system tray
+  7. Close the splash
+  8. Cleanup on exit
 
 Uses QTimer so all UI updates remain responsive while the backend
 is booting in the background.
@@ -17,10 +18,12 @@ from __future__ import annotations
 
 import logging
 import sys
+import tempfile
+import os
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QThread, pyqtSignal, QLockFile
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from desktop.splash_screen import SplashScreen
 from desktop.docker_check import DockerRequiredDialog
@@ -50,6 +53,20 @@ def _build_app_icon() -> QIcon:
     painter.drawText(pixmap.rect(), 0x0084, "⬢")  # Qt.AlignCenter
     painter.end()
     return QIcon(pixmap)
+
+
+class _StartupThread(QThread):
+    """Runs process_manager.start() off the main thread to avoid freezing the UI."""
+
+    finished = pyqtSignal(bool)  # True = started OK
+
+    def __init__(self, process_manager: ProcessManager) -> None:
+        super().__init__()
+        self._pm = process_manager
+
+    def run(self) -> None:
+        ok = self._pm.start()
+        self.finished.emit(ok)
 
 
 class _Launcher:
@@ -100,7 +117,15 @@ class _Launcher:
         self._process_manager.server_ready.connect(self._on_server_ready)
         self._process_manager.server_failed.connect(self._on_server_failed)
 
-        self._process_manager.start()
+        # Run start() in a background thread so the Qt event loop stays
+        # responsive (subprocess.run can block for up to 60 s).
+        self._startup_thread = _StartupThread(self._process_manager)
+        self._startup_thread.finished.connect(self._on_startup_thread_done)
+        self._startup_thread.start()
+
+    def _on_startup_thread_done(self, ok: bool) -> None:
+        if not ok:
+            log.warning("Backend start reported failure; polling anyway.")
 
         # Begin polling for the server in a non-blocking fashion
         self._poll_timer = QTimer()
@@ -184,6 +209,18 @@ def main() -> None:
     app.setWindowIcon(_build_app_icon())
     app.setQuitOnLastWindowClosed(False)
 
+    # ── Single-instance guard ────────────────────────────────────
+    lock_path = os.path.join(tempfile.gettempdir(), "tuneos.lock")
+    lock_file = QLockFile(lock_path)
+    if not lock_file.tryLock(100):
+        QMessageBox.warning(
+            None,
+            "TuneOS already running",
+            "Another instance of TuneOS is already open.\n"
+            "Please use the existing window.",
+        )
+        sys.exit(0)
+
     launcher = _Launcher(app)
     launcher.start()
 
@@ -192,6 +229,7 @@ def main() -> None:
     # Ensure backend processes are cleaned up even if the window was
     # force-closed without the closeEvent signal firing.
     launcher._cleanup()
+    lock_file.unlock()
     sys.exit(exit_code)
 
 

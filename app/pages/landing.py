@@ -454,7 +454,7 @@ def _overview_panel() -> rx.Component:
                 href=AppState.preview_url,
                 is_external=True,
             ),
-            align="flex-start",
+            align="start",
             width="100%",
         ),
         # ── Stats row ───────────────────────────────────────────

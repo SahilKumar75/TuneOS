@@ -5,7 +5,7 @@ FROM python:3.11-slim
 
 # ── System deps ─────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc g++ curl git \
+        gcc g++ curl git unzip \
         redis-server \
         nginx \
         build-essential \

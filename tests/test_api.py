@@ -2,8 +2,24 @@
 Tests for app/api.py REST endpoints.
 Uses FastAPI TestClient — no running server needed.
 """
+import sys
+from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
+
+# Mock Celery and Redis before importing the API
+_mock_task = MagicMock()
+_mock_task.apply_async = MagicMock(return_value=MagicMock(id="test-task-id"))
+_mock_celery = MagicMock()
+_mock_celery.task = MagicMock(return_value=lambda f: _mock_task)
+
+sys.modules.setdefault("celery", MagicMock())
+sys.modules.setdefault("redis", MagicMock())
+sys.modules.setdefault("workers.celery_app", MagicMock(celery_app=_mock_celery))
+sys.modules.setdefault("workers.train_task", MagicMock(run_finetune=_mock_task))
+sys.modules.setdefault("workers.status", MagicMock(
+    get_job_status=MagicMock(return_value={"status": "running", "job_id": "x"})
+))
 
 from app.api import app_api
 

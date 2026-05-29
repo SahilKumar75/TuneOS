@@ -53,7 +53,7 @@ class AppState(rx.State):
     preview_summary: str = ""
     preview_meta: str = ""
     chat_input: str = ""
-    chat_messages: list = []
+    chat_messages: list[dict[str, str]] = []
 
     # ── Mock project history ──────────────────────────────────────
     projects: List[ProjectItem] = [

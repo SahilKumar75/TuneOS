@@ -6,9 +6,9 @@ import redis, os, json
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-@celery_app.task(bind=True, name="workers.train_task.run_finetune")
-def run_finetune(self, job_id: str, model_cfg: dict, lora_cfg: dict,
-                 train_cfg: dict, dataset_path: str):
+def _run_finetune_impl(task_self, job_id: str, model_cfg: dict, lora_cfg: dict,
+                       train_cfg: dict, dataset_path: str):
+    """Core logic, separated so it can be unit-tested without a live Celery broker."""
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"
 
@@ -38,3 +38,9 @@ def run_finetune(self, job_id: str, model_cfg: dict, lora_cfg: dict,
             "traceback": traceback.format_exc(),
         }))
         raise
+
+
+@celery_app.task(bind=True, name="workers.train_task.run_finetune")
+def run_finetune(self, job_id: str, model_cfg: dict, lora_cfg: dict,
+                 train_cfg: dict, dataset_path: str):
+    return _run_finetune_impl(self, job_id, model_cfg, lora_cfg, train_cfg, dataset_path)

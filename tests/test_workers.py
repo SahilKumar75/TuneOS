@@ -2,10 +2,27 @@
 Tests for workers/status.py and workers/train_task.py.
 All Redis calls are mocked — no live Redis needed.
 """
+import sys
 import json
 from unittest.mock import MagicMock, patch, call
 
 import pytest
+
+# Mock all heavy/unavailable deps before importing workers modules
+for _mod in [
+    "redis", "celery", "celery.app",
+    "peft", "torch", "torch.nn", "torch.cuda",
+    "transformers", "transformers.trainer_utils",
+    "datasets", "accelerate", "trl", "bitsandbytes",
+    "trainer.lora", "trainer.qlora", "trainer.dataset",
+    "trainer.finetune", "trainer.callbacks", "trainer.config",
+    "trainer.loader",
+]:
+    sys.modules.setdefault(_mod, MagicMock())
+
+# Pre-import so patch() can resolve the dotted paths
+import workers.status
+import workers.train_task
 
 
 # ── workers/status.py ───────────────────────────────────────────
@@ -100,11 +117,8 @@ class TestRunFinetuneTask:
 
         with patch("workers.train_task.redis.from_url", return_value=mock_redis), \
              patch("workers.train_task.finetune", mock_finetune):
-            from workers.train_task import run_finetune
-            # Call the underlying function directly (bypass Celery)
-            run_finetune.__wrapped__(
-                MagicMock(),  # self (bound task)
-                "job1", model_cfg, lora_cfg, train_cfg, "/tmp/data.jsonl"
+            workers.train_task._run_finetune_impl(
+                MagicMock(), "job1", model_cfg, lora_cfg, train_cfg, "/tmp/data.jsonl"
             )
 
         first_set_call = mock_redis.set.call_args_list[0]
@@ -118,8 +132,7 @@ class TestRunFinetuneTask:
 
         with patch("workers.train_task.redis.from_url", return_value=mock_redis), \
              patch("workers.train_task.finetune", mock_finetune):
-            from workers.train_task import run_finetune
-            result = run_finetune.__wrapped__(
+            result = workers.train_task._run_finetune_impl(
                 MagicMock(), "job2", model_cfg, lora_cfg, train_cfg, "/tmp/data.jsonl"
             )
 
@@ -135,9 +148,8 @@ class TestRunFinetuneTask:
 
         with patch("workers.train_task.redis.from_url", return_value=mock_redis), \
              patch("workers.train_task.finetune", side_effect=RuntimeError("OOM")):
-            from workers.train_task import run_finetune
             with pytest.raises(RuntimeError):
-                run_finetune.__wrapped__(
+                workers.train_task._run_finetune_impl(
                     MagicMock(), "job3", model_cfg, lora_cfg, train_cfg, "/tmp/data.jsonl"
                 )
 

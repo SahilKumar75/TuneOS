@@ -23,7 +23,7 @@ def _nav_item(icon_name: str, label: str, active: bool = False, on_click=None) -
     )
 
 
-def _project_row(name: str, created_at: str) -> rx.Component:
+def _project_row_static(name: str, created_at: str) -> rx.Component:
     return rx.hstack(
         rx.icon("folder", size=17, color=c("text_secondary")),
         rx.vstack(
@@ -38,6 +38,40 @@ def _project_row(name: str, created_at: str) -> rx.Component:
             ),
             rx.text(
                 created_at,
+                font_size="0.78rem",
+                color=c("text_muted"),
+                line_height="1.1",
+            ),
+            spacing="0",
+            align_items="flex-start",
+            min_width="0",
+        ),
+        spacing="3",
+        align="center",
+        width="100%",
+        padding_x="14px",
+        padding_y="9px",
+        border_radius="8px",
+        cursor="pointer",
+        _hover={"background": c("hover")},
+    )
+
+
+def _project_row_dynamic(project: rx.Var) -> rx.Component:
+    return rx.hstack(
+        rx.icon("folder", size=17, color=c("text_secondary")),
+        rx.vstack(
+            rx.text(
+                project.name,
+                font_size="0.92rem",
+                color=c("text_primary"),
+                overflow="hidden",
+                text_overflow="ellipsis",
+                white_space="nowrap",
+                max_width="210px",
+            ),
+            rx.text(
+                project.created_at,
                 font_size="0.78rem",
                 color=c("text_muted"),
                 line_height="1.1",
@@ -102,14 +136,20 @@ def _expanded_sidebar() -> rx.Component:
         ),
         rx.vstack(
             _section_label("Projects"),
-            _project_row("Mistral-7B Customer Support", "2 hours ago"),
-            _project_row("Phi-3 Summarizer", "1 day ago"),
-            _project_row("Gemma-2B Chatbot", "2 days ago"),
-            _project_row("Mistral-7B Legal QA", "3 days ago"),
-            _project_row("Phi-3 Email Drafter", "1 week ago"),
-            _project_row("Gemma-2B Translator", "1 week ago"),
-            _project_row("Llama-3 Code Assistant", "5 hours ago"),
-            _project_row("Llama-3 Medical Notes", "4 days ago"),
+            rx.cond(
+                AppState.projects.length() == 0,
+                rx.text(
+                    "No projects yet",
+                    font_size="0.82rem",
+                    color=c("text_muted"),
+                    padding_x="14px",
+                    padding_y="8px",
+                ),
+                rx.foreach(
+                    AppState.projects,
+                    _project_row_dynamic,
+                ),
+            ),
             spacing="1",
             width="100%",
             overflow_y="auto",

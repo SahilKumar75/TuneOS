@@ -52,52 +52,18 @@ class AppState(rx.State):
     preview_owner: str = ""
     preview_summary: str = ""
     preview_meta: str = ""
+    preview_tags: list[str] = []
+    preview_license: str = ""
+    preview_pipeline: str = ""
+    preview_downloads: str = ""
+    preview_likes: str = ""
+    preview_model_id: str = ""
     chat_input: str = ""
     chat_messages: list[dict[str, str]] = []
 
-    # ── Mock project history ──────────────────────────────────────
-    projects: List[ProjectItem] = [
-        ProjectItem(
-            id="1", name="Mistral-7B Customer Support",
-            base_model="mistralai/Mistral-7B-v0.1",
-            status="completed", created_at="2 hours ago",
-        ),
-        ProjectItem(
-            id="2", name="Llama-3 Code Assistant",
-            base_model="meta-llama/Meta-Llama-3-8B",
-            status="training", created_at="5 hours ago",
-        ),
-        ProjectItem(
-            id="3", name="Phi-3 Summarizer",
-            base_model="microsoft/Phi-3-mini-4k-instruct",
-            status="completed", created_at="1 day ago",
-        ),
-        ProjectItem(
-            id="4", name="Gemma-2B Chatbot",
-            base_model="google/gemma-2b",
-            status="failed", created_at="2 days ago",
-        ),
-        ProjectItem(
-            id="5", name="Mistral-7B Legal QA",
-            base_model="mistralai/Mistral-7B-v0.1",
-            status="completed", created_at="3 days ago",
-        ),
-        ProjectItem(
-            id="6", name="Llama-3 Medical Notes",
-            base_model="meta-llama/Meta-Llama-3-8B",
-            status="queued", created_at="4 days ago",
-        ),
-        ProjectItem(
-            id="7", name="Phi-3 Email Drafter",
-            base_model="microsoft/Phi-3-mini-4k-instruct",
-            status="completed", created_at="1 week ago",
-        ),
-        ProjectItem(
-            id="8", name="Gemma-2B Translator",
-            base_model="google/gemma-2b",
-            status="completed", created_at="1 week ago",
-        ),
-    ]
+    # ── Project history (real, built from user actions) ───────────
+    projects: List[ProjectItem] = []
+    _next_project_id: int = 1
 
     # ── Computed vars ─────────────────────────────────────────────
     @rx.var
@@ -256,6 +222,12 @@ class AppState(rx.State):
         self.preview_meta = ""
         self.chat_input = ""
         self.chat_messages = []
+        self.preview_tags = []
+        self.preview_license = ""
+        self.preview_pipeline = ""
+        self.preview_downloads = ""
+        self.preview_likes = ""
+        self.preview_model_id = ""
 
     @rx.event
     def toggle_sidebar(self):
@@ -311,20 +283,43 @@ class AppState(rx.State):
         if likes is not None:
             meta_parts.append(f"{likes:,} likes")
 
-        summary_bits = []
-        if tags:
-            summary_bits.append("Tags: " + ", ".join(tags[:6]))
         card_data = data.get("cardData") or {}
-        if card_data.get("license"):
-            summary_bits.append(f"License: {card_data['license']}")
+        license_str = card_data.get("license") or ""
+
+        # Build a proper summary from model card
+        description = ""
+        if card_data.get("model_name"):
+            description = f"{card_data['model_name']} is a {pipeline} model."
+        if not description:
+            description = data.get("description") or f"A {pipeline} model hosted on Hugging Face."
+
+        # Siblings info for file formats
+        siblings = data.get("siblings") or []
+        file_types = set()
+        for s in siblings:
+            fname = s.get("rfilename", "")
+            if fname.endswith(".safetensors"):
+                file_types.add("SafeTensors")
+            elif fname.endswith(".gguf"):
+                file_types.add("GGUF")
+            elif fname.endswith(".bin"):
+                file_types.add("PyTorch")
+        if file_types:
+            description += f" Available formats: {', '.join(sorted(file_types))}."
 
         return {
             "kind": "huggingface",
             "url": url,
             "title": data.get("modelId") or repo_id,
             "owner": repo_id.split("/")[0],
-            "summary": ". ".join(summary_bits) or "Hugging Face model repository ready for fine-tuning setup.",
+            "summary": description,
             "meta": " • ".join(meta_parts),
+            "tags": tags[:8],
+            "license": license_str,
+            "pipeline": pipeline,
+            "downloads": f"{downloads:,}" if downloads is not None else "",
+            "likes": f"{likes:,}" if likes is not None else "",
+            "model_id": data.get("modelId") or repo_id,
         }
 
     async def _fetch_github_preview(self, text: str) -> dict[str, str]:
@@ -375,13 +370,19 @@ class AppState(rx.State):
             "meta": "Local • No network required",
         }
 
-    def _set_preview(self, preview: dict[str, str]):
+    def _set_preview(self, preview: dict):
         self.preview_kind = preview["kind"]
         self.preview_url = preview["url"]
         self.preview_title = preview["title"]
         self.preview_owner = preview["owner"]
         self.preview_summary = preview["summary"]
         self.preview_meta = preview["meta"]
+        self.preview_tags = preview.get("tags") or []
+        self.preview_license = preview.get("license") or ""
+        self.preview_pipeline = preview.get("pipeline") or ""
+        self.preview_downloads = preview.get("downloads") or ""
+        self.preview_likes = preview.get("likes") or ""
+        self.preview_model_id = preview.get("model_id") or ""
         self.preview_ready = True
 
     @rx.event
@@ -418,6 +419,18 @@ class AppState(rx.State):
             return
         self.workspace_active = True
         self.sidebar_collapsed = True
+        # Add to project history
+        already = any(p.base_model == self.preview_model_id for p in self.projects)
+        if not already and self.preview_title:
+            new_proj = ProjectItem(
+                id=str(self._next_project_id),
+                name=self.preview_title,
+                base_model=self.preview_model_id or self.preview_title,
+                status="active",
+                created_at="Just now",
+            )
+            self.projects = [new_proj, *self.projects]
+            self._next_project_id += 1
 
     @rx.event
     def cancel_preview(self):

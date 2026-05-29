@@ -261,13 +261,12 @@ def _preview_status() -> rx.Component:
     )
 
 
-def _chat_message(msg: dict) -> rx.Component:
+def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
     is_user = msg["role"] == "user"
     return rx.box(
         rx.text(
             msg["text"],
             font_size="0.9rem",
-            color=c("text_primary"),
             line_height="1.5",
         ),
         padding="10px 14px",
@@ -302,7 +301,7 @@ def _chat_panel() -> rx.Component:
             ),
             rx.vstack(
                 rx.cond(
-                    AppState.chat_messages == [],
+                    AppState.chat_messages.length() == 0,
                     rx.box(
                         rx.text(
                             "Ask about datasets, LoRA settings, or training configuration for this model.",

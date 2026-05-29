@@ -261,12 +261,54 @@ def _preview_status() -> rx.Component:
     )
 
 
+def _tag_pill(tag: rx.Var[str]) -> rx.Component:
+    return rx.badge(
+        tag,
+        variant="soft",
+        color_scheme="gray",
+        size="1",
+        font_size="0.72rem",
+        border_radius="999px",
+    )
+
+
+def _action_card(icon_name: str, label: str, desc: str) -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.icon(icon_name, size=22, color=c("text_secondary")),
+            rx.text(label, font_size="0.88rem", font_weight="600", color=c("text_primary")),
+            rx.text(desc, font_size="0.75rem", color=c("text_muted"), line_height="1.3"),
+            spacing="1",
+            align_items="flex-start",
+        ),
+        padding="14px",
+        background=c("bg_card"),
+        border="1px solid",
+        border_color=c("border"),
+        border_radius="12px",
+        cursor="pointer",
+        _hover={"border_color": c("border_strong"), "background": c("hover")},
+        transition="all 0.15s ease",
+        flex="1",
+        min_width="140px",
+    )
+
+
+def _stat_item(label: str, value: rx.Var[str]) -> rx.Component:
+    return rx.vstack(
+        rx.text(value, font_size="0.95rem", font_weight="600", color=c("text_primary")),
+        rx.text(label, font_size="0.72rem", color=c("text_muted")),
+        spacing="0",
+        align_items="center",
+    )
+
+
 def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
     is_user = msg["role"] == "user"
     return rx.box(
         rx.text(
             msg["text"],
-            font_size="0.9rem",
+            font_size="0.88rem",
             line_height="1.5",
         ),
         padding="10px 14px",
@@ -290,27 +332,39 @@ def _chat_panel() -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.hstack(
-                rx.icon("message-square", size=16, color=c("text_secondary")),
+                rx.icon("message-square", size=16, color=c("accent")),
                 rx.text("Chat", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                rx.spacer(),
+                rx.icon("sparkles", size=14, color=c("accent")),
                 align="center",
                 spacing="2",
                 width="100%",
-                padding_bottom="8px",
+                padding_bottom="10px",
                 border_bottom="1px solid",
                 border_color=c("border"),
             ),
             rx.vstack(
                 rx.cond(
                     AppState.chat_messages.length() == 0,
-                    rx.box(
+                    rx.vstack(
+                        rx.icon("bot", size=28, color=c("text_muted")),
                         rx.text(
-                            "Ask about datasets, LoRA settings, or training configuration for this model.",
-                            font_size="0.88rem",
+                            "Ask about this repository",
+                            font_size="0.92rem",
+                            font_weight="500",
+                            color=c("text_secondary"),
+                        ),
+                        rx.text(
+                            "I can help with datasets, LoRA config, training setup, and model analysis.",
+                            font_size="0.82rem",
                             color=c("text_muted"),
-                            line_height="1.5",
+                            line_height="1.4",
                             text_align="center",
                         ),
-                        padding="20px",
+                        spacing="2",
+                        align="center",
+                        justify="center",
+                        padding="32px 16px",
                         width="100%",
                     ),
                     rx.foreach(
@@ -324,38 +378,44 @@ def _chat_panel() -> rx.Component:
                 overflow_y="auto",
                 align_items="stretch",
             ),
-            rx.hstack(
-                rx.input(
-                    placeholder="Ask about this model...",
-                    value=AppState.chat_input,
-                    on_change=AppState.set_chat_input,
-                    size="2",
-                    flex="1",
-                    background=c("bg_input"),
-                    border="1px solid",
-                    border_color=c("border"),
-                    border_radius="8px",
+            rx.box(
+                rx.hstack(
+                    rx.input(
+                        placeholder="Ask about this model...",
+                        value=AppState.chat_input,
+                        on_change=AppState.set_chat_input,
+                        size="2",
+                        flex="1",
+                        background="transparent",
+                        border="none",
+                        _focus={"outline": "none", "box_shadow": "none"},
+                    ),
+                    rx.icon_button(
+                        rx.icon("send", size=15),
+                        on_click=AppState.send_chat_message,
+                        variant="ghost",
+                        size="2",
+                        color=c("text_secondary"),
+                        cursor="pointer",
+                        _hover={"color": c("accent")},
+                    ),
+                    spacing="2",
+                    align="center",
+                    width="100%",
                 ),
-                rx.icon_button(
-                    rx.icon("arrow-up", size=17),
-                    on_click=AppState.send_chat_message,
-                    variant="solid",
-                    size="2",
-                    border_radius="999px",
-                    background=rx.color_mode_cond(light="#171717", dark="#ededed"),
-                    color=rx.color_mode_cond(light="#ffffff", dark="#171717"),
-                    cursor="pointer",
-                ),
-                spacing="2",
-                align="center",
                 width="100%",
+                padding="8px 12px",
+                background=c("bg_input"),
+                border="1px solid",
+                border_color=c("border"),
+                border_radius="12px",
             ),
             spacing="3",
             height="100%",
             width="100%",
         ),
-        width="340px",
-        min_width="320px",
+        width="360px",
+        min_width="340px",
         height="100vh",
         padding="18px",
         background=c("bg_sidebar"),
@@ -366,34 +426,88 @@ def _chat_panel() -> rx.Component:
 
 def _overview_panel() -> rx.Component:
     return rx.vstack(
+        # ── Title row with actions ──────────────────────────────
         rx.hstack(
-            rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
-            rx.spacer(),
-            rx.button(
-                rx.icon("external-link", size=14),
-                rx.text("Open source", font_size="0.82rem"),
-                variant="ghost",
-                size="1",
-                color=c("text_secondary"),
-                cursor="pointer",
-                spacing="1",
+            rx.vstack(
+                rx.hstack(
+                    rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft", size="1"),
+                    rx.cond(
+                        AppState.preview_license != "",
+                        rx.badge(AppState.preview_license, color_scheme="green", variant="soft", size="1"),
+                        rx.fragment(),
+                    ),
+                    spacing="2",
+                ),
+                rx.heading(
+                    AppState.preview_title,
+                    font_size="1.6rem",
+                    font_weight="700",
+                    line_height="1.2",
+                    color=c("text_primary"),
+                ),
+                spacing="2",
+                align_items="flex-start",
+                flex="1",
             ),
-            align="center",
+            rx.link(
+                rx.icon("external-link", size=16, color=c("text_muted")),
+                href=AppState.preview_url,
+                is_external=True,
+            ),
+            align="flex-start",
             width="100%",
         ),
-        rx.heading(
-            AppState.preview_title,
-            font_size="1.75rem",
-            font_weight="600",
-            line_height="1.2",
-            color=c("text_primary"),
+        # ── Stats row ───────────────────────────────────────────
+        rx.hstack(
+            rx.cond(
+                AppState.preview_pipeline != "",
+                rx.hstack(
+                    rx.icon("cpu", size=14, color=c("text_muted")),
+                    rx.text(AppState.preview_pipeline, font_size="0.82rem", color=c("text_secondary")),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                AppState.preview_downloads != "",
+                rx.hstack(
+                    rx.icon("download", size=14, color=c("text_muted")),
+                    rx.text(AppState.preview_downloads, font_size="0.82rem", color=c("text_secondary")),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                AppState.preview_likes != "",
+                rx.hstack(
+                    rx.icon("heart", size=14, color=c("text_muted")),
+                    rx.text(AppState.preview_likes, font_size="0.82rem", color=c("text_secondary")),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            spacing="4",
+            flex_wrap="wrap",
         ),
-        rx.text(AppState.preview_meta, font_size="0.88rem", color=c("text_secondary")),
+        # ── Tags ────────────────────────────────────────────────
+        rx.cond(
+            AppState.preview_tags.length() > 0,
+            rx.hstack(
+                rx.foreach(AppState.preview_tags, _tag_pill),
+                spacing="1",
+                flex_wrap="wrap",
+            ),
+            rx.fragment(),
+        ),
+        # ── Description card ────────────────────────────────────
         rx.box(
             rx.text(
                 AppState.preview_summary,
-                font_size="0.95rem",
-                line_height="1.6",
+                font_size="0.92rem",
+                line_height="1.65",
                 color=c("text_primary"),
             ),
             width="100%",
@@ -403,52 +517,23 @@ def _overview_panel() -> rx.Component:
             border_color=c("border"),
             border_radius="12px",
         ),
-        rx.text(AppState.preview_url, font_size="0.78rem", color=c("text_muted")),
-        rx.divider(border_color=c("border")),
-        rx.text("Actions", font_size="0.82rem", font_weight="500", color=c("text_muted")),
+        # ── URL ─────────────────────────────────────────────────
+        rx.text(AppState.preview_url, font_size="0.75rem", color=c("text_muted")),
+        # ── Action grid ─────────────────────────────────────────
         rx.hstack(
-            rx.button(
-                rx.icon("zap", size=15),
-                rx.text("Train", font_size="0.88rem"),
-                variant="solid",
-                size="2",
-                background=rx.color_mode_cond(light="#171717", dark="#ededed"),
-                color=rx.color_mode_cond(light="#ffffff", dark="#171717"),
-                border_radius="8px",
-                cursor="pointer",
-            ),
-            rx.button(
-                rx.icon("bar-chart-2", size=15),
-                rx.text("Analyze", font_size="0.88rem"),
-                variant="outline",
-                size="2",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-            rx.button(
-                rx.icon("refresh-cw", size=15),
-                rx.text("Convert", font_size="0.88rem"),
-                variant="outline",
-                size="2",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-            rx.button(
-                rx.icon("notebook", size=15),
-                rx.text("Notebook", font_size="0.88rem"),
-                variant="outline",
-                size="2",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-            spacing="2",
+            _action_card("zap", "Train", "Fine-tune with LoRA/QLoRA"),
+            _action_card("bar-chart-2", "Analyze", "Model architecture & metrics"),
+            _action_card("refresh-cw", "Convert", "GGUF, SafeTensors formats"),
+            _action_card("notebook", "Notebook", "Open Jupyter explorer"),
+            spacing="3",
+            width="100%",
             flex_wrap="wrap",
         ),
         spacing="4",
         align_items="flex-start",
         width="100%",
-        padding="32px",
-        max_width="680px",
+        padding="28px 32px",
+        max_width="800px",
     )
 
 
@@ -469,10 +554,20 @@ def _workspace_content() -> rx.Component:
                         _hover={"background": c("hover"), "color": c("text_primary")},
                     ),
                     rx.spacer(),
+                    rx.text(
+                        AppState.preview_title,
+                        font_size="0.85rem",
+                        color=c("text_muted"),
+                        overflow="hidden",
+                        text_overflow="ellipsis",
+                        white_space="nowrap",
+                    ),
+                    rx.spacer(),
                     width="100%",
-                    padding="16px 32px",
+                    padding="12px 28px",
                     border_bottom="1px solid",
                     border_color=c("border"),
+                    align="center",
                 ),
                 _overview_panel(),
                 spacing="0",

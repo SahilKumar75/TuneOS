@@ -3,6 +3,9 @@
 
 FROM python:3.11-slim
 
+# ── Cache bust ───────────────────────────────────────────────────
+ARG CACHE_BUST=2
+
 # ── System deps ─────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc g++ curl git unzip \

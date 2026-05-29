@@ -1,58 +1,48 @@
-# TuneOS — Hugging Face Spaces Docker image
-# Runs Redis + the Celery training worker inside a single container.
+# TuneOS — Single Space (Reflex UI + FastAPI + Celery worker)
+# nginx listens on 7860 (required by HF Spaces) and proxies to Reflex on 3000.
 
 FROM python:3.11-slim
 
 # ── System deps ─────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc g++ curl git \
         redis-server \
+        nginx \
         build-essential \
-        git \
-        curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Working directory ────────────────────────────────────────────
+# ── Install Poetry ───────────────────────────────────────────────
+RUN pip install --no-cache-dir poetry
+
 WORKDIR /app
 
-# ── Python deps (inline — no pyproject.toml needed) ─────────────
-# Install torch (CPU-only) first with its own index, then everything else
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir \
-    transformers \
-    peft \
-    bitsandbytes \
-    datasets \
-    accelerate \
-    trl \
-    "celery[redis]" \
-    redis \
-    huggingface-hub \
-    python-dotenv \
-    evaluate \
-    nltk \
-    pandas
+# ── Python deps ─────────────────────────────────────────────────
+COPY pyproject.toml poetry.lock* ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --no-root --without dev
 
 # ── App source ───────────────────────────────────────────────────
+COPY app/ ./app/
 COPY workers/ ./workers/
 COPY trainer/ ./trainer/
 COPY storage/ ./storage/
+COPY rxconfig.py ./
 
-# ── Persistent storage dirs ──────────────────────────────────────
-RUN mkdir -p /app/models_cache /app/outputs /app/storage/datasets
+# ── nginx: proxy HF's required port 7860 → Reflex 3000 ──────────
+COPY hf_spaces/nginx.conf /etc/nginx/sites-available/default
+
+# ── Storage dirs ─────────────────────────────────────────────────
+RUN mkdir -p /app/models_cache /app/outputs /app/storage/datasets /app/uploaded_files
 
 # ── Environment defaults (override via Space secrets) ────────────
 ENV REDIS_URL=redis://localhost:6379/0 \
+    HF_TOKEN="" \
     HF_HOME=/app/models_cache \
-    CELERY_BROKER_URL=redis://localhost:6379/0 \
-    CELERY_RESULT_BACKEND=redis://localhost:6379/0 \
     PYTHONUNBUFFERED=1
 
-# ── HF Spaces: port 7860 must be exposed ────────────────────────
-EXPOSE 7860 6379
+EXPOSE 7860
 
-# ── Entrypoint: start Redis then Celery worker ───────────────────
-COPY entrypoint.sh /entrypoint.sh
+COPY hf_spaces/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 CMD ["/entrypoint.sh"]

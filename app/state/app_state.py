@@ -53,6 +53,7 @@ class AppState(rx.State):
     preview_summary: str = ""
     preview_meta: str = ""
     chat_input: str = ""
+    chat_messages: list = []
 
     # ── Mock project history ──────────────────────────────────────
     projects: List[ProjectItem] = [
@@ -134,11 +135,7 @@ class AppState(rx.State):
 
     @rx.var
     def current_input_value(self) -> str:
-        if self.active_tab == "huggingface":
-            return self.huggingface_model_id
-        elif self.active_tab == "github":
-            return self.github_url
-        return self.local_model_path
+        return self.huggingface_model_id
 
     @rx.var
     def preview_source_label(self) -> str:
@@ -209,12 +206,9 @@ class AppState(rx.State):
         self.preview_ready = False
         self.preview_error = ""
         self.workspace_active = False
-        if self.active_tab == "huggingface":
-            self.huggingface_model_id = value
-        elif self.active_tab == "github":
-            self.github_url = value
-        else:
-            self.local_model_path = value
+        self.huggingface_model_id = value
+        self.github_url = value
+        self.local_model_path = value
 
     @rx.event
     def toggle_model_selector(self):
@@ -261,6 +255,7 @@ class AppState(rx.State):
         self.preview_summary = ""
         self.preview_meta = ""
         self.chat_input = ""
+        self.chat_messages = []
 
     @rx.event
     def toggle_sidebar(self):
@@ -272,11 +267,7 @@ class AppState(rx.State):
         self.active_tab = "huggingface"
 
     def _input_text(self) -> str:
-        if self.active_tab == "huggingface":
-            return self.huggingface_model_id.strip()
-        if self.active_tab == "github":
-            return self.github_url.strip()
-        return self.local_model_path.strip()
+        return self.huggingface_model_id.strip()
 
     def _extract_hf_repo(self, text: str) -> tuple[str, str]:
         cleaned = text.strip()
@@ -372,6 +363,18 @@ class AppState(rx.State):
             "meta": " • ".join(meta_parts),
         }
 
+    def _handle_local_path(self, path: str) -> dict:
+        import os
+        name = os.path.basename(path.rstrip("/")) or path
+        return {
+            "kind": "local",
+            "url": path,
+            "title": name,
+            "owner": "local",
+            "summary": f"Local model or dataset at {path}",
+            "meta": "Local • No network required",
+        }
+
     def _set_preview(self, preview: dict[str, str]):
         self.preview_kind = preview["kind"]
         self.preview_url = preview["url"]
@@ -385,7 +388,7 @@ class AppState(rx.State):
     async def start_project(self):
         text = self._input_text()
         if not text:
-            self.preview_error = "Paste a Hugging Face or GitHub link first."
+            self.preview_error = "Paste a Hugging Face link, GitHub URL, or local path first."
             return
 
         self.preview_loading = True
@@ -397,7 +400,9 @@ class AppState(rx.State):
         yield
 
         try:
-            if "github.com" in text or self.active_tab == "github":
+            if text.startswith("/") or text.startswith("~/") or text.startswith("./"):
+                preview = self._handle_local_path(text)
+            elif "github.com" in text or self.active_tab == "github":
                 preview = await self._fetch_github_preview(text)
             else:
                 preview = await self._fetch_hf_preview(text)
@@ -424,3 +429,14 @@ class AppState(rx.State):
     @rx.event
     def set_chat_input(self, value: str):
         self.chat_input = value
+
+    @rx.event
+    def send_chat_message(self):
+        text = self.chat_input.strip()
+        if not text:
+            return
+        self.chat_messages = [*self.chat_messages, {"role": "user", "text": text}]
+        self.chat_input = ""
+        model_name = self.preview_title or "this model"
+        reply = f"You asked about {model_name}: \"{text}\". I can help configure datasets, LoRA settings, and training runs for this model."
+        self.chat_messages = [*self.chat_messages, {"role": "assistant", "text": reply}]

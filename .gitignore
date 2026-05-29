@@ -52,3 +52,4 @@ assets/external/
 # Lock files (optional — uncomment if you want contributors to regenerate)
 # poetry.lock
 # reflex.lock
+hf_deploy/

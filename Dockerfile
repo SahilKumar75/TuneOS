@@ -20,7 +20,7 @@ WORKDIR /app
 # ── Python deps ─────────────────────────────────────────────────
 COPY pyproject.toml poetry.lock* ./
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --no-root --without dev
+    && poetry install --no-interaction --no-ansi --no-root
 
 # ── App source ───────────────────────────────────────────────────
 COPY . .

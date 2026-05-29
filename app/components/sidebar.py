@@ -94,10 +94,8 @@ def _expanded_sidebar() -> rx.Component:
         ),
         rx.vstack(
             _nav_item("square-pen", "New chat", active=True, on_click=AppState.new_project),
-            _nav_item("search", "Search"),
-            _nav_item("database", "Datasets"),
+            _nav_item("database", "Datasets", on_click=rx.redirect("/datasets")),
             _nav_item("flask-conical", "Techniques"),
-            _nav_item("smartphone", "TuneOS mobile"),
             spacing="1",
             width="100%",
             padding_x="8px",
@@ -139,7 +137,6 @@ def _collapsed_sidebar() -> rx.Component:
     return rx.vstack(
         _panel_button(),
         rx.icon("square-pen", size=18, color=c("text_secondary")),
-        rx.icon("search", size=18, color=c("text_secondary")),
         rx.icon("database", size=18, color=c("text_secondary")),
         rx.icon("flask-conical", size=18, color=c("text_secondary")),
         rx.spacer(),

@@ -1,15 +1,22 @@
 ---
-title: TuneOS Worker
-emoji: 🧠
+title: TuneOS
+emoji: 🎛️
 colorFrom: blue
-colorTo: purple
+colorTo: indigo
 sdk: docker
-pinned: false
+pinned: true
+app_port: 7860
 ---
 
-# TuneOS — Training Worker Space
+# TuneOS
 
-This Space runs the **Redis + Celery worker** backend for TuneOS.
+Model operations workspace — discover models, explore datasets, and fine-tune with LoRA/QLoRA.
 
-The local TuneOS desktop app submits fine-tuning jobs here via Celery.
-Set `REDIS_URL` and `CELERY_BROKER_URL` in your local `.env` to point at this Space.
+## Secrets required
+
+Set these in Space Settings → Variables and Secrets:
+
+| Secret | Value |
+|---|---|
+| `REDIS_URL` | Your Redis Cloud URL (`redis://default:PASSWORD@HOST:PORT`) |
+| `HF_TOKEN` | Your Hugging Face token (for gated models) |

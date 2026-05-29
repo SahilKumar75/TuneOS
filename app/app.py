@@ -9,6 +9,7 @@ from app.pages.upload import upload_page
 from app.pages.configure import configure_page
 from app.pages.training import training_page
 from app.pages.results import results_page
+from app.pages.datasets import datasets_page
 
 
 def index() -> rx.Component:
@@ -32,6 +33,7 @@ app.add_page(upload_page, route="/upload", title="Upload Dataset — TuneOS")
 app.add_page(configure_page, route="/configure", title="Configure — TuneOS")
 app.add_page(training_page, route="/training", title="Training — TuneOS")
 app.add_page(results_page, route="/results", title="Results — TuneOS")
+app.add_page(datasets_page, route="/datasets", title="Datasets — TuneOS")
 
 # Mount REST API endpoints
 from app.api import app_api

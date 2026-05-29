@@ -1,3 +1,13 @@
+---
+title: TuneOS
+emoji: 🎛️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: true
+app_port: 7860
+---
+
 # TuneOS
 
 [![CI](https://github.com/SahilKumar75/TuneOS/actions/workflows/ci.yml/badge.svg)](https://github.com/SahilKumar75/TuneOS/actions/workflows/ci.yml)

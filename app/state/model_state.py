@@ -1,7 +1,9 @@
 import reflex as rx
 import uuid
 import os
-from workers.train_task import run_finetune
+def _get_run_finetune():
+    from workers.train_task import run_finetune
+    return run_finetune
 from app.state.job_state import JobState
 
 class ModelState(rx.State):
@@ -83,7 +85,7 @@ class ModelState(rx.State):
         }
 
         # Kick off Celery task
-        run_finetune.delay(
+        _get_run_finetune().delay(
             job_id=job_id,
             model_cfg=model_cfg,
             lora_cfg=lora_cfg,

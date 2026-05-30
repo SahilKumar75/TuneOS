@@ -2,12 +2,16 @@
 TuneOS — Application state for the landing page UI.
 Manages sidebar projects, input forms, and theme.
 """
+import os
 import re
 
 import httpx
 import reflex as rx
+from dotenv import load_dotenv
 from typing import List
 from pydantic import BaseModel
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"), override=True)
 
 
 class ProjectItem(BaseModel):
@@ -58,8 +62,19 @@ class AppState(rx.State):
     preview_downloads: str = ""
     preview_likes: str = ""
     preview_model_id: str = ""
+    preview_architecture: str = ""
+    preview_params: str = ""
+    preview_formats: str = ""
+    preview_library: str = ""
+    preview_total_files: str = ""
+    preview_created: str = ""
+    preview_updated: str = ""
+    preview_readme: str = ""
     chat_input: str = ""
     chat_messages: list[dict[str, str]] = []
+    is_chat_loading: bool = False
+    chat_model: str = "auto"
+    last_used_model: str = ""
 
     # ── Project history (real, built from user actions) ───────────
     projects: List[ProjectItem] = []
@@ -228,6 +243,14 @@ class AppState(rx.State):
         self.preview_downloads = ""
         self.preview_likes = ""
         self.preview_model_id = ""
+        self.preview_architecture = ""
+        self.preview_params = ""
+        self.preview_formats = ""
+        self.preview_library = ""
+        self.preview_total_files = ""
+        self.preview_created = ""
+        self.preview_updated = ""
+        self.preview_readme = ""
 
     @rx.event
     def toggle_sidebar(self):
@@ -264,14 +287,38 @@ class AppState(rx.State):
         if not repo_id:
             raise ValueError("Paste a Hugging Face model link or model id like owner/model.")
 
+        import os
         data: dict = {}
+        readme_content: str = ""
+        hf_token = os.getenv("HF_TOKEN", "")
+        headers: dict = {}
+        if hf_token:
+            headers["Authorization"] = f"Bearer {hf_token}"
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"https://huggingface.co/api/models/{repo_id}")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"https://huggingface.co/api/models/{repo_id}",
+                    headers=headers,
+                )
                 if response.status_code == 200:
                     data = response.json()
+                # Fetch README / model card (try resolve endpoint with auth)
+                for readme_url in [
+                    f"https://huggingface.co/{repo_id}/resolve/main/README.md",
+                    f"https://huggingface.co/{repo_id}/raw/main/README.md",
+                ]:
+                    readme_resp = await client.get(readme_url, headers=headers, follow_redirects=True)
+                    if readme_resp.status_code == 200:
+                        raw = readme_resp.text
+                        # Strip YAML front matter
+                        if raw.startswith("---"):
+                            end = raw.find("---", 3)
+                            if end != -1:
+                                raw = raw[end + 3:].strip()
+                        readme_content = raw[:12000]
+                        break
         except Exception:
-            data = {}
+            data = data or {}
 
         tags = data.get("tags") or []
         pipeline = data.get("pipeline_tag") or "model"
@@ -293,9 +340,10 @@ class AppState(rx.State):
         if not description:
             description = data.get("description") or f"A {pipeline} model hosted on Hugging Face."
 
-        # Siblings info for file formats
+        # Siblings info for file formats and size
         siblings = data.get("siblings") or []
         file_types = set()
+        total_files = len(siblings)
         for s in siblings:
             fname = s.get("rfilename", "")
             if fname.endswith(".safetensors"):
@@ -304,8 +352,29 @@ class AppState(rx.State):
                 file_types.add("GGUF")
             elif fname.endswith(".bin"):
                 file_types.add("PyTorch")
-        if file_types:
-            description += f" Available formats: {', '.join(sorted(file_types))}."
+
+        # Architecture info
+        config = data.get("config") or {}
+        model_type = config.get("model_type") or ""
+        arch_list = config.get("architectures") or []
+        architecture = arch_list[0] if arch_list else model_type
+
+        # Parameter count
+        safetensors_info = data.get("safetensors") or {}
+        params_total = safetensors_info.get("total") or 0
+        if params_total > 1_000_000_000:
+            params_str = f"{params_total / 1_000_000_000:.1f}B"
+        elif params_total > 1_000_000:
+            params_str = f"{params_total / 1_000_000:.0f}M"
+        else:
+            params_str = ""
+
+        # Library
+        library = data.get("library_name") or ""
+
+        # Created/updated dates
+        created = (data.get("createdAt") or "")[:10]
+        updated = (data.get("lastModified") or "")[:10]
 
         return {
             "kind": "huggingface",
@@ -320,6 +389,14 @@ class AppState(rx.State):
             "downloads": f"{downloads:,}" if downloads is not None else "",
             "likes": f"{likes:,}" if likes is not None else "",
             "model_id": data.get("modelId") or repo_id,
+            "architecture": architecture,
+            "params": params_str,
+            "formats": ", ".join(sorted(file_types)) if file_types else "",
+            "library": library,
+            "total_files": str(total_files),
+            "created": created,
+            "updated": updated,
+            "readme": readme_content,
         }
 
     async def _fetch_github_preview(self, text: str) -> dict[str, str]:
@@ -383,6 +460,14 @@ class AppState(rx.State):
         self.preview_downloads = preview.get("downloads") or ""
         self.preview_likes = preview.get("likes") or ""
         self.preview_model_id = preview.get("model_id") or ""
+        self.preview_architecture = preview.get("architecture") or ""
+        self.preview_params = preview.get("params") or ""
+        self.preview_formats = preview.get("formats") or ""
+        self.preview_library = preview.get("library") or ""
+        self.preview_total_files = preview.get("total_files") or ""
+        self.preview_created = preview.get("created") or ""
+        self.preview_updated = preview.get("updated") or ""
+        self.preview_readme = preview.get("readme") or ""
         self.preview_ready = True
 
     @rx.event
@@ -444,12 +529,208 @@ class AppState(rx.State):
         self.chat_input = value
 
     @rx.event
-    def send_chat_message(self):
+    def handle_chat_key(self, key: str):
+        if key == "Enter":
+            return AppState.send_chat_message
+
+    # Models available for manual selection
+    CHAT_MODELS: list[dict[str, str]] = [
+        {"id": "auto",                                       "label": "Auto (smart route)"},
+        {"id": "anthropic/claude-sonnet-4-5",               "label": "Claude Sonnet 4.5"},
+        {"id": "openai/gpt-oss-120b:free",                  "label": "GPT OSS 120B (free)"},
+        {"id": "deepseek/deepseek-v4-flash:free",           "label": "DeepSeek V4 Flash (free)"},
+        {"id": "qwen/qwen3-coder:free",                     "label": "Qwen3 Coder (free)"},
+        {"id": "meta-llama/llama-3.3-70b-instruct:free",    "label": "Llama 3.3 70B (free)"},
+        {"id": "nvidia/nemotron-3-super-120b-a12b:free",    "label": "Nemotron 120B (free)"},
+    ]
+
+    @rx.event
+    def set_chat_model(self, model_id: str):
+        self.chat_model = model_id
+
+    # Fallback chain tried in order when a model is rate-limited
+    # Each entry: (model_id, base_url, env_key)
+    # base_url=None means OpenRouter
+    _FREE_FALLBACKS: list[tuple[str, str, str]] = [
+        ("openai/gpt-oss-120b:free",                 "openrouter", "OPENROUTER_API_KEY"),
+        ("deepseek/deepseek-v4-flash:free",          "openrouter", "OPENROUTER_API_KEY"),
+        ("qwen/qwen3-coder:free",                    "openrouter", "OPENROUTER_API_KEY"),
+        ("meta-llama/llama-3.3-70b-instruct:free",   "openrouter", "OPENROUTER_API_KEY"),
+        ("llama-3.3-70b-versatile",                  "groq",       "GROQ_API_KEY"),
+        ("llama3-70b-8192",                          "groq",       "GROQ_API_KEY"),
+        ("mixtral-8x7b-32768",                       "groq",       "GROQ_API_KEY"),
+        ("gemma2-9b-it",                             "groq",       "GROQ_API_KEY"),
+        ("nvidia/nemotron-3-super-120b-a12b:free",   "openrouter", "OPENROUTER_API_KEY"),
+        ("moonshotai/kimi-k2.6:free",                "openrouter", "OPENROUTER_API_KEY"),
+    ]
+
+    def _route_model(self, text: str) -> tuple[str, str, str]:
+        lower = text.lower()
+        code_kws = {"config", "yaml", "json", "code", "script", "train", "lora", "qlora",
+                    "peft", "batch", "epoch", "lr", "learning rate", "trl", "transformers",
+                    "accelerate", "bitsandbytes", "quantiz", "merge", "export", "convert"}
+        reasoning_kws = {"why", "explain", "compare", "difference", "tradeoff", "should i",
+                         "best practice", "recommend", "analyse", "analyze", "pros", "cons"}
+        if any(k in lower for k in code_kws):
+            return ("qwen/qwen3-coder:free", "openrouter", "OPENROUTER_API_KEY")
+        if any(k in lower for k in reasoning_kws):
+            return ("deepseek/deepseek-v4-flash:free", "openrouter", "OPENROUTER_API_KEY")
+        return ("llama-3.3-70b-versatile", "groq", "GROQ_API_KEY")
+
+    def _build_system_prompt(self) -> str:
+        parts = [
+            "You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling.",
+            "The user is working with the following model. Use this context to give accurate, specific advice.",
+            "",
+        ]
+        if self.preview_title:
+            parts.append(f"Model: {self.preview_title}")
+        if self.preview_url:
+            parts.append(f"URL: {self.preview_url}")
+        if self.preview_summary:
+            parts.append(f"Description: {self.preview_summary}")
+        if self.preview_meta:
+            parts.append(f"Stats: {self.preview_meta}")
+        if self.preview_architecture:
+            parts.append(f"Architecture: {self.preview_architecture}")
+        if self.preview_params:
+            parts.append(f"Parameters: {self.preview_params}")
+        if self.preview_pipeline:
+            parts.append(f"Pipeline: {self.preview_pipeline}")
+        if self.preview_library:
+            parts.append(f"Library: {self.preview_library}")
+        if self.preview_license:
+            parts.append(f"License: {self.preview_license}")
+        if self.preview_tags:
+            parts.append(f"Tags: {', '.join(self.preview_tags)}")
+        if self.preview_readme:
+            parts.append("")
+            parts.append("Model Card (README):")
+            parts.append(self.preview_readme[:6000])
+        parts += [
+            "",
+            "Be concise and practical. For code/configs, use fenced code blocks.",
+        ]
+        return "\n".join(parts)
+
+    @rx.event
+    async def send_chat_message(self):
         text = self.chat_input.strip()
-        if not text:
+        if not text or self.is_chat_loading:
             return
+
+        if self.chat_model == "auto":
+            first = self._route_model(text)
+        else:
+            # manual pick — detect if it's a groq model by absence of "/"
+            provider = "groq" if "/" not in self.chat_model else "openrouter"
+            key_name = "GROQ_API_KEY" if provider == "groq" else "OPENROUTER_API_KEY"
+            first = (self.chat_model, provider, key_name)
+
         self.chat_messages = [*self.chat_messages, {"role": "user", "text": text}]
         self.chat_input = ""
-        model_name = self.preview_title or "this model"
-        reply = f"You asked about {model_name}: \"{text}\". I can help configure datasets, LoRA settings, and training runs for this model."
-        self.chat_messages = [*self.chat_messages, {"role": "assistant", "text": reply}]
+        self.is_chat_loading = True
+        self.last_used_model = first[0]
+        self.chat_messages = [*self.chat_messages, {"role": "assistant", "text": ""}]
+        yield
+
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not api_key:
+            self.chat_messages = [
+                *self.chat_messages[:-1],
+                {"role": "assistant", "text": "⚠️ No OPENROUTER_API_KEY found. Add it to your .env file."},
+            ]
+            self.is_chat_loading = False
+            yield
+            return
+
+        system = self._build_system_prompt()
+        history = [
+            {"role": ("user" if m["role"] == "user" else "assistant"), "content": m["text"]}
+            for m in self.chat_messages[:-1]
+            if m["text"]
+        ]
+
+        import json
+        import httpx as _httpx
+
+        BASE_URLS = {
+            "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+            "groq":       "https://api.groq.com/openai/v1/chat/completions",
+        }
+
+        # Build fallback queue: preferred model first, then rest
+        fallbacks = [first] + [
+            t for t in self._FREE_FALLBACKS if t[0] != first[0]
+        ]
+
+        full_text = ""
+        last_error = ""
+
+        try:
+            async with _httpx.AsyncClient(timeout=30.0) as http:
+                for model_id, provider, key_name in fallbacks:
+                    key = os.environ.get(key_name, "")
+                    if not key:
+                        continue  # skip if no key configured
+
+                    headers = {
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                    }
+                    if provider == "openrouter":
+                        headers["X-Title"] = "TuneOS"
+
+                    resp = await http.post(
+                        BASE_URLS[provider],
+                        headers=headers,
+                        json={
+                            "model": model_id,
+                            "messages": [{"role": "system", "content": system}, *history],
+                            "max_tokens": 1024,
+                            "stream": True,
+                        },
+                    )
+                    if resp.status_code in (429, 503):
+                        last_error = f"{resp.status_code} on {model_id}"
+                        continue
+                    if resp.status_code != 200:
+                        last_error = f"HTTP {resp.status_code} from {model_id}"
+                        continue
+
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk["choices"][0]["delta"].get("content") or ""
+                            full_text += delta
+                            if full_text:
+                                self.chat_messages = [
+                                    *self.chat_messages[:-1],
+                                    {"role": "assistant", "text": full_text},
+                                ]
+                                yield
+                        except Exception:
+                            continue
+
+                    if full_text:
+                        self.last_used_model = f"{model_id} ({provider})"
+                        break  # success
+
+            if not full_text:
+                self.chat_messages = [
+                    *self.chat_messages[:-1],
+                    {"role": "assistant", "text": f"⚠️ All models unavailable. Last error: {last_error}"},
+                ]
+        except Exception as exc:
+            self.chat_messages = [
+                *self.chat_messages[:-1],
+                {"role": "assistant", "text": f"⚠️ Error: {exc}"},
+            ]
+        finally:
+            self.is_chat_loading = False
+            yield

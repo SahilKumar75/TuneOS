@@ -18,38 +18,40 @@ ENV/
 *.swp
 *.swo
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Environment
+# Environment — never commit secrets
 .env
 
 # Build artifacts
 build/
 dist/
-TuneOS.spec
-tuneos.spec
 *.spec
 
-# Reflex
-.states
-.web
+# Reflex generated
+.states/
+.web/
 
 # App data (local only)
 models_cache/
 outputs/
 uploaded_files/
 storage/
-assets/external/
 
-# Database
+# HF deploy clone
+hf_deploy/
+
+# Test cache
+.pytest_cache/
+
+# Logs & DB
+*.log
 *.db
 
-# Logs
-*.log
-
-# Lock files (optional — uncomment if you want contributors to regenerate)
-# poetry.lock
-# reflex.lock
-hf_deploy/
+# Assets
+assets/external/

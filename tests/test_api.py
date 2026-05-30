@@ -2,9 +2,10 @@
 Tests for app/api.py REST endpoints.
 Uses FastAPI TestClient — no running server needed.
 """
+
 import sys
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
 # Mock Celery and Redis before importing the API
@@ -17,9 +18,10 @@ sys.modules.setdefault("celery", MagicMock())
 sys.modules.setdefault("redis", MagicMock())
 sys.modules.setdefault("workers.celery_app", MagicMock(celery_app=_mock_celery))
 sys.modules.setdefault("workers.train_task", MagicMock(run_finetune=_mock_task))
-sys.modules.setdefault("workers.status", MagicMock(
-    get_job_status=MagicMock(return_value={"status": "running", "job_id": "x"})
-))
+sys.modules.setdefault(
+    "workers.status",
+    MagicMock(get_job_status=MagicMock(return_value={"status": "running", "job_id": "x"})),
+)
 
 from app.api import app_api
 
@@ -27,6 +29,7 @@ client = TestClient(app_api)
 
 
 # ── /health ──────────────────────────────────────────────────────
+
 
 def test_health_returns_200():
     resp = client.get("/health")
@@ -40,6 +43,7 @@ def test_health_payload():
 
 
 # ── /gpu ─────────────────────────────────────────────────────────
+
 
 def test_gpu_returns_200():
     resp = client.get("/gpu")
@@ -55,6 +59,7 @@ def test_gpu_payload_shape():
 
 
 # ── /models ──────────────────────────────────────────────────────
+
 
 def test_models_returns_200():
     resp = client.get("/models")
@@ -81,6 +86,7 @@ def test_models_contains_mistral():
 
 
 # ── /jobs ────────────────────────────────────────────────────────
+
 
 def test_list_jobs_returns_empty_list():
     resp = client.get("/jobs")

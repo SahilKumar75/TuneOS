@@ -4,7 +4,9 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
 )
+
 from trainer.config import ModelConfig
+
 
 def load_model_and_tokenizer(cfg: ModelConfig):
     """
@@ -18,7 +20,7 @@ def load_model_and_tokenizer(cfg: ModelConfig):
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,   # QLoRA double quantization
+            bnb_4bit_use_double_quant=True,  # QLoRA double quantization
         )
     elif cfg.use_8bit:
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)

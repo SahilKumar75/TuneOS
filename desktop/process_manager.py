@@ -11,6 +11,7 @@ All heavy I/O is guarded by timeouts so the GUI thread is never blocked
 for an unreasonable amount of time.  Status updates are emitted through
 Qt signals.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -52,7 +52,7 @@ class ProcessManager(QObject):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._reflex_process: Optional[subprocess.Popen] = None
+        self._reflex_process: subprocess.Popen | None = None
         self._docker_started: bool = False
 
     # ── Docker helpers ───────────────────────────────────────────

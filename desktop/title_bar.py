@@ -8,10 +8,15 @@ Features:
 - Double-click to maximize/restore
 - Dark theme matching the Reflex UI
 """
-from PyQt6.QtCore import Qt, QPoint, QSize
-from PyQt6.QtGui import QMouseEvent, QIcon, QPainter, QColor, QFont
+
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QWidget,
 )
 
 
@@ -46,9 +51,7 @@ class TitleBar(QWidget):
         # App icon (circle dot)
         self._icon_label = QLabel("⬢")
         self._icon_label.setObjectName("AppIcon")
-        self._icon_label.setStyleSheet(
-            "color: #3b82f6; font-size: 16px; padding-right: 6px;"
-        )
+        self._icon_label.setStyleSheet("color: #3b82f6; font-size: 16px; padding-right: 6px;")
         layout.addWidget(self._icon_label)
 
         # Title text

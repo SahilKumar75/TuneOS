@@ -31,5 +31,30 @@ fastapi = "^0.136.3"
 uvicorn = "^0.48.0"
 pyinstaller = "^6.20.0"
 
+[tool.poetry.group.dev.dependencies]
+ruff = ">=0.6.0"
+pytest = ">=8.0.0"
+
 [tool.poetry.scripts]
 tuneos = "main:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".web", ".states", "build", "dist", "hf_deploy", "reflex.lock"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test modules deliberately stub heavy dependencies in sys.modules before
+# importing the modules under test, so imports are not at the top of the file.
+"tests/**" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# The PyQt smoke test requires a display server; it is exercised in the
+# desktop packaging job, not the headless unit-test run.
+norecursedirs = [".web", ".states", "build", "dist"]

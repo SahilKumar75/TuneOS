@@ -1,8 +1,9 @@
 """TuneOS start screen with a focused software-style composer."""
+
 import reflex as rx
 
-from app.state.app_state import AppState
 from app.components.workspace_tabs import workspace_tab_bar
+from app.state.app_state import AppState
 from app.styles import c
 
 
@@ -27,9 +28,17 @@ def _permission_selector() -> rx.Component:
         AppState.show_permission_selector,
         rx.box(
             rx.vstack(
-                _dropdown_item("chart-no-axes-column", "Analytics", AppState.select_permission_mode("analytics")),
+                _dropdown_item(
+                    "chart-no-axes-column",
+                    "Analytics",
+                    AppState.select_permission_mode("analytics"),
+                ),
                 _dropdown_item("activity", "Training", AppState.select_permission_mode("training")),
-                _dropdown_item("sliders-horizontal", "Fine-tuning", AppState.select_permission_mode("finetuning")),
+                _dropdown_item(
+                    "sliders-horizontal",
+                    "Fine-tuning",
+                    AppState.select_permission_mode("finetuning"),
+                ),
                 spacing="1",
                 width="100%",
             ),
@@ -184,7 +193,12 @@ def _preview_panel() -> rx.Component:
                 align="center",
                 width="100%",
             ),
-            rx.heading(AppState.preview_title, font_size="1.2rem", font_weight="600", color=c("text_primary")),
+            rx.heading(
+                AppState.preview_title,
+                font_size="1.2rem",
+                font_weight="600",
+                color=c("text_primary"),
+            ),
             rx.text(AppState.preview_meta, font_size="0.88rem", color=c("text_secondary")),
             rx.text(
                 AppState.preview_summary,
@@ -262,8 +276,16 @@ def _preview_status() -> rx.Component:
 
 # ── Workspace Components ──────────────────────────────────────────
 
+
 def _tag_pill(tag: rx.Var[str]) -> rx.Component:
-    return rx.badge(tag, variant="soft", color_scheme="gray", size="1", font_size="0.7rem", border_radius="999px")
+    return rx.badge(
+        tag,
+        variant="soft",
+        color_scheme="gray",
+        size="1",
+        font_size="0.7rem",
+        border_radius="999px",
+    )
 
 
 def _info_row(icon_name: str, label: str, value: rx.Var[str]) -> rx.Component:
@@ -326,7 +348,9 @@ def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
         rx.hstack(
             rx.spacer(),
             rx.box(
-                rx.text(msg["text"], font_size="0.9rem", line_height="1.55", color=c("text_primary")),
+                rx.text(
+                    msg["text"], font_size="0.9rem", line_height="1.55", color=c("text_primary")
+                ),
                 padding="10px 16px",
                 background=rx.color_mode_cond(light="#f0f0f0", dark="#2a2a2a"),
                 border_radius="20px",
@@ -403,15 +427,41 @@ def _chat_panel() -> rx.Component:
                 rx.vstack(
                     rx.vstack(
                         rx.icon("bot", size=28, color=c("text_muted")),
-                        rx.text("Ask about this model", font_size="0.92rem", font_weight="500", color=c("text_primary")),
-                        rx.text("Get help with fine-tuning, architecture, training configs, or dataset prep.", font_size="0.82rem", color=c("text_muted"), text_align="center", line_height="1.5"),
+                        rx.text(
+                            "Ask about this model",
+                            font_size="0.92rem",
+                            font_weight="500",
+                            color=c("text_primary"),
+                        ),
+                        rx.text(
+                            "Get help with fine-tuning, architecture, training configs, or dataset prep.",
+                            font_size="0.82rem",
+                            color=c("text_muted"),
+                            text_align="center",
+                            line_height="1.5",
+                        ),
                         spacing="2",
                         align="center",
                     ),
                     rx.box(
                         rx.vstack(
                             *[
-                                rx.text(hint, font_size="0.8rem", color=c("text_secondary"), line_height="1.4", width="100%", padding_y="8px", border_bottom=rx.cond(hint != "How much VRAM do I need to fine-tune this?", "1px solid", "none"), border_color=c("border"), cursor="pointer", _hover={"color": c("text_primary")})
+                                rx.text(
+                                    hint,
+                                    font_size="0.8rem",
+                                    color=c("text_secondary"),
+                                    line_height="1.4",
+                                    width="100%",
+                                    padding_y="8px",
+                                    border_bottom=rx.cond(
+                                        hint != "How much VRAM do I need to fine-tune this?",
+                                        "1px solid",
+                                        "none",
+                                    ),
+                                    border_color=c("border"),
+                                    cursor="pointer",
+                                    _hover={"color": c("text_primary")},
+                                )
                                 for hint in [
                                     "What LoRA rank works best for this model?",
                                     "Suggest a training config for my dataset size",
@@ -496,7 +546,9 @@ def _chat_panel() -> rx.Component:
                                 color=rx.color_mode_cond(light="#ffffff", dark="#171717"),
                                 cursor="pointer",
                                 _hover={
-                                    "background": rx.color_mode_cond(light="#000000", dark="#ffffff"),
+                                    "background": rx.color_mode_cond(
+                                        light="#000000", dark="#ffffff"
+                                    ),
                                 },
                             ),
                         ),
@@ -560,15 +612,30 @@ def _workspace_content() -> rx.Component:
                             rx.hstack(
                                 rx.vstack(
                                     rx.hstack(
-                                        rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft", size="1"),
+                                        rx.badge(
+                                            AppState.preview_source_label,
+                                            color_scheme="blue",
+                                            variant="soft",
+                                            size="1",
+                                        ),
                                         rx.cond(
                                             AppState.preview_license != "",
-                                            rx.badge(AppState.preview_license, color_scheme="green", variant="soft", size="1"),
+                                            rx.badge(
+                                                AppState.preview_license,
+                                                color_scheme="green",
+                                                variant="soft",
+                                                size="1",
+                                            ),
                                             rx.fragment(),
                                         ),
                                         rx.cond(
                                             AppState.preview_params != "",
-                                            rx.badge(AppState.preview_params + " params", color_scheme="orange", variant="soft", size="1"),
+                                            rx.badge(
+                                                AppState.preview_params + " params",
+                                                color_scheme="orange",
+                                                variant="soft",
+                                                size="1",
+                                            ),
                                             rx.fragment(),
                                         ),
                                         spacing="2",
@@ -581,7 +648,11 @@ def _workspace_content() -> rx.Component:
                                         line_height="1.2",
                                         color=c("text_primary"),
                                     ),
-                                    rx.text(AppState.preview_pipeline, font_size="0.82rem", color=c("text_secondary")),
+                                    rx.text(
+                                        AppState.preview_pipeline,
+                                        font_size="0.82rem",
+                                        color=c("text_secondary"),
+                                    ),
                                     spacing="2",
                                     flex="1",
                                 ),
@@ -589,7 +660,11 @@ def _workspace_content() -> rx.Component:
                                     _action_tile("cpu", "Train"),
                                     _action_tile("bar-chart-2", "Analyze"),
                                     _action_tile("refresh-cw", "Convert"),
-                                    _action_tile("notebook-pen", "Notebook", on_click=AppState.open_notebook_tab),
+                                    _action_tile(
+                                        "notebook-pen",
+                                        "Notebook",
+                                        on_click=AppState.open_notebook_tab,
+                                    ),
                                     spacing="2",
                                 ),
                                 align="start",
@@ -612,7 +687,11 @@ def _workspace_content() -> rx.Component:
                                         AppState.preview_downloads != "",
                                         rx.hstack(
                                             rx.icon("arrow-down-to-line", size=13, color="#4a9eff"),
-                                            rx.text(AppState.preview_downloads, font_size="0.75rem", color=c("text_secondary")),
+                                            rx.text(
+                                                AppState.preview_downloads,
+                                                font_size="0.75rem",
+                                                color=c("text_secondary"),
+                                            ),
                                             spacing="1",
                                             align="center",
                                         ),
@@ -622,7 +701,11 @@ def _workspace_content() -> rx.Component:
                                         AppState.preview_likes != "",
                                         rx.hstack(
                                             rx.icon("heart", size=13, color="#e85d75"),
-                                            rx.text(AppState.preview_likes, font_size="0.75rem", color=c("text_secondary")),
+                                            rx.text(
+                                                AppState.preview_likes,
+                                                font_size="0.75rem",
+                                                color=c("text_secondary"),
+                                            ),
                                             spacing="1",
                                             align="center",
                                         ),
@@ -641,8 +724,18 @@ def _workspace_content() -> rx.Component:
                             rx.divider(border_color=c("border")),
                             # About
                             rx.vstack(
-                                rx.text("About", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                                rx.text(AppState.preview_summary, font_size="0.92rem", line_height="1.7", color=c("text_secondary")),
+                                rx.text(
+                                    "About",
+                                    font_size="0.95rem",
+                                    font_weight="600",
+                                    color=c("text_primary"),
+                                ),
+                                rx.text(
+                                    AppState.preview_summary,
+                                    font_size="0.92rem",
+                                    line_height="1.7",
+                                    color=c("text_secondary"),
+                                ),
                                 spacing="3",
                                 width="100%",
                             ),
@@ -651,18 +744,45 @@ def _workspace_content() -> rx.Component:
                             rx.hstack(
                                 rx.vstack(
                                     rx.vstack(
-                                        rx.text("Model Details", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                        rx.text(
+                                            "Model Details",
+                                            font_size="0.95rem",
+                                            font_weight="600",
+                                            color=c("text_primary"),
+                                        ),
                                         rx.box(
                                             rx.vstack(
-                                                _info_row("cpu", "Architecture", AppState.preview_architecture),
-                                                _info_row("hash", "Parameters", AppState.preview_params),
-                                                _info_row("layers", "Pipeline", AppState.preview_pipeline),
-                                                _info_row("package", "Library", AppState.preview_library),
-                                                _info_row("hard-drive", "Formats", AppState.preview_formats),
-                                                _info_row("file", "Files", AppState.preview_total_files),
-                                                _info_row("scale", "License", AppState.preview_license),
-                                                _info_row("calendar", "Created", AppState.preview_created),
-                                                _info_row("clock", "Updated", AppState.preview_updated),
+                                                _info_row(
+                                                    "cpu",
+                                                    "Architecture",
+                                                    AppState.preview_architecture,
+                                                ),
+                                                _info_row(
+                                                    "hash", "Parameters", AppState.preview_params
+                                                ),
+                                                _info_row(
+                                                    "layers", "Pipeline", AppState.preview_pipeline
+                                                ),
+                                                _info_row(
+                                                    "package", "Library", AppState.preview_library
+                                                ),
+                                                _info_row(
+                                                    "hard-drive",
+                                                    "Formats",
+                                                    AppState.preview_formats,
+                                                ),
+                                                _info_row(
+                                                    "file", "Files", AppState.preview_total_files
+                                                ),
+                                                _info_row(
+                                                    "scale", "License", AppState.preview_license
+                                                ),
+                                                _info_row(
+                                                    "calendar", "Created", AppState.preview_created
+                                                ),
+                                                _info_row(
+                                                    "clock", "Updated", AppState.preview_updated
+                                                ),
                                                 spacing="0",
                                                 width="100%",
                                             ),
@@ -680,7 +800,12 @@ def _workspace_content() -> rx.Component:
                                     rx.cond(
                                         AppState.preview_benchmark != "",
                                         rx.vstack(
-                                            rx.text("Benchmark Results", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                            rx.text(
+                                                "Benchmark Results",
+                                                font_size="0.95rem",
+                                                font_weight="600",
+                                                color=c("text_primary"),
+                                            ),
                                             rx.box(
                                                 rx.markdown(AppState.preview_benchmark),
                                                 width="100%",

@@ -1,13 +1,18 @@
+import asyncio
+import json
+import os
+from typing import Any
+
+import redis
 import reflex as rx
-import redis, json, os, asyncio
-from typing import List, Dict, Any
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+
 class JobState(rx.State):
     job_id: str = ""
-    status: str = "idle"          # idle | running | done | failed
-    loss_history: List[Dict[str, Any]] = []
+    status: str = "idle"  # idle | running | done | failed
+    loss_history: list[dict[str, Any]] = []
     output_path: str = ""
     error_msg: str = ""
 

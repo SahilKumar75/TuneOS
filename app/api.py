@@ -5,13 +5,12 @@ Mounted under ``/api`` by the Reflex application.  Provides health
 checks, GPU detection, model listing, and CRUD placeholders for
 fine-tuning jobs.
 """
+
 from __future__ import annotations
 
 import platform
 import subprocess
 import uuid
-import os
-from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -49,12 +48,14 @@ _SUPPORTED_MODELS: list[dict[str, str]] = [
 # ── Pydantic Schemas ─────────────────────────────────────────────
 class HealthResponse(BaseModel):
     """Health-check response."""
+
     status: str = "ok"
     version: str = _VERSION
 
 
 class GpuInfo(BaseModel):
     """GPU detection result."""
+
     available: bool
     backend: str
     name: str
@@ -63,6 +64,7 @@ class GpuInfo(BaseModel):
 
 class ModelInfo(BaseModel):
     """A supported base model."""
+
     name: str
     hf_id: str
     notes: str = ""
@@ -70,6 +72,7 @@ class ModelInfo(BaseModel):
 
 class JobConfig(BaseModel):
     """Request body for creating a new fine-tuning job."""
+
     model_id: str = Field(..., description="Hugging Face model ID")
     dataset_path: str = Field(..., description="Path to the uploaded dataset")
     lora_rank: int = Field(default=8, ge=1, le=256)
@@ -81,6 +84,7 @@ class JobConfig(BaseModel):
 
 class JobStatus(BaseModel):
     """Response schema for job status."""
+
     job_id: str
     status: str
     progress: float = 0.0
@@ -89,6 +93,7 @@ class JobStatus(BaseModel):
 
 class JobCreated(BaseModel):
     """Response returned when a job is successfully queued."""
+
     job_id: str
     status: str = "queued"
 
@@ -162,6 +167,7 @@ async def list_models() -> list[ModelInfo]:
 def _get_celery():
     """Import Celery app lazily so the API starts even if Redis is down."""
     from workers.celery_app import celery_app
+
     return celery_app
 
 
@@ -169,6 +175,7 @@ def _get_job_status_from_redis(job_id: str) -> dict:
     """Read job status from Redis. Returns dict with at least 'status' key."""
     try:
         from workers.status import get_job_status
+
         return get_job_status(job_id)
     except Exception:
         return {"status": "unknown", "job_id": job_id}
@@ -207,12 +214,13 @@ async def create_job(config: JobConfig) -> JobCreated:
 
     try:
         from workers.train_task import run_finetune
+
         run_finetune.apply_async(
             args=[job_id, model_cfg, lora_cfg, train_cfg, config.dataset_path],
             task_id=job_id,
         )
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}")
+        raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
 

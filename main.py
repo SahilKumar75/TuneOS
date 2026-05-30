@@ -14,21 +14,22 @@ Orchestrates the startup sequence:
 Uses QTimer so all UI updates remain responsive while the backend
 is booting in the background.
 """
+
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import tempfile
-import os
 
-from PyQt6.QtCore import QTimer, QThread, pyqtSignal, QLockFile
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
+from PyQt6.QtCore import QLockFile, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from desktop.splash_screen import SplashScreen
 from desktop.docker_check import DockerRequiredDialog
-from desktop.process_manager import ProcessManager
 from desktop.main_window import MainWindow
+from desktop.process_manager import ProcessManager
+from desktop.splash_screen import SplashScreen
 from desktop.system_tray import SystemTray
 
 # ── Logging ──────────────────────────────────────────────────────
@@ -216,8 +217,7 @@ def main() -> None:
         QMessageBox.warning(
             None,
             "TuneOS already running",
-            "Another instance of TuneOS is already open.\n"
-            "Please use the existing window.",
+            "Another instance of TuneOS is already open.\nPlease use the existing window.",
         )
         sys.exit(0)
 

@@ -3,10 +3,12 @@ TuneOS Desktop — Status bar with GPU, job, and Docker health indicators.
 
 Shows at the bottom of the window (like VS Code's blue status bar).
 """
-import subprocess
+
 import platform
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
+import subprocess
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 
 def _detect_gpu() -> str:
@@ -17,7 +19,9 @@ def _detect_gpu() -> str:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             gpu_name = result.stdout.strip().split("\n")[0]
@@ -30,7 +34,9 @@ def _detect_gpu() -> str:
         try:
             result = subprocess.run(
                 ["sysctl", "-n", "machdep.cpu.brand_string"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 cpu = result.stdout.strip()
@@ -47,7 +53,9 @@ def _check_docker_running() -> bool:
     try:
         result = subprocess.run(
             ["docker", "info"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -97,6 +105,7 @@ class StatusBar(QWidget):
         spacer = QWidget()
         spacer.setStyleSheet("background: transparent;")
         from PyQt6.QtWidgets import QSizePolicy
+
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(spacer)
 

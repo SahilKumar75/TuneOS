@@ -2,8 +2,11 @@
 Tests for trainer/evaluate.py.
 torch, transformers, and the evaluate library are mocked.
 """
+
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 # Mock heavy ML deps before importing the module
 sys.modules.setdefault("torch", MagicMock())
@@ -43,4 +46,4 @@ class TestEvaluateModel:
         try:
             _evaluate_mod.evaluate_model(mock_model, mock_tokenizer, mock_dataset)
         except Exception as exc:
-            assert False, f"evaluate_model raised unexpectedly: {exc}"
+            pytest.fail(f"evaluate_model raised unexpectedly: {exc}")

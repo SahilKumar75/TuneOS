@@ -4,6 +4,7 @@ TuneOS Desktop — Docker availability checker and prompt dialog.
 When Docker Desktop is not reachable the user is shown a dialog
 explaining the dependency and offering a one-click download link.
 """
+
 import platform
 import subprocess
 import webbrowser
@@ -11,20 +12,20 @@ import webbrowser
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QVBoxLayout,
     QWidget,
 )
 
-from desktop.theme import DIALOG_QSS, COLORS
+from desktop.theme import DIALOG_QSS
 
 # ── Download URLs per platform ───────────────────────────────────
 _DOCKER_URLS: dict[str, str] = {
-    "Darwin":  "https://docs.docker.com/desktop/install/mac-install/",
+    "Darwin": "https://docs.docker.com/desktop/install/mac-install/",
     "Windows": "https://docs.docker.com/desktop/install/windows-install/",
-    "Linux":   "https://docs.docker.com/desktop/install/linux/",
+    "Linux": "https://docs.docker.com/desktop/install/linux/",
 }
 
 
@@ -54,10 +55,7 @@ class DockerRequiredDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Docker Required")
         self.setFixedSize(440, 280)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog
-            | Qt.WindowType.FramelessWindowHint
-        )
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setStyleSheet(DIALOG_QSS)
         self._docker_available = False
         self._setup_ui()

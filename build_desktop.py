@@ -2,11 +2,12 @@
 Build script for packaging TuneOS desktop application.
 Run this script to compile the frontend and package the desktop app with PyInstaller.
 """
+
 import os
-import sys
-import subprocess
 import platform
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -29,7 +30,7 @@ def main():
 
     # 1. Clean previous builds
     print_step("Cleaning previous builds...")
-    for d in ['build', 'dist']:
+    for d in ["build", "dist"]:
         if os.path.exists(d):
             shutil.rmtree(d)
 
@@ -51,7 +52,7 @@ def main():
 
     # 4. Final instructions
     print_step("Build complete!")
-    
+
     system = platform.system()
     if system == "Darwin":
         print("    App is ready at: dist/TuneOS.app")

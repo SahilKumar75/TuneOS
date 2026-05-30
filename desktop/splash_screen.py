@@ -7,17 +7,18 @@ Features:
 - Animated gradient progress bar (#3b82f6 → #8b5cf6)
 - Live status text that the launcher updates as each service comes up
 """
-from PyQt6.QtCore import Qt, QSize
+
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainterPath, QRegion
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QApplication,
     QLabel,
     QProgressBar,
-    QApplication,
+    QVBoxLayout,
+    QWidget,
 )
 
-from desktop.theme import SPLASH_QSS, COLORS
+from desktop.theme import COLORS, SPLASH_QSS
 
 # ── Constants ────────────────────────────────────────────────────
 _WIDTH = 480
@@ -65,9 +66,7 @@ class SplashScreen(QWidget):
         self._title = QLabel()
         self._title.setObjectName("SplashTitle")
         self._title.setTextFormat(Qt.TextFormat.RichText)
-        self._title.setText(
-            f'<span style="color:{COLORS["accent"]};">⬢</span> TuneOS'
-        )
+        self._title.setText(f'<span style="color:{COLORS["accent"]};">⬢</span> TuneOS')
         self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._title)
 
@@ -103,9 +102,12 @@ class SplashScreen(QWidget):
         """Clip the widget to a rounded rectangle."""
         path = QPainterPath()
         path.addRoundedRect(
-            0.0, 0.0,
-            float(_WIDTH), float(_HEIGHT),
-            _CORNER_RADIUS, _CORNER_RADIUS,
+            0.0,
+            0.0,
+            float(_WIDTH),
+            float(_HEIGHT),
+            _CORNER_RADIUS,
+            _CORNER_RADIUS,
         )
         region = QRegion(path.toFillPolygon().toPolygon())
         self.setMask(region)

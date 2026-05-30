@@ -1,8 +1,10 @@
 """TuneOS application shell."""
+
 import reflex as rx
+
 from app.components.sidebar import sidebar
-from app.pages.landing import landing_content
 from app.pages.datasets import datasets_page
+from app.pages.landing import landing_content
 from app.state.app_state import AppState
 from app.styles import c
 
@@ -11,7 +13,11 @@ def _models_placeholder() -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.heading("Models", font_size="1.4rem", font_weight="600", color=c("text_primary")),
-            rx.text("Browse models from Hugging Face and GitHub — coming soon.", font_size="0.95rem", color=c("text_secondary")),
+            rx.text(
+                "Browse models from Hugging Face and GitHub — coming soon.",
+                font_size="0.95rem",
+                color=c("text_secondary"),
+            ),
             spacing="3",
             align="center",
             justify="center",

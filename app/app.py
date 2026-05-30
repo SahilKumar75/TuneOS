@@ -17,15 +17,39 @@ def index() -> rx.Component:
     return two_panel_layout()
 
 
+_SYNC_THEME_SCRIPT = """
+(function(){
+  try {
+    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var mode = dark ? 'dark' : 'light';
+    // Overwrite whatever Reflex / Radix stored previously
+    localStorage.setItem('color_mode', mode);
+    document.cookie = 'color_mode=' + mode + ';path=/;SameSite=Lax';
+    // Immediately apply so there is zero flash
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = mode;
+    // Keep in sync if the user changes their OS theme while the tab is open
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+      var m = e.matches ? 'dark' : 'light';
+      localStorage.setItem('color_mode', m);
+      document.cookie = 'color_mode=' + m + ';path=/;SameSite=Lax';
+      document.documentElement.classList.toggle('dark', e.matches);
+      document.documentElement.style.colorScheme = m;
+    });
+  } catch(e) {}
+})();
+"""
+
 app = rx.App(
     theme=rx.theme(
-        appearance="light",
+        appearance="inherit",
         accent_color="blue",
         radius="medium",
         has_background=True,
     ),
     style=GLOBAL_STYLES,
     stylesheets=STYLESHEETS,
+    head_components=[rx.el.script(_SYNC_THEME_SCRIPT)],
 )
 
 app.add_page(index, route="/", title="TuneOS — Fine-tune LLMs")

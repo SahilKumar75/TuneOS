@@ -44,7 +44,6 @@ GLOBAL_STYLES = {
         "font_family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         "margin": "0",
         "padding": "0",
-        "background": "#ffffff",
     },
     "*": {
         "box_sizing": "border-box",
@@ -66,5 +65,29 @@ GLOBAL_STYLES = {
     "@keyframes pulse": {
         "0%, 100%": {"opacity": "1"},
         "50%": {"opacity": "0.5"},
+    },
+    # Benchmark card — make tables fit the fixed-width column
+    ".bench-card table": {
+        "width": "100%",
+        "border_collapse": "collapse",
+        "font_size": "0.78rem",
+        "table_layout": "fixed",
+    },
+    ".bench-card th, .bench-card td": {
+        "padding": "4px 6px",
+        "text_align": "left",
+        "word_break": "break-word",
+        "white_space": "normal",
+        "vertical_align": "top",
+        "border_bottom": "1px solid rgba(128,128,128,0.15)",
+    },
+    ".bench-card th": {
+        "font_weight": "600",
+        "font_size": "0.72rem",
+        "color": "inherit",
+    },
+    ".bench-card p, .bench-card h1, .bench-card h2, .bench-card h3": {
+        "font_size": "0.82rem",
+        "margin_bottom": "6px",
     },
 }

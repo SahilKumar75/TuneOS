@@ -173,14 +173,28 @@ def _expanded_sidebar() -> rx.Component:
     )
 
 
+def _collapsed_icon_btn(icon_name: str, on_click=None) -> rx.Component:
+    click_props = {"on_click": on_click} if on_click is not None else {}
+    return rx.icon_button(
+        rx.icon(icon_name, size=18),
+        variant="ghost",
+        size="2",
+        color=c("text_secondary"),
+        border_radius="8px",
+        cursor="pointer",
+        _hover={"background": c("hover"), "color": c("text_primary")},
+        **click_props,
+    )
+
+
 def _collapsed_sidebar() -> rx.Component:
     return rx.vstack(
         _panel_button(),
-        rx.icon("square-pen", size=18, color=c("text_secondary")),
-        rx.icon("database", size=18, color=c("text_secondary")),
-        rx.icon("flask-conical", size=18, color=c("text_secondary")),
+        _collapsed_icon_btn("square-pen", on_click=AppState.new_project),
+        _collapsed_icon_btn("database", on_click=rx.redirect("/datasets")),
+        _collapsed_icon_btn("flask-conical"),
         rx.spacer(),
-        rx.icon("settings", size=18, color=c("text_secondary")),
+        _collapsed_icon_btn("settings"),
         spacing="4",
         align="center",
         height="100%",

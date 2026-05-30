@@ -2,6 +2,7 @@
 import reflex as rx
 
 from app.state.app_state import AppState
+from app.components.workspace_tabs import workspace_tab_bar
 from app.styles import c
 
 
@@ -283,7 +284,7 @@ def _info_row(icon_name: str, label: str, value: rx.Var[str]) -> rx.Component:
     )
 
 
-def _action_tile(icon_name: str, label: str) -> rx.Component:
+def _action_tile(icon_name: str, label: str, on_click=None) -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.icon(icon_name, size=20, color=c("text_secondary")),
@@ -301,6 +302,7 @@ def _action_tile(icon_name: str, label: str) -> rx.Component:
         transition="all 0.15s ease",
         width="72px",
         text_align="center",
+        on_click=on_click,
     )
 
 
@@ -392,18 +394,56 @@ def _chat_panel() -> rx.Component:
                 ),
                 align="center",
                 width="100%",
-                padding_bottom="8px",
+                padding_bottom="10px",
                 border_bottom="1px solid",
                 border_color=c("border"),
             ),
-            rx.vstack(
-                rx.foreach(AppState.chat_messages, _chat_message),
-                spacing="4",
-                width="100%",
-                flex="1",
-                overflow_y="auto",
-                padding_y="8px",
-                padding_x="4px",
+            rx.cond(
+                AppState.chat_messages.length() == 0,
+                rx.vstack(
+                    rx.vstack(
+                        rx.icon("bot", size=28, color=c("text_muted")),
+                        rx.text("Ask about this model", font_size="0.92rem", font_weight="500", color=c("text_primary")),
+                        rx.text("Get help with fine-tuning, architecture, training configs, or dataset prep.", font_size="0.82rem", color=c("text_muted"), text_align="center", line_height="1.5"),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.box(
+                        rx.vstack(
+                            *[
+                                rx.text(hint, font_size="0.8rem", color=c("text_secondary"), line_height="1.4", width="100%", padding_y="8px", border_bottom=rx.cond(hint != "How much VRAM do I need to fine-tune this?", "1px solid", "none"), border_color=c("border"), cursor="pointer", _hover={"color": c("text_primary")})
+                                for hint in [
+                                    "What LoRA rank works best for this model?",
+                                    "Suggest a training config for my dataset size",
+                                    "How much VRAM do I need to fine-tune this?",
+                                ]
+                            ],
+                            spacing="0",
+                            width="100%",
+                        ),
+                        width="100%",
+                        padding="4px 14px",
+                        background=c("bg_card"),
+                        border="1px solid",
+                        border_color=c("border"),
+                        border_radius="12px",
+                    ),
+                    spacing="5",
+                    align="center",
+                    justify="center",
+                    flex="1",
+                    width="100%",
+                    padding_y="24px",
+                ),
+                rx.vstack(
+                    rx.foreach(AppState.chat_messages, _chat_message),
+                    spacing="4",
+                    width="100%",
+                    flex="1",
+                    overflow_y="auto",
+                    padding_y="8px",
+                    padding_x="4px",
+                ),
             ),
             rx.box(
                 rx.vstack(
@@ -416,6 +456,8 @@ def _chat_panel() -> rx.Component:
                         width="100%",
                         background="transparent",
                         border="none",
+                        box_shadow="none",
+                        outline="none",
                         font_size="0.9rem",
                         color=c("text_primary"),
                         _placeholder={"color": c("text_muted")},
@@ -468,9 +510,9 @@ def _chat_panel() -> rx.Component:
                 width="100%",
                 padding="10px 12px",
                 background=c("bg_input"),
-                border="1px solid",
-                border_color=c("border"),
                 border_radius="16px",
+                border="none",
+                box_shadow="none",
             ),
             spacing="3",
             height="100%",
@@ -479,10 +521,26 @@ def _chat_panel() -> rx.Component:
         width="380px",
         min_width="360px",
         height="100vh",
-        padding="16px",
+        padding_top="10px",
+        padding_x="16px",
+        padding_bottom="16px",
         background=c("bg_sidebar"),
         border_left="1px solid",
         border_color=c("border"),
+    )
+
+
+def _notebook_view() -> rx.Component:
+    return rx.el.iframe(
+        src="/notebook/index.html",
+        style={
+            "border": "none",
+            "width": "100%",
+            "height": "100%",
+            "display": "block",
+            "flex": "1",
+            "min-height": "0",
+        },
     )
 
 
@@ -490,172 +548,223 @@ def _workspace_content() -> rx.Component:
     return rx.hstack(
         rx.box(
             rx.vstack(
-                # Top bar
-                rx.hstack(
-                    rx.link(
-                        rx.hstack(
-                            rx.text(AppState.preview_url, font_size="0.78rem", color=c("text_muted")),
-                            rx.icon("external-link", size=13, color=c("text_muted")),
-                            spacing="1",
-                            align="center",
-                        ),
-                        href=AppState.preview_url,
-                        is_external=True,
-                        margin_left="auto",
-                    ),
-                    width="100%",
-                    padding="10px 24px",
-                    border_bottom="1px solid",
-                    border_color=c("border"),
-                ),
-                # Main content
-                rx.vstack(
-                    # Title row + action tiles
-                    rx.hstack(
+                # Tab bar (replaces old single-link top bar)
+                workspace_tab_bar(),
+                # Content area: dual-layer so the iframe is never unmounted
+                rx.box(
+                    # ── Model card layer ─────────────────────────────────
+                    # Always in DOM; hidden via CSS when a notebook tab is active.
+                    rx.box(
                         rx.vstack(
+                            # Title row + action tiles
                             rx.hstack(
-                                rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft", size="1"),
+                                rx.vstack(
+                                    rx.hstack(
+                                        rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft", size="1"),
+                                        rx.cond(
+                                            AppState.preview_license != "",
+                                            rx.badge(AppState.preview_license, color_scheme="green", variant="soft", size="1"),
+                                            rx.fragment(),
+                                        ),
+                                        rx.cond(
+                                            AppState.preview_params != "",
+                                            rx.badge(AppState.preview_params + " params", color_scheme="orange", variant="soft", size="1"),
+                                            rx.fragment(),
+                                        ),
+                                        spacing="2",
+                                        flex_wrap="wrap",
+                                    ),
+                                    rx.heading(
+                                        AppState.preview_title,
+                                        font_size="1.5rem",
+                                        font_weight="700",
+                                        line_height="1.2",
+                                        color=c("text_primary"),
+                                    ),
+                                    rx.text(AppState.preview_pipeline, font_size="0.82rem", color=c("text_secondary")),
+                                    spacing="2",
+                                    flex="1",
+                                ),
+                                rx.hstack(
+                                    _action_tile("cpu", "Train"),
+                                    _action_tile("bar-chart-2", "Analyze"),
+                                    _action_tile("refresh-cw", "Convert"),
+                                    _action_tile("notebook-pen", "Notebook", on_click=AppState.open_notebook_tab),
+                                    spacing="2",
+                                ),
+                                align="start",
+                                width="100%",
+                                justify="between",
+                            ),
+                            # Tags + stats
+                            rx.hstack(
                                 rx.cond(
-                                    AppState.preview_license != "",
-                                    rx.badge(AppState.preview_license, color_scheme="green", variant="soft", size="1"),
+                                    AppState.preview_tags.length() > 0,
+                                    rx.hstack(
+                                        rx.foreach(AppState.preview_tags, _tag_pill),
+                                        spacing="1",
+                                        flex_wrap="wrap",
+                                    ),
                                     rx.fragment(),
                                 ),
-                                rx.cond(
-                                    AppState.preview_params != "",
-                                    rx.badge(AppState.preview_params + " params", color_scheme="orange", variant="soft", size="1"),
-                                    rx.fragment(),
+                                rx.hstack(
+                                    rx.cond(
+                                        AppState.preview_downloads != "",
+                                        rx.hstack(
+                                            rx.icon("arrow-down-to-line", size=13, color="#4a9eff"),
+                                            rx.text(AppState.preview_downloads, font_size="0.75rem", color=c("text_secondary")),
+                                            spacing="1",
+                                            align="center",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    rx.cond(
+                                        AppState.preview_likes != "",
+                                        rx.hstack(
+                                            rx.icon("heart", size=13, color="#e85d75"),
+                                            rx.text(AppState.preview_likes, font_size="0.75rem", color=c("text_secondary")),
+                                            spacing="1",
+                                            align="center",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    spacing="3",
+                                    align="center",
+                                    flex_shrink="0",
                                 ),
-                                spacing="2",
+                                align="center",
+                                width="100%",
+                                justify="between",
                                 flex_wrap="wrap",
+                                gap="2",
                             ),
-                            rx.heading(
-                                AppState.preview_title,
-                                font_size="1.5rem",
-                                font_weight="700",
-                                line_height="1.2",
-                                color=c("text_primary"),
+                            rx.divider(border_color=c("border")),
+                            # About
+                            rx.vstack(
+                                rx.text("About", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                rx.text(AppState.preview_summary, font_size="0.92rem", line_height="1.7", color=c("text_secondary")),
+                                spacing="3",
+                                width="100%",
                             ),
-                            rx.text(AppState.preview_meta, font_size="0.82rem", color=c("text_secondary")),
-                            spacing="2",
-                            flex="1",
+                            rx.divider(border_color=c("border")),
+                            # Left col (Model Details + Benchmark) + right col (Model Card)
+                            rx.hstack(
+                                rx.vstack(
+                                    rx.vstack(
+                                        rx.text("Model Details", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                        rx.box(
+                                            rx.vstack(
+                                                _info_row("cpu", "Architecture", AppState.preview_architecture),
+                                                _info_row("hash", "Parameters", AppState.preview_params),
+                                                _info_row("layers", "Pipeline", AppState.preview_pipeline),
+                                                _info_row("package", "Library", AppState.preview_library),
+                                                _info_row("hard-drive", "Formats", AppState.preview_formats),
+                                                _info_row("file", "Files", AppState.preview_total_files),
+                                                _info_row("scale", "License", AppState.preview_license),
+                                                _info_row("calendar", "Created", AppState.preview_created),
+                                                _info_row("clock", "Updated", AppState.preview_updated),
+                                                spacing="0",
+                                                width="100%",
+                                            ),
+                                            width="100%",
+                                            padding="12px 16px",
+                                            background=c("bg_card"),
+                                            border="1px solid",
+                                            border_color=c("border"),
+                                            border_radius="10px",
+                                        ),
+                                        spacing="2",
+                                        width="100%",
+                                        align="start",
+                                    ),
+                                    rx.cond(
+                                        AppState.preview_benchmark != "",
+                                        rx.vstack(
+                                            rx.text("Benchmark Results", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                            rx.box(
+                                                rx.markdown(AppState.preview_benchmark),
+                                                width="100%",
+                                                padding="12px 16px",
+                                                background=c("bg_card"),
+                                                border="1px solid",
+                                                border_color=c("border"),
+                                                border_radius="10px",
+                                                overflow_x="hidden",
+                                                class_name="bench-card",
+                                            ),
+                                            spacing="2",
+                                            width="100%",
+                                            align="start",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    spacing="4",
+                                    width="420px",
+                                    min_width="360px",
+                                    flex_shrink="0",
+                                    align="start",
+                                ),
+                                rx.cond(
+                                    AppState.preview_readme != "",
+                                    rx.vstack(
+                                        rx.markdown(AppState.preview_readme_no_bench),
+                                        spacing="2",
+                                        flex="1",
+                                        align="start",
+                                        min_width="0",
+                                        overflow_x="auto",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                spacing="5",
+                                align="start",
+                                width="100%",
+                            ),
+                            spacing="5",
+                            width="100%",
+                            padding="24px 28px",
                         ),
-                        rx.hstack(
-                            _action_tile("zap", "Train"),
-                            _action_tile("bar-chart-2", "Analyze"),
-                            _action_tile("refresh-cw", "Convert"),
-                            _action_tile("notebook", "Notebook"),
-                            spacing="2",
-                        ),
-                        align="start",
+                        display=rx.cond(AppState.active_tab_is_notebook, "none", "block"),
                         width="100%",
-                        justify="between",
+                        height="100%",
+                        overflow_y="auto",
                     ),
-                    # Tags
+                    # ── Notebook iframe layer ─────────────────────────────
+                    # Mounted once when the first notebook tab opens; never
+                    # unmounted while a notebook tab exists → Pyodide stays alive.
                     rx.cond(
-                        AppState.preview_tags.length() > 0,
-                        rx.hstack(
-                            rx.foreach(AppState.preview_tags, _tag_pill),
-                            spacing="1",
-                            flex_wrap="wrap",
+                        AppState.has_notebook_tab,
+                        rx.box(
+                            rx.el.iframe(
+                                src="/notebook/index.html",
+                                style={
+                                    "border": "none",
+                                    "width": "100%",
+                                    "height": "100%",
+                                },
+                            ),
+                            display=rx.cond(AppState.active_tab_is_notebook, "flex", "none"),
+                            position="absolute",
+                            top="0",
+                            left="0",
+                            width="100%",
+                            height="100%",
                         ),
                         rx.fragment(),
                     ),
-                    rx.divider(border_color=c("border")),
-                    # About
-                    rx.vstack(
-                        rx.text("About", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                        rx.text(AppState.preview_summary, font_size="0.92rem", line_height="1.7", color=c("text_secondary")),
-                        spacing="3",
-                        width="100%",
-                    ),
-                    rx.divider(border_color=c("border")),
-                    # Left col (Model Details + Benchmark) beside right col (Model Card)
-                    rx.hstack(
-                        # Left column — fixed width, stacks Model Details then Benchmark
-                        rx.vstack(
-                            # Model Details card
-                            rx.vstack(
-                                rx.text("Model Details", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                                rx.box(
-                                    rx.vstack(
-                                        _info_row("cpu", "Architecture", AppState.preview_architecture),
-                                        _info_row("hash", "Parameters", AppState.preview_params),
-                                        _info_row("layers", "Pipeline", AppState.preview_pipeline),
-                                        _info_row("package", "Library", AppState.preview_library),
-                                        _info_row("hard-drive", "Formats", AppState.preview_formats),
-                                        _info_row("file", "Files", AppState.preview_total_files),
-                                        _info_row("scale", "License", AppState.preview_license),
-                                        _info_row("calendar", "Created", AppState.preview_created),
-                                        _info_row("clock", "Updated", AppState.preview_updated),
-                                        spacing="0",
-                                        width="100%",
-                                    ),
-                                    width="100%",
-                                    padding="12px 16px",
-                                    background=c("bg_card"),
-                                    border="1px solid",
-                                    border_color=c("border"),
-                                    border_radius="10px",
-                                ),
-                                spacing="2",
-                                width="100%",
-                                align="start",
-                            ),
-                            # Benchmark Results card below Model Details
-                            rx.cond(
-                                AppState.preview_benchmark != "",
-                                rx.vstack(
-                                    rx.text("Benchmark Results", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                                    rx.box(
-                                        rx.markdown(AppState.preview_benchmark),
-                                        width="100%",
-                                        padding="12px 16px",
-                                        background=c("bg_card"),
-                                        border="1px solid",
-                                        border_color=c("border"),
-                                        border_radius="10px",
-                                        overflow_x="hidden",
-                                        class_name="bench-card",
-                                    ),
-                                    spacing="2",
-                                    width="100%",
-                                    align="start",
-                                ),
-                                rx.fragment(),
-                            ),
-                            spacing="4",
-                            width="420px",
-                            min_width="360px",
-                            flex_shrink="0",
-                            align="start",
-                        ),
-                        # Right column — Model Card (no card wrapper)
-                        rx.cond(
-                            AppState.preview_readme != "",
-                            rx.vstack(
-                                rx.markdown(AppState.preview_readme_no_bench),
-                                spacing="2",
-                                flex="1",
-                                align="start",
-                                min_width="0",
-                                overflow_x="auto",
-                            ),
-                            rx.fragment(),
-                        ),
-                        spacing="5",
-                        align="start",
-                        width="100%",
-                    ),
-                    spacing="5",
+                    position="relative",
+                    flex="1",
                     width="100%",
-                    padding="24px 28px",
-                ),
+                    height="100%",
+                    overflow="hidden",
+                ),  # end content area
                 spacing="0",
                 width="100%",
+                height="100%",
             ),
             flex="1",
             height="100vh",
-            overflow_y="auto",
+            overflow="hidden",
             background=c("bg_primary"),
         ),
         _chat_panel(),

@@ -492,16 +492,6 @@ def _workspace_content() -> rx.Component:
             rx.vstack(
                 # Top bar
                 rx.hstack(
-                    rx.icon_button(
-                        rx.icon("arrow-left", size=16),
-                        on_click=AppState.cancel_preview,
-                        variant="ghost",
-                        size="2",
-                        color=c("text_secondary"),
-                        border_radius="8px",
-                        cursor="pointer",
-                    ),
-                    rx.spacer(),
                     rx.link(
                         rx.hstack(
                             rx.text(AppState.preview_url, font_size="0.78rem", color=c("text_muted")),
@@ -511,8 +501,8 @@ def _workspace_content() -> rx.Component:
                         ),
                         href=AppState.preview_url,
                         is_external=True,
+                        margin_left="auto",
                     ),
-                    align="center",
                     width="100%",
                     padding="10px 24px",
                     border_bottom="1px solid",
@@ -579,55 +569,82 @@ def _workspace_content() -> rx.Component:
                         width="100%",
                     ),
                     rx.divider(border_color=c("border")),
-                    # Model Details
-                    rx.vstack(
-                        rx.text("Model Details", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                        rx.box(
-                            rx.vstack(
-                                _info_row("cpu", "Architecture", AppState.preview_architecture),
-                                _info_row("hash", "Parameters", AppState.preview_params),
-                                _info_row("layers", "Pipeline", AppState.preview_pipeline),
-                                _info_row("package", "Library", AppState.preview_library),
-                                _info_row("hard-drive", "Formats", AppState.preview_formats),
-                                _info_row("file", "Files", AppState.preview_total_files),
-                                _info_row("scale", "License", AppState.preview_license),
-                                _info_row("calendar", "Created", AppState.preview_created),
-                                _info_row("clock", "Updated", AppState.preview_updated),
-                                spacing="0",
-                                width="100%",
-                            ),
-                            width="100%",
-                            padding="16px 20px",
-                            background=c("bg_card"),
-                            border="1px solid",
-                            border_color=c("border"),
-                            border_radius="10px",
-                        ),
-                        spacing="2",
-                        width="100%",
-                    ),
-                    # Model Card (README)
-                    rx.cond(
-                        AppState.preview_readme != "",
+                    # Left col (Model Details + Benchmark) beside right col (Model Card)
+                    rx.hstack(
+                        # Left column — fixed width, stacks Model Details then Benchmark
                         rx.vstack(
-                            rx.divider(border_color=c("border")),
-                            rx.text("Model Card", font_size="0.95rem", font_weight="600", color=c("text_primary")),
-                            rx.box(
-                                rx.markdown(
-                                    AppState.preview_readme,
+                            # Model Details card
+                            rx.vstack(
+                                rx.text("Model Details", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                rx.box(
+                                    rx.vstack(
+                                        _info_row("cpu", "Architecture", AppState.preview_architecture),
+                                        _info_row("hash", "Parameters", AppState.preview_params),
+                                        _info_row("layers", "Pipeline", AppState.preview_pipeline),
+                                        _info_row("package", "Library", AppState.preview_library),
+                                        _info_row("hard-drive", "Formats", AppState.preview_formats),
+                                        _info_row("file", "Files", AppState.preview_total_files),
+                                        _info_row("scale", "License", AppState.preview_license),
+                                        _info_row("calendar", "Created", AppState.preview_created),
+                                        _info_row("clock", "Updated", AppState.preview_updated),
+                                        spacing="0",
+                                        width="100%",
+                                    ),
+                                    width="100%",
+                                    padding="12px 16px",
+                                    background=c("bg_card"),
+                                    border="1px solid",
+                                    border_color=c("border"),
+                                    border_radius="10px",
                                 ),
+                                spacing="2",
                                 width="100%",
-                                padding="20px",
-                                background=c("bg_card"),
-                                border="1px solid",
-                                border_color=c("border"),
-                                border_radius="10px",
+                                align="start",
+                            ),
+                            # Benchmark Results card below Model Details
+                            rx.cond(
+                                AppState.preview_benchmark != "",
+                                rx.vstack(
+                                    rx.text("Benchmark Results", font_size="0.95rem", font_weight="600", color=c("text_primary")),
+                                    rx.box(
+                                        rx.markdown(AppState.preview_benchmark),
+                                        width="100%",
+                                        padding="12px 16px",
+                                        background=c("bg_card"),
+                                        border="1px solid",
+                                        border_color=c("border"),
+                                        border_radius="10px",
+                                        overflow_x="hidden",
+                                        class_name="bench-card",
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                    align="start",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="4",
+                            width="420px",
+                            min_width="360px",
+                            flex_shrink="0",
+                            align="start",
+                        ),
+                        # Right column — Model Card (no card wrapper)
+                        rx.cond(
+                            AppState.preview_readme != "",
+                            rx.vstack(
+                                rx.markdown(AppState.preview_readme_no_bench),
+                                spacing="2",
+                                flex="1",
+                                align="start",
+                                min_width="0",
                                 overflow_x="auto",
                             ),
-                            spacing="3",
-                            width="100%",
+                            rx.fragment(),
                         ),
-                        rx.fragment(),
+                        spacing="5",
+                        align="start",
+                        width="100%",
                     ),
                     spacing="5",
                     width="100%",

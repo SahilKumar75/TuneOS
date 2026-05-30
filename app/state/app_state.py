@@ -145,6 +145,49 @@ class AppState(rx.State):
         }
         return labels.get(self.permission_mode, "Training")
 
+    def _extract_bench_bounds(self) -> tuple[int, int]:
+        """Return (start, end) line indices of the benchmark section, or (-1,-1)."""
+        if not self.preview_readme:
+            return (-1, -1)
+        lines = self.preview_readme.splitlines()
+        bench_kws = {"benchmark", "evaluation", "results", "performance", "leaderboard"}
+        start = -1
+        depth = 0
+        for i, line in enumerate(lines):
+            stripped = line.lstrip("#")
+            level = len(line) - len(stripped)
+            if level == 0:
+                continue
+            title = stripped.strip().lower()
+            if start == -1:
+                if any(k in title for k in bench_kws):
+                    start = i
+                    depth = level
+            else:
+                if level <= depth and i > start:
+                    return (start, i)
+        if start != -1:
+            return (start, len(lines))
+        return (-1, -1)
+
+    @rx.var
+    def preview_benchmark(self) -> str:
+        """Extract the benchmark/evaluation section from the README."""
+        s, e = self._extract_bench_bounds()
+        if s == -1:
+            return ""
+        lines = self.preview_readme.splitlines()
+        return "\n".join(lines[s:e]).strip()
+
+    @rx.var
+    def preview_readme_no_bench(self) -> str:
+        """README with the benchmark section removed (to avoid duplication)."""
+        s, e = self._extract_bench_bounds()
+        if s == -1:
+            return self.preview_readme
+        lines = self.preview_readme.splitlines()
+        return "\n".join(lines[:s] + lines[e:]).strip()
+
     @rx.var
     def balanced_tree_count(self) -> str:
         try:

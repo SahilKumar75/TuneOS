@@ -1,7 +1,6 @@
-from datasets import load_dataset, Dataset
-from transformers import PreTrainedTokenizer
-from trainer.config import TrainingConfig, ModelConfig
 import pandas as pd
+from datasets import Dataset, load_dataset
+from transformers import PreTrainedTokenizer
 
 PROMPT_TEMPLATE = """### Instruction:
 {instruction}
@@ -9,11 +8,13 @@ PROMPT_TEMPLATE = """### Instruction:
 ### Response:
 {output}"""
 
+
 def format_prompt(row: dict) -> str:
     return PROMPT_TEMPLATE.format(
         instruction=row.get("instruction", ""),
         output=row.get("output", ""),
     )
+
 
 def load_and_tokenize(
     file_path: str,

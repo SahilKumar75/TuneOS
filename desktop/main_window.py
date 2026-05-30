@@ -9,21 +9,22 @@ Frameless QMainWindow that hosts:
 The window supports edge-resize grips (8 px from each border) so the
 user can freely resize the frameless window.
 """
+
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal, QUrl
-from PyQt6.QtGui import QMouseEvent, QCursor
+from PyQt6.QtCore import QPoint, QSize, Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
     QApplication,
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
 )
 
+from desktop.status_bar import StatusBar
 from desktop.theme import get_full_stylesheet
 from desktop.title_bar import TitleBar
-from desktop.status_bar import StatusBar
 
 # ── Constants ────────────────────────────────────────────────────
 _DEFAULT_SIZE = QSize(1400, 900)

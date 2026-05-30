@@ -1,15 +1,18 @@
 import json
-import redis
 import os
+
+import redis
 from transformers import TrainerCallback
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
 
 class RedisLossCallback(TrainerCallback):
     """
     Publishes training loss to Redis channel 'job:<job_id>:loss'
     after every logging step so the frontend can stream it live.
     """
+
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.redis = redis.from_url(REDIS_URL)

@@ -1,12 +1,14 @@
 from peft import (
-    get_peft_model,
     LoraConfig as PeftLoraConfig,
+)
+from peft import (
     TaskType,
-    PeftModel,
+    get_peft_model,
     prepare_model_for_kbit_training,
 )
+
 from trainer.config import LoraConfig
-import torch
+
 
 def inject_lora(model, lora_cfg: LoraConfig):
     """
@@ -23,7 +25,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
         target_modules=lora_cfg.target_modules,
     )
     model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()   # log how many params are trainable
+    model.print_trainable_parameters()  # log how many params are trainable
     return model
 
 

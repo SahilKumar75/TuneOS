@@ -1,5 +1,7 @@
 import reflex as rx
+
 from app.state.job_state import JobState
+
 
 def loss_chart() -> rx.Component:
     return rx.recharts.line_chart(

@@ -1,6 +1,8 @@
 import reflex as rx
-from app.state.job_state import JobState
+
 from app.components.loss_chart import loss_chart
+from app.state.job_state import JobState
+
 
 def training_page() -> rx.Component:
     return rx.container(
@@ -9,8 +11,9 @@ def training_page() -> rx.Component:
             rx.badge(
                 JobState.status,
                 color_scheme=rx.cond(
-                    JobState.status == "done", "green",
-                    rx.cond(JobState.status == "failed", "red", "yellow")
+                    JobState.status == "done",
+                    "green",
+                    rx.cond(JobState.status == "failed", "red", "yellow"),
                 ),
             ),
             loss_chart(),
@@ -28,6 +31,6 @@ def training_page() -> rx.Component:
             ),
             spacing="4",
             padding="2em",
-            align_items="center"
+            align_items="center",
         )
     )

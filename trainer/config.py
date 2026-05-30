@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+
 
 @dataclass
 class ModelConfig:
@@ -9,16 +9,16 @@ class ModelConfig:
     trust_remote_code: bool = False
     max_seq_length: int = 512
 
+
 @dataclass
 class LoraConfig:
-    r: int = 16                          # LoRA rank
-    lora_alpha: int = 32                 # scaling factor
+    r: int = 16  # LoRA rank
+    lora_alpha: int = 32  # scaling factor
     lora_dropout: float = 0.05
     bias: str = "none"
     task_type: str = "CAUSAL_LM"
-    target_modules: List[str] = field(
-        default_factory=lambda: ["q_proj", "v_proj"]
-    )
+    target_modules: list[str] = field(default_factory=lambda: ["q_proj", "v_proj"])
+
 
 @dataclass
 class TrainingConfig:

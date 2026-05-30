@@ -2,13 +2,13 @@
 TuneOS — Application state for the landing page UI.
 Manages sidebar projects, input forms, and theme.
 """
+
 import os
 import re
 
 import httpx
 import reflex as rx
 from dotenv import load_dotenv
-from typing import List
 from pydantic import BaseModel
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"), override=True)
@@ -16,15 +16,17 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".en
 
 class ProjectItem(BaseModel):
     """A single project entry in the sidebar history."""
+
     id: str
     name: str
     base_model: str
-    status: str   # 'training' | 'completed' | 'failed' | 'queued'
+    status: str  # 'training' | 'completed' | 'failed' | 'queued'
     created_at: str
 
 
 class SavedNotebook(BaseModel):
     """A saved notebook entry shown in the sidebar."""
+
     id: str
     title: str
     project: str = ""  # project name this notebook belongs to
@@ -32,6 +34,7 @@ class SavedNotebook(BaseModel):
 
 class WorkspaceTab(BaseModel):
     """A single tab in the workspace tab bar."""
+
     id: str
     title: str
     tab_type: str  # "model" | "notebook"
@@ -94,43 +97,34 @@ class AppState(rx.State):
     last_used_model: str = ""
 
     # ── Project history (real, built from user actions) ───────────
-    projects: List[ProjectItem] = []
+    projects: list[ProjectItem] = []
     _next_project_id: int = 1
 
     # ── Workspace tab system ──────────────────────────────────────
-    workspace_tabs: List[WorkspaceTab] = []
+    workspace_tabs: list[WorkspaceTab] = []
     active_workspace_tab_id: str = ""
     _notebook_counter: int = 0
     editing_tab_id: str = ""
     editing_tab_title: str = ""
 
     # ── Saved notebooks (persisted in sidebar) ────────────────────
-    saved_notebooks: List[SavedNotebook] = []
+    saved_notebooks: list[SavedNotebook] = []
 
     # ── Computed vars ─────────────────────────────────────────────
     @rx.var
-    def filtered_projects(self) -> List[ProjectItem]:
+    def filtered_projects(self) -> list[ProjectItem]:
         if not self.search_query:
             return self.projects
         q = self.search_query.lower()
-        return [
-            p for p in self.projects
-            if q in p.name.lower() or q in p.base_model.lower()
-        ]
+        return [p for p in self.projects if q in p.name.lower() or q in p.base_model.lower()]
 
     @rx.var
-    def active_projects(self) -> List[ProjectItem]:
-        return [
-            p for p in self.filtered_projects
-            if p.status in ("training", "queued")
-        ]
+    def active_projects(self) -> list[ProjectItem]:
+        return [p for p in self.filtered_projects if p.status in ("training", "queued")]
 
     @rx.var
-    def recent_projects(self) -> List[ProjectItem]:
-        return [
-            p for p in self.filtered_projects
-            if p.status not in ("training", "queued")
-        ]
+    def recent_projects(self) -> list[ProjectItem]:
+        return [p for p in self.filtered_projects if p.status not in ("training", "queued")]
 
     @rx.var
     def input_placeholder(self) -> str:
@@ -270,25 +264,25 @@ class AppState(rx.State):
         pipeline = self.preview_pipeline or "text-generation"
         if any(k in pipeline for k in ("text-generation", "causal", "conversational")):
             return (
-                f'from transformers import AutoTokenizer, AutoModelForCausalLM\n'
-                f'import torch\n\n'
+                f"from transformers import AutoTokenizer, AutoModelForCausalLM\n"
+                f"import torch\n\n"
                 f'model_id = "{model_id}"\n'
-                f'tokenizer = AutoTokenizer.from_pretrained(model_id)\n'
-                f'model = AutoModelForCausalLM.from_pretrained(\n'
-                f'    model_id,\n'
-                f'    torch_dtype=torch.float16,\n'
+                f"tokenizer = AutoTokenizer.from_pretrained(model_id)\n"
+                f"model = AutoModelForCausalLM.from_pretrained(\n"
+                f"    model_id,\n"
+                f"    torch_dtype=torch.float16,\n"
                 f'    device_map="auto",\n'
-                f')\n\n'
+                f")\n\n"
                 f'prompt = "Hello! Tell me about yourself."\n'
                 f'inputs = tokenizer(prompt, return_tensors="pt").to(model.device)\n'
-                f'outputs = model.generate(**inputs, max_new_tokens=200, do_sample=True)\n'
-                f'print(tokenizer.decode(outputs[0], skip_special_tokens=True))'
+                f"outputs = model.generate(**inputs, max_new_tokens=200, do_sample=True)\n"
+                f"print(tokenizer.decode(outputs[0], skip_special_tokens=True))"
             )
         return (
-            f'from transformers import pipeline\n\n'
+            f"from transformers import pipeline\n\n"
             f'pipe = pipeline("{pipeline}", model="{model_id}")\n\n'
             f'result = pipe("Your input here")\n'
-            f'print(result)'
+            f"print(result)"
         )
 
     # ── Event handlers ────────────────────────────────────────────
@@ -387,7 +381,15 @@ class AppState(rx.State):
         updated = []
         for t in self.workspace_tabs:
             if t.id == tab_id:
-                updated.append(WorkspaceTab(id=t.id, title=new_title, tab_type=t.tab_type, url=t.url, closeable=t.closeable))
+                updated.append(
+                    WorkspaceTab(
+                        id=t.id,
+                        title=new_title,
+                        tab_type=t.tab_type,
+                        url=t.url,
+                        closeable=t.closeable,
+                    )
+                )
             else:
                 updated.append(t)
         self.workspace_tabs = updated
@@ -398,7 +400,9 @@ class AppState(rx.State):
             already = any(n.id == tab_id for n in self.saved_notebooks)
             if already:
                 self.saved_notebooks = [
-                    SavedNotebook(id=n.id, title=new_title, project=n.project) if n.id == tab_id else n
+                    SavedNotebook(id=n.id, title=new_title, project=n.project)
+                    if n.id == tab_id
+                    else n
                     for n in self.saved_notebooks
                 ]
             else:
@@ -515,6 +519,7 @@ class AppState(rx.State):
             raise ValueError("Paste a Hugging Face model link or model id like owner/model.")
 
         import os
+
         data: dict = {}
         readme_content: str = ""
         hf_token = os.getenv("HF_TOKEN", "")
@@ -534,14 +539,16 @@ class AppState(rx.State):
                     f"https://huggingface.co/{repo_id}/resolve/main/README.md",
                     f"https://huggingface.co/{repo_id}/raw/main/README.md",
                 ]:
-                    readme_resp = await client.get(readme_url, headers=headers, follow_redirects=True)
+                    readme_resp = await client.get(
+                        readme_url, headers=headers, follow_redirects=True
+                    )
                     if readme_resp.status_code == 200:
                         raw = readme_resp.text
                         # Strip YAML front matter
                         if raw.startswith("---"):
                             end = raw.find("---", 3)
                             if end != -1:
-                                raw = raw[end + 3:].strip()
+                                raw = raw[end + 3 :].strip()
                         readme_content = raw[:12000]
                         break
         except Exception:
@@ -658,12 +665,14 @@ class AppState(rx.State):
             "url": url,
             "title": data.get("full_name") or repo,
             "owner": repo.split("/")[0],
-            "summary": data.get("description") or "GitHub repository ready for import and training setup.",
+            "summary": data.get("description")
+            or "GitHub repository ready for import and training setup.",
             "meta": " • ".join(meta_parts),
         }
 
     def _handle_local_path(self, path: str) -> dict:
         import os
+
         name = os.path.basename(path.rstrip("/")) or path
         return {
             "kind": "local",
@@ -773,13 +782,13 @@ class AppState(rx.State):
 
     # Models available for manual selection
     CHAT_MODELS: list[dict[str, str]] = [
-        {"id": "auto",                                       "label": "Auto (smart route)"},
-        {"id": "anthropic/claude-sonnet-4-5",               "label": "Claude Sonnet 4.5"},
-        {"id": "openai/gpt-oss-120b:free",                  "label": "GPT OSS 120B (free)"},
-        {"id": "deepseek/deepseek-v4-flash:free",           "label": "DeepSeek V4 Flash (free)"},
-        {"id": "qwen/qwen3-coder:free",                     "label": "Qwen3 Coder (free)"},
-        {"id": "meta-llama/llama-3.3-70b-instruct:free",    "label": "Llama 3.3 70B (free)"},
-        {"id": "nvidia/nemotron-3-super-120b-a12b:free",    "label": "Nemotron 120B (free)"},
+        {"id": "auto", "label": "Auto (smart route)"},
+        {"id": "anthropic/claude-sonnet-4-5", "label": "Claude Sonnet 4.5"},
+        {"id": "openai/gpt-oss-120b:free", "label": "GPT OSS 120B (free)"},
+        {"id": "deepseek/deepseek-v4-flash:free", "label": "DeepSeek V4 Flash (free)"},
+        {"id": "qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)"},
+        {"id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (free)"},
+        {"id": "nvidia/nemotron-3-super-120b-a12b:free", "label": "Nemotron 120B (free)"},
     ]
 
     @rx.event
@@ -790,25 +799,57 @@ class AppState(rx.State):
     # Each entry: (model_id, base_url, env_key)
     # base_url=None means OpenRouter
     _FREE_FALLBACKS: list[tuple[str, str, str]] = [
-        ("openai/gpt-oss-120b:free",                 "openrouter", "OPENROUTER_API_KEY"),
-        ("deepseek/deepseek-v4-flash:free",          "openrouter", "OPENROUTER_API_KEY"),
-        ("qwen/qwen3-coder:free",                    "openrouter", "OPENROUTER_API_KEY"),
-        ("meta-llama/llama-3.3-70b-instruct:free",   "openrouter", "OPENROUTER_API_KEY"),
-        ("llama-3.3-70b-versatile",                  "groq",       "GROQ_API_KEY"),
-        ("llama3-70b-8192",                          "groq",       "GROQ_API_KEY"),
-        ("mixtral-8x7b-32768",                       "groq",       "GROQ_API_KEY"),
-        ("gemma2-9b-it",                             "groq",       "GROQ_API_KEY"),
-        ("nvidia/nemotron-3-super-120b-a12b:free",   "openrouter", "OPENROUTER_API_KEY"),
-        ("moonshotai/kimi-k2.6:free",                "openrouter", "OPENROUTER_API_KEY"),
+        ("openai/gpt-oss-120b:free", "openrouter", "OPENROUTER_API_KEY"),
+        ("deepseek/deepseek-v4-flash:free", "openrouter", "OPENROUTER_API_KEY"),
+        ("qwen/qwen3-coder:free", "openrouter", "OPENROUTER_API_KEY"),
+        ("meta-llama/llama-3.3-70b-instruct:free", "openrouter", "OPENROUTER_API_KEY"),
+        ("llama-3.3-70b-versatile", "groq", "GROQ_API_KEY"),
+        ("llama3-70b-8192", "groq", "GROQ_API_KEY"),
+        ("mixtral-8x7b-32768", "groq", "GROQ_API_KEY"),
+        ("gemma2-9b-it", "groq", "GROQ_API_KEY"),
+        ("nvidia/nemotron-3-super-120b-a12b:free", "openrouter", "OPENROUTER_API_KEY"),
+        ("moonshotai/kimi-k2.6:free", "openrouter", "OPENROUTER_API_KEY"),
     ]
 
     def _route_model(self, text: str) -> tuple[str, str, str]:
         lower = text.lower()
-        code_kws = {"config", "yaml", "json", "code", "script", "train", "lora", "qlora",
-                    "peft", "batch", "epoch", "lr", "learning rate", "trl", "transformers",
-                    "accelerate", "bitsandbytes", "quantiz", "merge", "export", "convert"}
-        reasoning_kws = {"why", "explain", "compare", "difference", "tradeoff", "should i",
-                         "best practice", "recommend", "analyse", "analyze", "pros", "cons"}
+        code_kws = {
+            "config",
+            "yaml",
+            "json",
+            "code",
+            "script",
+            "train",
+            "lora",
+            "qlora",
+            "peft",
+            "batch",
+            "epoch",
+            "lr",
+            "learning rate",
+            "trl",
+            "transformers",
+            "accelerate",
+            "bitsandbytes",
+            "quantiz",
+            "merge",
+            "export",
+            "convert",
+        }
+        reasoning_kws = {
+            "why",
+            "explain",
+            "compare",
+            "difference",
+            "tradeoff",
+            "should i",
+            "best practice",
+            "recommend",
+            "analyse",
+            "analyze",
+            "pros",
+            "cons",
+        }
         if any(k in lower for k in code_kws):
             return ("qwen/qwen3-coder:free", "openrouter", "OPENROUTER_API_KEY")
         if any(k in lower for k in reasoning_kws):
@@ -842,7 +883,9 @@ class AppState(rx.State):
 
         context_block = ""
         if context_lines:
-            context_block = "\n<current_model>\n" + "\n".join(context_lines) + "\n</current_model>\n"
+            context_block = (
+                "\n<current_model>\n" + "\n".join(context_lines) + "\n</current_model>\n"
+            )
 
         return f"""<role>
 You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling. You help users explore models, prepare datasets, plan training runs, and debug ML workflows.
@@ -879,7 +922,10 @@ You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugg
         if not api_key:
             self.chat_messages = [
                 *self.chat_messages[:-1],
-                {"role": "assistant", "text": "⚠️ No OPENROUTER_API_KEY found. Add it to your .env file."},
+                {
+                    "role": "assistant",
+                    "text": "⚠️ No OPENROUTER_API_KEY found. Add it to your .env file.",
+                },
             ]
             self.is_chat_loading = False
             yield
@@ -893,17 +939,16 @@ You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugg
         ]
 
         import json
+
         import httpx as _httpx
 
         BASE_URLS = {
             "openrouter": "https://openrouter.ai/api/v1/chat/completions",
-            "groq":       "https://api.groq.com/openai/v1/chat/completions",
+            "groq": "https://api.groq.com/openai/v1/chat/completions",
         }
 
         # Build fallback queue: preferred model first, then rest
-        fallbacks = [first] + [
-            t for t in self._FREE_FALLBACKS if t[0] != first[0]
-        ]
+        fallbacks = [first] + [t for t in self._FREE_FALLBACKS if t[0] != first[0]]
 
         full_text = ""
         last_error = ""
@@ -965,7 +1010,10 @@ You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugg
             if not full_text:
                 self.chat_messages = [
                     *self.chat_messages[:-1],
-                    {"role": "assistant", "text": f"⚠️ All models unavailable. Last error: {last_error}"},
+                    {
+                        "role": "assistant",
+                        "text": f"⚠️ All models unavailable. Last error: {last_error}",
+                    },
                 ]
         except Exception as exc:
             self.chat_messages = [

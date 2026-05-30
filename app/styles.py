@@ -2,8 +2,8 @@
 TuneOS neutral app styling.
 The palette intentionally avoids the previous purple landing-page treatment.
 """
-import reflex as rx
 
+import reflex as rx
 
 STYLESHEETS = [
     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",

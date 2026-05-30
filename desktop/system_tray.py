@@ -6,9 +6,10 @@ Features:
 - Single-click toggles the main window visibility
 - Notification bubbles for training completion and other events
 """
+
 from PyQt6.QtCore import QObject
-from PyQt6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor, QFont
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
+from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from desktop.theme import COLORS
 
@@ -54,8 +55,8 @@ class SystemTray(QObject):
         menu.setStyleSheet(
             f"""
             QMenu {{
-                background-color: {COLORS['bg_card']};
-                color: {COLORS['text_primary']};
+                background-color: {COLORS["bg_card"]};
+                color: {COLORS["text_primary"]};
                 border: 1px solid rgba(255,255,255,0.10);
                 border-radius: 6px;
                 padding: 4px 0;
@@ -66,7 +67,7 @@ class SystemTray(QObject):
                 padding: 6px 24px;
             }}
             QMenu::item:selected {{
-                background-color: {COLORS['bg_hover']};
+                background-color: {COLORS["bg_hover"]};
             }}
             QMenu::separator {{
                 height: 1px;

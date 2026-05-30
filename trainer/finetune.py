@@ -1,11 +1,14 @@
 import os
-from trainer.config import ModelConfig, LoraConfig, TrainingConfig
-from trainer.qlora import prepare_qlora_model
-from trainer.dataset import load_and_tokenize
-from trainer.lora import save_adapter
-from trainer.callbacks import RedisLossCallback
+
 from transformers import TrainingArguments
 from trl import SFTTrainer
+
+from trainer.callbacks import RedisLossCallback
+from trainer.config import LoraConfig, ModelConfig, TrainingConfig
+from trainer.dataset import load_and_tokenize
+from trainer.lora import save_adapter
+from trainer.qlora import prepare_qlora_model
+
 
 def finetune(
     model_cfg: ModelConfig,
@@ -26,9 +29,7 @@ def finetune(
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
     # 2. Load dataset
-    dataset = load_and_tokenize(
-        dataset_path, tokenizer, model_cfg.max_seq_length
-    )
+    dataset = load_and_tokenize(dataset_path, tokenizer, model_cfg.max_seq_length)
 
     # 3. Training arguments
     output_path = os.path.join(train_cfg.output_dir, job_id)
@@ -46,7 +47,7 @@ def finetune(
         lr_scheduler_type=train_cfg.lr_scheduler_type,
         optim=train_cfg.optim,
         max_grad_norm=train_cfg.max_grad_norm,
-        report_to="none",          # disable wandb/mlflow by default
+        report_to="none",  # disable wandb/mlflow by default
         gradient_checkpointing=True,
     )
 

@@ -1,4 +1,5 @@
 """TuneOS Datasets discovery page."""
+
 import reflex as rx
 
 from app.state.app_state import AppState
@@ -197,7 +198,9 @@ def datasets_page() -> rx.Component:
         rx.box(
             rx.vstack(
                 rx.hstack(
-                    rx.heading("Datasets", font_size="1.4rem", font_weight="600", color=c("text_primary")),
+                    rx.heading(
+                        "Datasets", font_size="1.4rem", font_weight="600", color=c("text_primary")
+                    ),
                     rx.spacer(),
                     rx.button(
                         rx.icon("plus", size=15),

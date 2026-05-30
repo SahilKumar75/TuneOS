@@ -1,4 +1,5 @@
 """VS Code-style workspace tab bar."""
+
 import reflex as rx
 
 from app.state.app_state import AppState, WorkspaceTab

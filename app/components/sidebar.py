@@ -1,4 +1,5 @@
 """Neutral TuneOS sidebar."""
+
 import reflex as rx
 
 from app.state.app_state import AppState, SavedNotebook
@@ -206,17 +207,20 @@ def _expanded_sidebar() -> rx.Component:
         ),
         rx.vstack(
             _nav_item(
-                "square-pen", "New chat",
+                "square-pen",
+                "New chat",
                 active=AppState.is_on_start_screen,
                 on_click=AppState.new_project,
             ),
             _nav_item(
-                "layers", "Models",
+                "layers",
+                "Models",
                 active=AppState.current_view == "models",
                 on_click=AppState.set_view("models"),
             ),
             _nav_item(
-                "database", "Datasets",
+                "database",
+                "Datasets",
                 active=AppState.current_view == "datasets",
                 on_click=AppState.set_view("datasets"),
             ),
@@ -294,9 +298,17 @@ def _collapsed_icon_btn(icon_name: str, active=False, on_click=None) -> rx.Compo
 def _collapsed_sidebar() -> rx.Component:
     return rx.vstack(
         _panel_button(),
-        _collapsed_icon_btn("square-pen", active=AppState.is_on_start_screen, on_click=AppState.new_project),
-        _collapsed_icon_btn("layers",     active=AppState.current_view == "models",   on_click=AppState.set_view("models")),
-        _collapsed_icon_btn("database",   active=AppState.current_view == "datasets", on_click=AppState.set_view("datasets")),
+        _collapsed_icon_btn(
+            "square-pen", active=AppState.is_on_start_screen, on_click=AppState.new_project
+        ),
+        _collapsed_icon_btn(
+            "layers", active=AppState.current_view == "models", on_click=AppState.set_view("models")
+        ),
+        _collapsed_icon_btn(
+            "database",
+            active=AppState.current_view == "datasets",
+            on_click=AppState.set_view("datasets"),
+        ),
         _collapsed_icon_btn("flask-conical"),
         rx.spacer(),
         _collapsed_icon_btn("settings"),

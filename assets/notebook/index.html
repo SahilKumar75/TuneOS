@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>TuneOS Notebook</title>
+
+<!--
+  coi-serviceworker: registers a service worker that adds Cross-Origin-Opener-Policy
+  and Cross-Origin-Embedder-Policy headers so that SharedArrayBuffer (required by
+  Pyodide) is available even without server-side header configuration.
+  On first load it registers the SW and does one silent auto-reload.
+-->
+<script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@v0.1.7/coi-serviceworker.min.js"></script>
+
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/edit/matchbrackets.min.js"></script>
+
+<!-- marked.js -->
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+
+<!-- Pyodide -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+
+<style>
+:root {
+  --bg:          #111111;
+  --bg-nb:       #161616;
+  --cell-bg:     #1e1e1e;
+  --cell-border: rgba(255,255,255,0.10);
+  --active-blue: #3b82f6;
+  --active-glow: rgba(59,130,246,0.18);
+  --gutter-bg:   #181818;
+  --out-bg:      #141414;
+  --toolbar-bg:  #1a1a1a;
+  --text:        #e0e0e0;
+  --text-sec:    #9a9a9a;
+  --text-muted:  #666;
+  --error:       #f28b82;
+  --warning:     #fdd663;
+  --success:     #81c995;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  background:var(--bg-nb);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;
+  font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────── */
+.toolbar{
+  background:var(--toolbar-bg);border-bottom:1px solid var(--cell-border);
+  display:flex;align-items:center;gap:6px;padding:0 14px;height:44px;flex-shrink:0;
+}
+.logo{
+  display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600;
+  padding-right:14px;border-right:1px solid var(--cell-border);margin-right:4px;
+}
+.tsep{width:1px;height:20px;background:var(--cell-border);margin:0 2px}
+
+.btn{
+  display:flex;align-items:center;gap:5px;padding:5px 12px;
+  border-radius:20px;border:1px solid var(--cell-border);
+  background:transparent;color:var(--text-sec);font-size:.76rem;
+  font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,.06);color:var(--text);border-color:rgba(255,255,255,.22)}
+.btn.accent{color:var(--active-blue);border-color:rgba(59,130,246,.45)}
+.btn.accent:hover{background:rgba(59,130,246,.12)}
+.btn:disabled{opacity:.32;cursor:not-allowed}
+
+.kpill{
+  margin-left:auto;display:flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:20px;
+  background:rgba(255,255,255,.04);border:1px solid var(--cell-border);
+  font-size:.71rem;color:var(--text-sec);
+}
+.kdot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);transition:background .3s}
+.kdot.ready{background:var(--success)}
+.kdot.busy {background:var(--warning);animation:pulse .9s infinite}
+.kdot.error{background:var(--error)}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin  {to{transform:rotate(360deg)}}
+
+/* ── Notebook scroll area ────────────────────────────────── */
+.notebook{flex:1;overflow-y:auto;padding:24px 0 100px}
+
+/* ── Cell wrapper ────────────────────────────────────────── */
+.cell-wrap{
+  width:100%;margin:0 0 6px;padding:0 16px;position:relative;
+}
+.cell-wrap:hover .ca-bar{opacity:1}
+
+/* Floating action bar — top-right (Colab style) */
+.ca-bar{
+  position:absolute;top:2px;right:22px;z-index:10;
+  display:flex;gap:2px;opacity:0;transition:opacity .15s;
+  background:var(--toolbar-bg);border:1px solid var(--cell-border);
+  border-radius:6px;padding:2px;
+}
+.ca-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border:none;border-radius:4px;
+  background:transparent;color:var(--text-sec);cursor:pointer;transition:all .12s;
+  font-size:11px;
+}
+.ca-btn:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.ca-btn.del:hover{color:var(--error)}
+
+/* ── Code cell card ──────────────────────────────────────── */
+.code-card{
+  display:flex;border:1px solid var(--cell-border);border-radius:8px;
+  overflow:hidden;background:var(--cell-bg);transition:border-color .15s,box-shadow .15s;
+}
+.code-card.focused{
+  border-color:var(--active-blue);
+  box-shadow:0 0 0 1px var(--active-glow);
+}
+
+/* Gutter */
+.gutter{
+  width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;
+  padding:8px 4px 8px;gap:6px;background:var(--gutter-bg);
+  border-right:1px solid var(--cell-border);
+}
+.exec-lbl{
+  font-size:.64rem;font-family:monospace;color:var(--text-muted);
+  min-height:16px;text-align:center;user-select:none;
+}
+.run-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border:none;border-radius:50%;
+  background:transparent;color:var(--text-sec);cursor:pointer;transition:all .15s;
+}
+.run-btn:hover{background:var(--active-blue);color:#fff}
+.run-btn svg{pointer-events:none}
+
+.code-body{flex:1;min-width:0;display:flex;flex-direction:column}
+
+/* ── CodeMirror ──────────────────────────────────────────── */
+.CodeMirror{
+  background:transparent!important;color:#d4d4d4!important;
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code',Menlo,monospace!important;
+  font-size:.84rem!important;line-height:1.65!important;
+  height:auto!important;min-height:34px;padding:10px 14px;
+}
+.CodeMirror-scroll{min-height:34px;overflow-x:auto!important}
+.CodeMirror-cursor{border-left:2px solid var(--active-blue)!important}
+.CodeMirror-selected{background:rgba(59,130,246,.2)!important}
+.CodeMirror-line{padding:0!important}
+.CodeMirror-gutters{display:none}
+
+/* VS Code Dark+ syntax */
+.cm-keyword  {color:#569cd6!important}
+.cm-def      {color:#dcdcaa!important}
+.cm-string,.cm-string-2{color:#ce9178!important}
+.cm-number   {color:#b5cea8!important}
+.cm-comment  {color:#6a9955!important;font-style:italic}
+.cm-operator {color:#d4d4d4!important}
+.cm-builtin  {color:#4ec9b0!important}
+.cm-variable {color:#9cdcfe!important}
+.cm-property {color:#9cdcfe!important}
+.cm-atom     {color:#569cd6!important}
+.cm-meta     {color:#d4d4d4!important}
+
+/* ── Output area ─────────────────────────────────────────── */
+.out-area{border-top:1px solid var(--cell-border);background:var(--out-bg)}
+.out-area:empty{display:none}
+
+.out-item{
+  padding:8px 14px;
+  font-family:'JetBrains Mono','Fira Code',Menlo,monospace;
+  font-size:.81rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;
+  color:#d4d4d4;
+}
+.out-item.err {color:var(--error)}
+.out-item.warn{color:var(--warning)}
+.out-item.img {padding:10px 14px}
+.out-item.img img{display:block;max-width:100%;border-radius:6px;margin-top:2px}
+
+/* ── Text / Markdown cell ────────────────────────────────── */
+.text-card{
+  border:1px solid transparent;border-radius:8px;overflow:hidden;
+  transition:border-color .15s;cursor:text;
+}
+.text-card:hover{border-color:var(--cell-border)}
+.text-card.focused{border-color:var(--active-blue);box-shadow:0 0 0 1px var(--active-glow)}
+
+.text-rendered{
+  padding:12px 18px;line-height:1.75;color:var(--text);min-height:36px;
+}
+.text-rendered:empty::after{content:'Double-click to edit…';color:var(--text-muted);font-style:italic}
+
+/* Markdown typography */
+.text-rendered h1{font-size:1.55rem;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--cell-border)}
+.text-rendered h2{font-size:1.2rem;font-weight:600;margin:14px 0 7px}
+.text-rendered h3{font-size:1rem;font-weight:600;margin:10px 0 5px;color:#c0c0c0}
+.text-rendered p {margin-bottom:8px}
+.text-rendered ul,.text-rendered ol{margin:6px 0 8px 22px}
+.text-rendered li{margin-bottom:3px}
+.text-rendered strong{font-weight:600;color:#f0f0f0}
+.text-rendered em{font-style:italic;color:#bbb}
+.text-rendered a{color:var(--active-blue);text-decoration:none}
+.text-rendered a:hover{text-decoration:underline}
+.text-rendered code{
+  font-family:'JetBrains Mono',monospace;font-size:.81rem;
+  background:rgba(255,255,255,.09);padding:2px 6px;border-radius:4px;
+}
+.text-rendered pre{background:rgba(255,255,255,.05);padding:12px 14px;border-radius:6px;margin:8px 0;overflow-x:auto}
+.text-rendered pre code{background:none;padding:0}
+.text-rendered blockquote{border-left:3px solid var(--active-blue);padding-left:12px;color:var(--text-sec);margin:8px 0}
+.text-rendered hr{border:none;border-top:1px solid var(--cell-border);margin:12px 0}
+.text-rendered table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.85rem}
+.text-rendered th,.text-rendered td{padding:6px 10px;border:1px solid var(--cell-border);text-align:left}
+.text-rendered th{background:rgba(255,255,255,.05);font-weight:600}
+
+/* Edit mode */
+.text-ta{
+  display:block;width:100%;padding:12px 18px;
+  background:rgba(59,130,246,.06);color:var(--text);
+  font-family:'JetBrains Mono','Fira Code',monospace;
+  font-size:.83rem;line-height:1.65;border:none;outline:none;resize:none;
+  min-height:80px;overflow:hidden;
+}
+.text-hint{padding:3px 18px 8px;font-size:.67rem;color:var(--text-muted)}
+
+/* ── Add strip ───────────────────────────────────────────── */
+.add-strip{
+  width:100%;margin:8px 0 0;padding:0 16px;
+  display:flex;gap:8px;
+}
+
+/* ── Kernel error banner ─────────────────────────────────── */
+.kerr-banner{
+  margin:10px 16px 0;padding:10px 14px;
+  background:rgba(242,139,130,.1);border:1px solid rgba(242,139,130,.3);
+  border-radius:8px;font-size:.8rem;color:var(--error);line-height:1.5;
+  white-space:pre-wrap;word-break:break-word;display:none;
+}
+.kerr-banner.visible{display:block}
+.add-btn{
+  display:flex;align-items:center;gap:5px;padding:5px 16px;
+  border:1px dashed rgba(255,255,255,.14);border-radius:20px;
+  background:transparent;color:var(--text-muted);font-size:.76rem;
+  font-family:inherit;cursor:pointer;transition:all .15s;
+}
+.add-btn:hover{border-color:var(--active-blue);color:var(--active-blue);background:rgba(59,130,246,.08)}
+
+/* ── Loading overlay ─────────────────────────────────────── */
+#overlay{
+  position:fixed;inset:0;background:var(--bg-nb);z-index:999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  transition:opacity .4s;
+}
+#overlay.gone{opacity:0;pointer-events:none}
+.spinner{width:26px;height:26px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--active-blue);border-radius:50%;animation:spin .75s linear infinite}
+.ov-lbl{color:var(--text-sec);font-size:.88rem}
+.ov-sub{color:var(--text-muted);font-size:.73rem;text-align:center;max-width:320px}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="overlay">
+  <div class="spinner"></div>
+  <div class="ov-lbl">Starting Python kernel…</div>
+  <div class="ov-sub">Loading Python kernel — first run ~5s, then cached by browser</div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="logo">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--active-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+    </svg>
+    TuneOS Notebook
+  </div>
+  <button class="btn accent" id="btnRunAll" onclick="runAll()" disabled>
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    Run all
+  </button>
+  <div class="tsep"></div>
+  <button class="btn" onclick="addCodeCell()">+ Code</button>
+  <button class="btn" onclick="addTextCell()">+ Text</button>
+  <div class="tsep"></div>
+  <button class="btn" onclick="clearAll()">Clear outputs</button>
+  <div class="kpill">
+    <div class="kdot" id="kdot"></div>
+    <span id="klbl">Loading…</span>
+  </div>
+</div>
+
+<!-- Kernel error banner (hidden by default) -->
+<div class="kerr-banner" id="kerrBanner"></div>
+
+<!-- Cells -->
+<div class="notebook" id="nb"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────────────────
+let pyodide     = null;
+let cellSeq     = 0;
+let execCount   = 0;
+let runningId   = null;
+const cellMeta  = {};     // id → { type, editor?, textContent? }
+let cellOrder   = [];
+
+// ─────────────────────────────────────────────────────────────
+//  Kernel
+// ─────────────────────────────────────────────────────────────
+async function initKernel() {
+  try {
+    pyodide = await loadPyodide();
+
+    // No eager package loading — packages are fetched on-demand when cells
+    // run (via loadPackagesFromImports). This cuts startup from ~20 s to ~5 s.
+
+    document.querySelector('.ov-lbl').textContent = 'Starting kernel…';
+    await pyodide.runPythonAsync(`
+import sys, io as _io, json as _json
+
+class _Buf(_io.StringIO):
+    def write(self, s):
+        from js import _nbWrite
+        _nbWrite(s, False)
+        return len(s)
+    def flush(self): pass
+
+class _ErrBuf(_io.StringIO):
+    def write(self, s):
+        from js import _nbWrite
+        _nbWrite(s, True)
+        return len(s)
+    def flush(self): pass
+
+sys.stdout = _Buf()
+sys.stderr = _ErrBuf()
+
+# Set up matplotlib if available
+_mpl_ready = False
+try:
+    import matplotlib as _mpl
+    _mpl.use('Agg')
+    import matplotlib.pyplot as _plt
+    _mpl_ready = True
+except ImportError:
+    pass
+
+def _grab_plots():
+    if not _mpl_ready:
+        return _json.dumps([])
+    import io as _io2, base64 as _b64
+    out = []
+    for n in _plt.get_fignums():
+        fig = _plt.figure(n)
+        buf = _io2.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=110,
+                    facecolor='#141414', edgecolor='none')
+        buf.seek(0)
+        out.append(_b64.b64encode(buf.read()).decode('utf-8'))
+    _plt.close('all')
+    return _json.dumps(out)
+`);
+
+    setKernel('ready', 'Python 3 · Ready');
+    document.getElementById('btnRunAll').disabled = false;
+    document.getElementById('overlay').classList.add('gone');
+  } catch(e) {
+    setKernel('error', 'Kernel error');
+    document.getElementById('overlay').classList.add('gone');
+    const banner = document.getElementById('kerrBanner');
+    if (banner) {
+      banner.textContent = '⚠ Kernel failed to start — Python execution is unavailable.\n\n' + (e?.message || String(e));
+      banner.classList.add('visible');
+    }
+    console.error(e);
+  }
+}
+
+function setKernel(state, label) {
+  document.getElementById('kdot').className   = 'kdot ' + state;
+  document.getElementById('klbl').textContent = label;
+}
+
+// Called from Python stdout/stderr redirects
+window._nbWrite = (text, isErr) => {
+  if (runningId !== null) {
+    const m = cellMeta[runningId];
+    const outEl = document.getElementById('out' + runningId);
+    if (!outEl) return;
+    const cls = isErr ? 'err' : '';
+    // Append to last item of same class, or create new
+    let last = outEl.lastElementChild;
+    if (!last || last.dataset.cls !== (cls || 'out') || last.classList.contains('img')) {
+      last = document.createElement('div');
+      last.className = 'out-item' + (cls ? ' ' + cls : '');
+      last.dataset.cls = cls || 'out';
+      outEl.appendChild(last);
+    }
+    last.textContent += text;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+//  Run
+// ─────────────────────────────────────────────────────────────
+async function runCell(id) {
+  const m = cellMeta[id];
+  if (!m || m.type !== 'code' || !pyodide) return;
+
+  const code = m.editor.getValue().trim();
+  if (!code) return;
+
+  const outEl = document.getElementById('out' + id);
+  const lbl   = document.getElementById('lbl' + id);
+
+  execCount++;
+  runningId = id;
+  if (outEl) outEl.innerHTML = '';
+  if (lbl)   lbl.textContent = '[*]';
+  setKernel('busy', 'Running…');
+  document.getElementById('card' + id)?.classList.add('focused');
+
+  try {
+    // Auto-install any packages this cell imports (cached after first download)
+    if (/\bimport\b/.test(code)) {
+      setKernel('busy', 'Loading packages…');
+      try { await pyodide.loadPackagesFromImports(code); } catch(_) {}
+      setKernel('busy', 'Running…');
+    }
+
+    const result = await pyodide.runPythonAsync(code);
+
+    if (lbl) lbl.textContent = '[' + execCount + ']';
+
+    // Show repr of return value if meaningful
+    if (result !== undefined && result !== null) {
+      const s = String(result);
+      if (s !== 'None' && s !== 'undefined') {
+        const div = document.createElement('div');
+        div.className = 'out-item';
+        div.dataset.cls = 'out';
+        div.textContent = s;
+        if (outEl) outEl.appendChild(div);
+      }
+    }
+
+    // Capture matplotlib figures
+    const plotJson = await pyodide.runPythonAsync('_grab_plots()');
+    const plots = JSON.parse(plotJson);
+    for (const b64 of plots) {
+      const div = document.createElement('div');
+      div.className = 'out-item img';
+      div.dataset.cls = 'img';
+      const img = document.createElement('img');
+      img.src = 'data:image/png;base64,' + b64;
+      div.appendChild(img);
+      if (outEl) outEl.appendChild(div);
+    }
+
+  } catch(err) {
+    if (lbl) lbl.textContent = '[' + execCount + ']';
+    const div = document.createElement('div');
+    div.className = 'out-item err';
+    div.dataset.cls = 'err';
+    // Clean up Pyodide traceback — keep the meaningful lines
+    div.textContent = cleanTraceback(err.message);
+    if (outEl) outEl.appendChild(div);
+  }
+
+  runningId = null;
+  setKernel('ready', 'Python 3 · Ready');
+}
+
+function cleanTraceback(msg) {
+  // Remove the Pyodide JS wrapper lines, keep Python traceback
+  const lines = msg.split('\n');
+  const start = lines.findIndex(l => l.startsWith('Traceback') || l.includes('Error:'));
+  return start >= 0 ? lines.slice(start).join('\n') : msg;
+}
+
+async function runAll() {
+  for (const id of [...cellOrder]) {
+    if (cellMeta[id]?.type === 'code') await runCell(id);
+  }
+}
+
+function clearAll() {
+  execCount = 0;
+  for (const id of cellOrder) {
+    const out = document.getElementById('out' + id);
+    const lbl = document.getElementById('lbl' + id);
+    if (out) out.innerHTML = '';
+    if (lbl) lbl.textContent = '[ ]';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Code cell creation
+// ─────────────────────────────────────────────────────────────
+function createCodeCell(code = '', afterId = null) {
+  const id = ++cellSeq;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cell-wrap';
+  wrap.id = 'w' + id;
+
+  wrap.innerHTML = `
+    <div class="ca-bar">
+      <button class="ca-btn" title="Move up"   onclick="moveCellUp(${id})">↑</button>
+      <button class="ca-btn" title="Move down" onclick="moveCellDown(${id})">↓</button>
+      <button class="ca-btn del" title="Delete" onclick="deleteCell(${id})">✕</button>
+    </div>
+    <div class="code-card" id="card${id}">
+      <div class="gutter">
+        <span class="exec-lbl" id="lbl${id}">[ ]</span>
+        <button class="run-btn" title="Run  Shift+Enter" onclick="runCell(${id})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+      </div>
+      <div class="code-body">
+        <textarea id="ta${id}"></textarea>
+        <div class="out-area" id="out${id}"></div>
+      </div>
+    </div>`;
+
+  insertWrap(wrap, afterId);
+
+  const ta = document.getElementById('ta' + id);
+  ta.value = code;
+
+  const editor = CodeMirror.fromTextArea(ta, {
+    mode: 'python',
+    indentUnit: 4,
+    indentWithTabs: false,
+    smartIndent: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    viewportMargin: Infinity,
+    extraKeys: {
+      'Shift-Enter': () => { runCell(id); return false; },
+      'Ctrl-Enter' : () => { runCell(id); return false; },
+    },
+  });
+
+  editor.on('focus', () => focusCard('card' + id));
+  editor.on('blur',  () => document.getElementById('card' + id)?.classList.remove('focused'));
+
+  cellMeta[id] = { type: 'code', editor };
+  editor.focus();
+  refreshStrip();
+  return id;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Text (Markdown) cell creation
+// ─────────────────────────────────────────────────────────────
+function createTextCell(md = '', afterId = null) {
+  const id = ++cellSeq;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cell-wrap';
+  wrap.id = 'w' + id;
+
+  wrap.innerHTML = `
+    <div class="ca-bar">
+      <button class="ca-btn" title="Move up"   onclick="moveCellUp(${id})">↑</button>
+      <button class="ca-btn" title="Move down" onclick="moveCellDown(${id})">↓</button>
+      <button class="ca-btn del" title="Delete" onclick="deleteCell(${id})">✕</button>
+    </div>
+    <div class="text-card" id="card${id}" ondblclick="editText(${id})">
+      <div class="text-rendered" id="rend${id}"></div>
+    </div>`;
+
+  insertWrap(wrap, afterId);
+  cellMeta[id] = { type: 'text', textContent: md };
+  renderMd(id);
+  refreshStrip();
+  return id;
+}
+
+function renderMd(id) {
+  const el = document.getElementById('rend' + id);
+  if (!el) return;
+  const md = cellMeta[id]?.textContent || '';
+  el.innerHTML = marked.parse(md);
+}
+
+function editText(id) {
+  const card = document.getElementById('card' + id);
+  if (!card || card.dataset.editing === '1') return;
+  card.dataset.editing = '1';
+  card.classList.add('focused');
+
+  const rend = document.getElementById('rend' + id);
+  if (rend) rend.style.display = 'none';
+
+  const orig = cellMeta[id].textContent || '';
+  const ta   = document.createElement('textarea');
+  ta.className = 'text-ta';
+  ta.id        = 'tta' + id;
+  ta.value     = orig;
+
+  const hint = document.createElement('div');
+  hint.className = 'text-hint';
+  hint.textContent = 'Shift+Enter to save · Esc to cancel';
+
+  card.appendChild(ta);
+  card.appendChild(hint);
+
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', grow);
+  grow();
+  ta.focus();
+
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); saveText(id); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelText(id, orig); }
+  });
+  // Blur-to-save with small delay to allow button clicks
+  ta.addEventListener('blur', () => setTimeout(() => saveText(id), 200));
+}
+
+function saveText(id) {
+  const card = document.getElementById('card' + id);
+  if (!card || card.dataset.editing !== '1') return;
+  const ta   = document.getElementById('tta' + id);
+  const hint = card.querySelector('.text-hint');
+  if (ta)   { cellMeta[id].textContent = ta.value; ta.remove(); }
+  if (hint) hint.remove();
+  const rend = document.getElementById('rend' + id);
+  if (rend) rend.style.display = '';
+  delete card.dataset.editing;
+  card.classList.remove('focused');
+  renderMd(id);
+}
+
+function cancelText(id, orig) {
+  const card = document.getElementById('card' + id);
+  if (!card) return;
+  const ta   = document.getElementById('tta' + id);
+  const hint = card.querySelector('.text-hint');
+  if (ta)   ta.remove();
+  if (hint) hint.remove();
+  cellMeta[id].textContent = orig;
+  const rend = document.getElementById('rend' + id);
+  if (rend) rend.style.display = '';
+  delete card.dataset.editing;
+  card.classList.remove('focused');
+  renderMd(id);
+}
+
+function focusCard(cardId) {
+  document.querySelectorAll('.code-card,.text-card').forEach(el => el.classList.remove('focused'));
+  document.getElementById(cardId)?.classList.add('focused');
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Cell order management
+// ─────────────────────────────────────────────────────────────
+function insertWrap(el, afterId) {
+  const nb    = document.getElementById('nb');
+  const strip = document.getElementById('addStrip');
+  if (afterId !== null) {
+    const ref = document.getElementById('w' + afterId);
+    const next = ref?.nextSibling;
+    nb.insertBefore(el, next && next.id !== 'addStrip' ? next : (strip || null));
+    const idx = cellOrder.indexOf(afterId);
+    cellOrder.splice(idx + 1, 0, Number(el.id.slice(1)));
+  } else {
+    nb.insertBefore(el, strip || null);
+    cellOrder.push(Number(el.id.slice(1)));
+  }
+}
+
+function refreshStrip() {
+  const nb = document.getElementById('nb');
+  let strip = document.getElementById('addStrip');
+  if (!strip) {
+    strip = document.createElement('div');
+    strip.id = 'addStrip';
+    strip.className = 'add-strip';
+    strip.innerHTML = `<button class="add-btn" onclick="addCodeCell()">+ Code</button>
+                       <button class="add-btn" onclick="addTextCell()">+ Text</button>`;
+  }
+  nb.appendChild(strip); // always keep at bottom
+}
+
+function deleteCell(id) {
+  if (cellOrder.length <= 1) return;
+  document.getElementById('w' + id)?.remove();
+  cellOrder = cellOrder.filter(x => x !== id);
+  delete cellMeta[id];
+}
+
+function moveCellUp(id) {
+  const idx = cellOrder.indexOf(id);
+  if (idx <= 0) return;
+  const nb   = document.getElementById('nb');
+  const cur  = document.getElementById('w' + id);
+  const prev = document.getElementById('w' + cellOrder[idx - 1]);
+  if (cur && prev) nb.insertBefore(cur, prev);
+  [cellOrder[idx], cellOrder[idx - 1]] = [cellOrder[idx - 1], cellOrder[idx]];
+}
+
+function moveCellDown(id) {
+  const idx = cellOrder.indexOf(id);
+  if (idx >= cellOrder.length - 1) return;
+  const nb   = document.getElementById('nb');
+  const cur  = document.getElementById('w' + id);
+  const next = document.getElementById('w' + cellOrder[idx + 1]);
+  if (cur && next) nb.insertBefore(next, cur);
+  [cellOrder[idx], cellOrder[idx + 1]] = [cellOrder[idx + 1], cellOrder[idx]];
+}
+
+// Public shortcuts
+function addCodeCell() { createCodeCell(''); scroll2Bottom(); }
+function addTextCell() { createTextCell('## New Section\n\nDouble-click to edit.'); scroll2Bottom(); }
+function scroll2Bottom() { const nb = document.getElementById('nb'); nb.scrollTop = nb.scrollHeight; }
+
+// ─────────────────────────────────────────────────────────────
+//  marked.js config — enable GFM (tables, strikethrough, etc.)
+// ─────────────────────────────────────────────────────────────
+marked.use({ gfm: true, breaks: true });
+
+// ─────────────────────────────────────────────────────────────
+//  Starter cells
+// ─────────────────────────────────────────────────────────────
+createTextCell(`# TuneOS Notebook
+
+Welcome! This notebook runs **real Python** in your browser via [Pyodide](https://pyodide.org) (WebAssembly — no server needed).
+
+| Shortcut | Action |
+|----------|--------|
+| **Shift+Enter** | Run code cell / save text cell |
+| **Ctrl+Enter** | Run code cell (stay in place) |
+| **Double-click** | Edit a text cell |
+| **Esc** | Cancel text edit |
+
+> Numpy, Pandas, Matplotlib, Scipy and many more packages are bundled with Pyodide.`);
+
+createCodeCell(`# Check Python environment
+import sys, platform
+print(f"Python  {sys.version}")
+print(f"Platform: {platform.system()}")`);
+
+createTextCell(`## Matplotlib example
+
+Run the cell below to see inline plot rendering.`);
+
+createCodeCell(`import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 2 * np.pi, 500)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3))
+
+ax1.plot(x, np.sin(x), color='#3b82f6', lw=2)
+ax1.set_title('sin(x)', color='#e0e0e0')
+ax1.set_facecolor('#1a1a2e')
+
+ax2.plot(x, np.cos(x), color='#f28b82', lw=2)
+ax2.set_title('cos(x)', color='#e0e0e0')
+ax2.set_facecolor('#1a1a2e')
+
+for ax in (ax1, ax2):
+    ax.tick_params(colors='#9a9a9a')
+    ax.spines[:].set_color('#333')
+
+plt.suptitle('Matplotlib in TuneOS Notebook', color='#e0e0e0', y=1.02)
+plt.tight_layout()
+plt.show()`);
+
+createCodeCell('# Your code here\n');
+
+refreshStrip();
+initKernel();
+</script>
+</body>
+</html>

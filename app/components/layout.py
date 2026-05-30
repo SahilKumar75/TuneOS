@@ -2,8 +2,41 @@
 import reflex as rx
 from app.components.sidebar import sidebar
 from app.pages.landing import landing_content
+from app.pages.datasets import datasets_page
 from app.state.app_state import AppState
 from app.styles import c
+
+
+def _models_placeholder() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.heading("Models", font_size="1.4rem", font_weight="600", color=c("text_primary")),
+            rx.text("Browse models from Hugging Face and GitHub — coming soon.", font_size="0.95rem", color=c("text_secondary")),
+            spacing="3",
+            align="center",
+            justify="center",
+            height="100%",
+            width="100%",
+        ),
+        width="100%",
+        height="100vh",
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        background=c("bg_primary"),
+    )
+
+
+def _center_panel() -> rx.Component:
+    return rx.cond(
+        AppState.current_view == "datasets",
+        datasets_page(),
+        rx.cond(
+            AppState.current_view == "models",
+            _models_placeholder(),
+            landing_content(),
+        ),
+    )
 
 
 def _resize_handle() -> rx.Component:
@@ -27,10 +60,11 @@ def two_panel_layout() -> rx.Component:
             height="100vh",
             flex_shrink="0",
             overflow="hidden",
+            transition="width 0.25s ease, min-width 0.25s ease, max-width 0.25s ease",
         ),
         _resize_handle(),
         rx.box(
-            landing_content(),
+            _center_panel(),
             flex="1",
             height="100vh",
             overflow="hidden",

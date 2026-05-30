@@ -23,6 +23,22 @@ class ProjectItem(BaseModel):
     created_at: str
 
 
+class SavedNotebook(BaseModel):
+    """A saved notebook entry shown in the sidebar."""
+    id: str
+    title: str
+    project: str = ""  # project name this notebook belongs to
+
+
+class WorkspaceTab(BaseModel):
+    """A single tab in the workspace tab bar."""
+    id: str
+    title: str
+    tab_type: str  # "model" | "notebook"
+    url: str = ""
+    closeable: bool = True
+
+
 class AppState(rx.State):
     """Main application state for the landing page."""
 
@@ -43,6 +59,7 @@ class AppState(rx.State):
     show_permission_selector: bool = False
     permission_mode: str = "training"
     sidebar_collapsed: bool = False
+    current_view: str = "home"
     tree_n: str = "3"
 
     # ── Link preview / workspace state ───────────────────────────
@@ -79,6 +96,16 @@ class AppState(rx.State):
     # ── Project history (real, built from user actions) ───────────
     projects: List[ProjectItem] = []
     _next_project_id: int = 1
+
+    # ── Workspace tab system ──────────────────────────────────────
+    workspace_tabs: List[WorkspaceTab] = []
+    active_workspace_tab_id: str = ""
+    _notebook_counter: int = 0
+    editing_tab_id: str = ""
+    editing_tab_title: str = ""
+
+    # ── Saved notebooks (persisted in sidebar) ────────────────────
+    saved_notebooks: List[SavedNotebook] = []
 
     # ── Computed vars ─────────────────────────────────────────────
     @rx.var
@@ -210,6 +237,60 @@ class AppState(rx.State):
         except Exception:
             return "0"
 
+    @rx.var
+    def is_on_start_screen(self) -> bool:
+        """True only before the user has confirmed any model (no workspace open)."""
+        return not self.workspace_active and self.current_view == "home"
+
+    @rx.var
+    def active_project_id(self) -> str:
+        """Id of the project currently open in the workspace, empty otherwise."""
+        if not self.workspace_active or self.current_view != "home":
+            return ""
+        for p in self.projects:
+            if p.base_model == self.preview_model_id or p.name == self.preview_title:
+                return p.id
+        return ""
+
+    @rx.var
+    def active_tab_is_notebook(self) -> bool:
+        for tab in self.workspace_tabs:
+            if tab.id == self.active_workspace_tab_id:
+                return tab.tab_type == "notebook"
+        return False
+
+    @rx.var
+    def has_notebook_tab(self) -> bool:
+        """True whenever at least one notebook tab is open — keeps the iframe alive."""
+        return any(t.tab_type == "notebook" for t in self.workspace_tabs)
+
+    @rx.var
+    def notebook_starter_code(self) -> str:
+        model_id = self.preview_model_id or self.preview_title or "your/model"
+        pipeline = self.preview_pipeline or "text-generation"
+        if any(k in pipeline for k in ("text-generation", "causal", "conversational")):
+            return (
+                f'from transformers import AutoTokenizer, AutoModelForCausalLM\n'
+                f'import torch\n\n'
+                f'model_id = "{model_id}"\n'
+                f'tokenizer = AutoTokenizer.from_pretrained(model_id)\n'
+                f'model = AutoModelForCausalLM.from_pretrained(\n'
+                f'    model_id,\n'
+                f'    torch_dtype=torch.float16,\n'
+                f'    device_map="auto",\n'
+                f')\n\n'
+                f'prompt = "Hello! Tell me about yourself."\n'
+                f'inputs = tokenizer(prompt, return_tensors="pt").to(model.device)\n'
+                f'outputs = model.generate(**inputs, max_new_tokens=200, do_sample=True)\n'
+                f'print(tokenizer.decode(outputs[0], skip_special_tokens=True))'
+            )
+        return (
+            f'from transformers import pipeline\n\n'
+            f'pipe = pipeline("{pipeline}", model="{model_id}")\n\n'
+            f'result = pipe("Your input here")\n'
+            f'print(result)'
+        )
+
     # ── Event handlers ────────────────────────────────────────────
     @rx.event
     def set_search_query(self, query: str):
@@ -261,7 +342,103 @@ class AppState(rx.State):
         self.show_permission_selector = False
 
     @rx.event
+    def set_active_workspace_tab(self, tab_id: str):
+        self.active_workspace_tab_id = tab_id
+
+    @rx.event
+    def close_workspace_tab(self, tab_id: str):
+        remaining = [t for t in self.workspace_tabs if t.id != tab_id]
+        self.workspace_tabs = remaining
+        if self.active_workspace_tab_id == tab_id:
+            self.active_workspace_tab_id = remaining[-1].id if remaining else ""
+
+    @rx.event
+    def open_notebook_tab(self):
+        self._notebook_counter += 1
+        nb_num = len([t for t in self.workspace_tabs if t.tab_type == "notebook"]) + 1
+        nb_id = f"notebook-{self._notebook_counter}"
+        new_tab = WorkspaceTab(
+            id=nb_id,
+            title=f"Notebook {nb_num}",
+            tab_type="notebook",
+            closeable=True,
+        )
+        self.workspace_tabs = [*self.workspace_tabs, new_tab]
+        self.active_workspace_tab_id = nb_id
+
+    @rx.event
+    def start_editing_tab(self, tab_id: str, current_title: str):
+        self.editing_tab_id = tab_id
+        self.editing_tab_title = current_title
+
+    @rx.event
+    def update_editing_title(self, value: str):
+        self.editing_tab_title = value
+
+    @rx.event
+    def save_tab_title(self):
+        if not self.editing_tab_id:
+            return
+        new_title = self.editing_tab_title.strip()
+        if not new_title:
+            self.editing_tab_id = ""
+            return
+        tab_id = self.editing_tab_id
+        updated = []
+        for t in self.workspace_tabs:
+            if t.id == tab_id:
+                updated.append(WorkspaceTab(id=t.id, title=new_title, tab_type=t.tab_type, url=t.url, closeable=t.closeable))
+            else:
+                updated.append(t)
+        self.workspace_tabs = updated
+        # Save to sidebar notebooks section
+        tab = next((t for t in updated if t.id == tab_id), None)
+        if tab and tab.tab_type == "notebook":
+            project_name = self.preview_title or ""
+            already = any(n.id == tab_id for n in self.saved_notebooks)
+            if already:
+                self.saved_notebooks = [
+                    SavedNotebook(id=n.id, title=new_title, project=n.project) if n.id == tab_id else n
+                    for n in self.saved_notebooks
+                ]
+            else:
+                self.saved_notebooks = [
+                    *self.saved_notebooks,
+                    SavedNotebook(id=tab_id, title=new_title, project=project_name),
+                ]
+        self.editing_tab_id = ""
+
+    @rx.event
+    def handle_tab_rename_key(self, key: str):
+        if key == "Enter":
+            return AppState.save_tab_title
+        if key == "Escape":
+            self.editing_tab_id = ""
+
+    @rx.event
+    def open_saved_notebook(self, notebook_id: str):
+        existing = next((t for t in self.workspace_tabs if t.id == notebook_id), None)
+        if existing:
+            self.active_workspace_tab_id = notebook_id
+        else:
+            saved = next((n for n in self.saved_notebooks if n.id == notebook_id), None)
+            if saved:
+                restored_tab = WorkspaceTab(
+                    id=saved.id,
+                    title=saved.title,
+                    tab_type="notebook",
+                    closeable=True,
+                )
+                self.workspace_tabs = [*self.workspace_tabs, restored_tab]
+                self.active_workspace_tab_id = notebook_id
+        self.workspace_active = True
+        self.current_view = "home"
+
+    @rx.event
     def new_project(self):
+        # Only clear the input form and preview/loading state.
+        # Model data (preview_*) and workspace_tabs are intentionally kept so
+        # the user can click a sidebar project to come back to the workspace.
         self.local_model_path = ""
         self.github_url = ""
         self.huggingface_model_id = ""
@@ -271,33 +448,40 @@ class AppState(rx.State):
         self.preview_loading = False
         self.preview_ready = False
         self.preview_error = ""
-        self.workspace_active = False
-        self.preview_kind = ""
-        self.preview_url = ""
-        self.preview_title = ""
-        self.preview_owner = ""
-        self.preview_summary = ""
-        self.preview_meta = ""
         self.chat_input = ""
-        self.chat_messages = []
-        self.preview_tags = []
-        self.preview_license = ""
-        self.preview_pipeline = ""
-        self.preview_downloads = ""
-        self.preview_likes = ""
-        self.preview_model_id = ""
-        self.preview_architecture = ""
-        self.preview_params = ""
-        self.preview_formats = ""
-        self.preview_library = ""
-        self.preview_total_files = ""
-        self.preview_created = ""
-        self.preview_updated = ""
-        self.preview_readme = ""
+        # Navigate to the start screen without destroying the loaded workspace
+        self.workspace_active = False
+        self.current_view = "home"
 
     @rx.event
     def toggle_sidebar(self):
         self.sidebar_collapsed = not self.sidebar_collapsed
+
+    @rx.event
+    def set_view(self, view: str):
+        self.current_view = view
+
+    @rx.event
+    def restore_workspace(self):
+        """Re-open the workspace for the currently loaded model (sidebar project click)."""
+        self.current_view = "home"
+        if not self.preview_title:
+            return  # nothing loaded yet — stay on start screen
+        self.workspace_active = True
+        self.sidebar_collapsed = True
+        # Rebuild the model tab if it was lost
+        has_model_tab = any(t.id == "model-main" for t in self.workspace_tabs)
+        if not has_model_tab:
+            model_tab = WorkspaceTab(
+                id="model-main",
+                title=self.preview_title,
+                tab_type="model",
+                url=self.preview_url,
+                closeable=False,
+            )
+            nb_tabs = [t for t in self.workspace_tabs if t.tab_type == "notebook"]
+            self.workspace_tabs = [model_tab] + nb_tabs
+        self.active_workspace_tab_id = "model-main"
 
     @rx.event
     def set_hf_model(self, model_id: str):
@@ -547,6 +731,17 @@ class AppState(rx.State):
             return
         self.workspace_active = True
         self.sidebar_collapsed = True
+        # Create/replace the model tab, preserving any open notebook tabs
+        model_tab = WorkspaceTab(
+            id="model-main",
+            title=self.preview_title or "Model",
+            tab_type="model",
+            url=self.preview_url,
+            closeable=False,
+        )
+        nb_tabs = [t for t in self.workspace_tabs if t.tab_type == "notebook"]
+        self.workspace_tabs = [model_tab] + nb_tabs
+        self.active_workspace_tab_id = "model-main"
         # Add to project history
         already = any(p.base_model == self.preview_model_id for p in self.projects)
         if not already and self.preview_title:
@@ -621,40 +816,43 @@ class AppState(rx.State):
         return ("llama-3.3-70b-versatile", "groq", "GROQ_API_KEY")
 
     def _build_system_prompt(self) -> str:
-        parts = [
-            "You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling.",
-            "The user is working with the following model. Use this context to give accurate, specific advice.",
-            "",
-        ]
+        context_lines = []
         if self.preview_title:
-            parts.append(f"Model: {self.preview_title}")
+            context_lines.append(f"  <model_name>{self.preview_title}</model_name>")
         if self.preview_url:
-            parts.append(f"URL: {self.preview_url}")
+            context_lines.append(f"  <model_url>{self.preview_url}</model_url>")
         if self.preview_summary:
-            parts.append(f"Description: {self.preview_summary}")
+            context_lines.append(f"  <description>{self.preview_summary}</description>")
         if self.preview_meta:
-            parts.append(f"Stats: {self.preview_meta}")
+            context_lines.append(f"  <stats>{self.preview_meta}</stats>")
         if self.preview_architecture:
-            parts.append(f"Architecture: {self.preview_architecture}")
+            context_lines.append(f"  <architecture>{self.preview_architecture}</architecture>")
         if self.preview_params:
-            parts.append(f"Parameters: {self.preview_params}")
+            context_lines.append(f"  <parameters>{self.preview_params}</parameters>")
         if self.preview_pipeline:
-            parts.append(f"Pipeline: {self.preview_pipeline}")
+            context_lines.append(f"  <pipeline>{self.preview_pipeline}</pipeline>")
         if self.preview_library:
-            parts.append(f"Library: {self.preview_library}")
+            context_lines.append(f"  <library>{self.preview_library}</library>")
         if self.preview_license:
-            parts.append(f"License: {self.preview_license}")
+            context_lines.append(f"  <license>{self.preview_license}</license>")
         if self.preview_tags:
-            parts.append(f"Tags: {', '.join(self.preview_tags)}")
+            context_lines.append(f"  <tags>{', '.join(self.preview_tags)}</tags>")
         if self.preview_readme:
-            parts.append("")
-            parts.append("Model Card (README):")
-            parts.append(self.preview_readme[:6000])
-        parts += [
-            "",
-            "Be concise and practical. For code/configs, use fenced code blocks.",
-        ]
-        return "\n".join(parts)
+            context_lines.append(f"  <model_card>{self.preview_readme[:6000]}</model_card>")
+
+        context_block = ""
+        if context_lines:
+            context_block = "\n<current_model>\n" + "\n".join(context_lines) + "\n</current_model>\n"
+
+        return f"""<role>
+You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling. You help users explore models, prepare datasets, plan training runs, and debug ML workflows.
+</role>
+{context_block}
+<rules>
+- Be concise and practical. For code/configs, use fenced code blocks.
+- Never speculate about a model you haven't been given context for. If the user asks about a model not shown above, say you don't have its details loaded yet.
+- When comparing options, give a direct recommendation instead of listing pros and cons without a conclusion.
+</rules>"""
 
     @rx.event
     async def send_chat_message(self):

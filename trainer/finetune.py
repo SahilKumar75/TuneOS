@@ -65,4 +65,4 @@ def finetune(
     trainer.train()
     save_adapter(model, output_path)
 
-    return output_path
+    return output_path, model, tokenizer

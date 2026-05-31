@@ -1,6 +1,5 @@
 ---
 title: TuneOS
-emoji: 🎛️
 colorFrom: blue
 colorTo: indigo
 sdk: docker

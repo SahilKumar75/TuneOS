@@ -21,13 +21,29 @@ def _run_finetune_impl(
     try:
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))
 
-        output_path = finetune(
+        output_path, model, tokenizer = finetune(
             model_cfg=ModelConfig(**model_cfg),
             lora_cfg=LoraConfig(**lora_cfg),
             train_cfg=TrainingConfig(**train_cfg),
             dataset_path=dataset_path,
             job_id=job_id,
         )
+
+        # Evaluate on a 20% random sample of the training data
+        try:
+            from trainer.dataset import load_and_tokenize
+            from trainer.evaluate import evaluate_model
+
+            full_dataset = load_and_tokenize(
+                dataset_path, tokenizer, ModelConfig(**model_cfg).max_seq_length
+            )
+            n_eval = max(1, int(0.2 * len(full_dataset)))
+            eval_sample = full_dataset.shuffle(seed=42).select(range(n_eval))
+            eval_results = evaluate_model(model, tokenizer, eval_sample)
+            r.set(f"job:{job_id}:eval", json.dumps(eval_results))
+        except Exception:
+            # Eval failure must not fail the whole job
+            r.set(f"job:{job_id}:eval", json.dumps({"perplexity": None, "bleu": None}))
 
         r.set(
             status_key,

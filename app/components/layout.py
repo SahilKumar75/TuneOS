@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from app.components.settings_panel import settings_panel
 from app.components.sidebar import sidebar
 from app.pages.datasets import datasets_page
 from app.pages.landing import landing_content
@@ -40,7 +41,11 @@ def _center_panel() -> rx.Component:
         rx.cond(
             AppState.current_view == "models",
             _models_placeholder(),
-            landing_content(),
+            rx.cond(
+                AppState.current_view == "settings",
+                settings_panel(),
+                landing_content(),
+            ),
         ),
     )
 

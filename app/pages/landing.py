@@ -310,9 +310,16 @@ def _action_tile(icon_name: str, label: str, on_click=None) -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.icon(icon_name, size=20, color=c("text_secondary")),
-            rx.text(label, font_size="0.78rem", font_weight="500", color=c("text_primary")),
+            rx.text(
+                label,
+                font_size="0.78rem",
+                font_weight="500",
+                color=c("text_primary"),
+                white_space="nowrap",
+            ),
             spacing="1",
             align="center",
+            justify="center",
         ),
         padding="12px 8px",
         background=c("bg_card"),
@@ -322,7 +329,11 @@ def _action_tile(icon_name: str, label: str, on_click=None) -> rx.Component:
         cursor="pointer",
         _hover={"border_color": c("accent"), "background": c("hover")},
         transition="all 0.15s ease",
-        width="72px",
+        width="88px",
+        height="68px",
+        display="flex",
+        align_items="center",
+        justify_content="center",
         text_align="center",
         on_click=on_click,
     )
@@ -657,9 +668,8 @@ def _workspace_content() -> rx.Component:
                                     flex="1",
                                 ),
                                 rx.hstack(
-                                    _action_tile("cpu", "Train"),
                                     _action_tile("bar-chart-2", "Analyze"),
-                                    _action_tile("refresh-cw", "Convert"),
+                                    _action_tile("activity", "Fine Tuning", on_click=rx.redirect("/finetune")),
                                     _action_tile(
                                         "notebook-pen",
                                         "Notebook",

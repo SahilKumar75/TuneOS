@@ -13,6 +13,27 @@
 -->
 <script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@v0.1.7/coi-serviceworker.min.js"></script>
 
+<!-- Theme sync: read user preference from localStorage (same origin as main app) -->
+<script>
+(function(){
+  try {
+    var pref = localStorage.getItem('tune_theme_pref') || 'system';
+    var saved = localStorage.getItem('theme') || 'system';
+    var dark;
+    if (pref === 'dark') dark = true;
+    else if (pref === 'light') dark = false;
+    else dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    // Keep in sync if OS changes while page is open
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+      if ((localStorage.getItem('tune_theme_pref') || 'system') === 'system') {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      }
+    });
+  } catch(e) {}
+})();
+</script>
+
 <!-- CodeMirror 5 -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
@@ -44,6 +65,72 @@
   --warning:     #fdd663;
   --success:     #81c995;
 }
+/* ── Light theme overrides ───────────────────────────────── */
+html[data-theme="light"] {
+  --bg:          #f5f5f7;
+  --bg-nb:       #efefef;
+  --cell-bg:     #ffffff;
+  --cell-border: rgba(0,0,0,0.10);
+  --active-blue: #2563eb;
+  --active-glow: rgba(37,99,235,0.14);
+  --gutter-bg:   #f8f8fa;
+  --out-bg:      #f5f5f7;
+  --toolbar-bg:  #ffffff;
+  --text:        #1a1a1a;
+  --text-sec:    #555555;
+  --text-muted:  #999999;
+  --error:       #d93025;
+  --warning:     #e37400;
+  --success:     #188038;
+}
+
+/* Light-mode hover/interaction overrides (dark uses rgba white, light needs rgba black) */
+html[data-theme="light"] .btn:hover{background:rgba(0,0,0,.06);color:var(--text);border-color:rgba(0,0,0,.22)}
+html[data-theme="light"] .ca-btn:hover{background:rgba(0,0,0,.08);color:var(--text)}
+html[data-theme="light"] .text-card{background:transparent}
+html[data-theme="light"] .text-card:hover{background:rgba(0,0,0,.02)}
+html[data-theme="light"] .CodeMirror-selected{background:rgba(37,99,235,.15)!important}
+html[data-theme="light"] .CodeMirror-cursor{border-left:2px solid var(--active-blue)!important}
+
+/* Light-mode syntax (VS Code Light+) */
+html[data-theme="light"] .CodeMirror{color:#1e1e1e!important;background:transparent!important}
+html[data-theme="light"] .cm-keyword  {color:#0000ff!important}
+html[data-theme="light"] .cm-def      {color:#795e26!important}
+html[data-theme="light"] .cm-string,
+html[data-theme="light"] .cm-string-2 {color:#a31515!important}
+html[data-theme="light"] .cm-number   {color:#098658!important}
+html[data-theme="light"] .cm-comment  {color:#008000!important;font-style:italic}
+html[data-theme="light"] .cm-operator {color:#1e1e1e!important}
+html[data-theme="light"] .cm-builtin  {color:#267f99!important}
+html[data-theme="light"] .cm-variable {color:#001080!important}
+html[data-theme="light"] .cm-property {color:#001080!important}
+html[data-theme="light"] .cm-atom     {color:#0000ff!important}
+html[data-theme="light"] .cm-meta     {color:#1e1e1e!important}
+
+/* Light-mode output text */
+html[data-theme="light"] .out-item{color:#1e1e1e}
+html[data-theme="light"] .out-item.err{color:var(--error)}
+
+/* Light-mode inline code in markdown */
+html[data-theme="light"] .text-rendered code{background:rgba(0,0,0,.06);color:#1e1e1e}
+html[data-theme="light"] .text-rendered pre{background:rgba(0,0,0,.04)}
+html[data-theme="light"] .text-rendered pre code{color:#1e1e1e}
+html[data-theme="light"] .text-rendered td,
+html[data-theme="light"] .text-rendered th{border-color:rgba(0,0,0,.12);color:#1a1a1a}
+html[data-theme="light"] .text-rendered tr:nth-child(even){background:rgba(0,0,0,.03)}
+/* bold/italic: dark theme hardcodes near-white colors, must override for light */
+html[data-theme="light"] .text-rendered strong{color:#111111}
+html[data-theme="light"] .text-rendered em{color:#333333}
+html[data-theme="light"] .text-rendered h1,
+html[data-theme="light"] .text-rendered h2,
+html[data-theme="light"] .text-rendered h3{color:#111111}
+html[data-theme="light"] .text-rendered p{color:#1a1a1a}
+html[data-theme="light"] .text-rendered li{color:#1a1a1a}
+
+/* Light-mode "Add cell" strip */
+html[data-theme="light"] .add-strip button{background:transparent;color:var(--text-sec)}
+html[data-theme="light"] .add-strip button:hover{background:rgba(0,0,0,.05);color:var(--text)}
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 body{
@@ -361,15 +448,22 @@ except ImportError:
     pass
 
 def _grab_plots():
+    global _mpl_ready, _plt
     if not _mpl_ready:
-        return _json.dumps([])
+        try:
+            import matplotlib as _mpl
+            _mpl.use('Agg')
+            import matplotlib.pyplot as _plt
+            _mpl_ready = True
+        except ImportError:
+            return _json.dumps([])
     import io as _io2, base64 as _b64
     out = []
     for n in _plt.get_fignums():
         fig = _plt.figure(n)
         buf = _io2.BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight', dpi=110,
-                    facecolor='#141414', edgecolor='none')
+                    facecolor=globals().get('_plot_bg', '#141414'), edgecolor='none')
         buf.seek(0)
         out.append(_b64.b64encode(buf.read()).decode('utf-8'))
     _plt.close('all')
@@ -440,6 +534,20 @@ async function runCell(id) {
     if (/\bimport\b/.test(code)) {
       setKernel('busy', 'Loading packages…');
       try { await pyodide.loadPackagesFromImports(code); } catch(_) {}
+      // If matplotlib just became available, force Agg backend before user code runs
+      // so plt.show() doesn't create stray canvas elements outside the cell.
+      try {
+        await pyodide.runPythonAsync(
+          'if not _mpl_ready:\n' +
+          '    try:\n' +
+          '        import matplotlib as _mpl\n' +
+          '        _mpl.use("Agg")\n' +
+          '        import matplotlib.pyplot as _plt\n' +
+          '        _mpl_ready = True\n' +
+          '    except Exception:\n' +
+          '        pass\n'
+        );
+      } catch(_) {}
       setKernel('busy', 'Running…');
     }
 
@@ -459,6 +567,9 @@ async function runCell(id) {
       }
     }
 
+    // Pass current theme to Python so _grab_plots uses the right background
+    const _isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    await pyodide.runPythonAsync(`_plot_bg = '${_isDark ? '#141414' : '#ffffff'}'`);
     // Capture matplotlib figures
     const plotJson = await pyodide.runPythonAsync('_grab_plots()');
     const plots = JSON.parse(plotJson);
@@ -770,18 +881,12 @@ x = np.linspace(0, 2 * np.pi, 500)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3))
 
 ax1.plot(x, np.sin(x), color='#3b82f6', lw=2)
-ax1.set_title('sin(x)', color='#e0e0e0')
-ax1.set_facecolor('#1a1a2e')
+ax1.set_title('sin(x)')
 
 ax2.plot(x, np.cos(x), color='#f28b82', lw=2)
-ax2.set_title('cos(x)', color='#e0e0e0')
-ax2.set_facecolor('#1a1a2e')
+ax2.set_title('cos(x)')
 
-for ax in (ax1, ax2):
-    ax.tick_params(colors='#9a9a9a')
-    ax.spines[:].set_color('#333')
-
-plt.suptitle('Matplotlib in TuneOS Notebook', color='#e0e0e0', y=1.02)
+plt.suptitle('Matplotlib in TuneOS Notebook', y=1.02)
 plt.tight_layout()
 plt.show()`);
 

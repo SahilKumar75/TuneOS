@@ -811,6 +811,11 @@ class AppState(rx.State):
         self.chat_input = value
 
     @rx.event
+    def handle_composer_key(self, key: str):
+        if key == "Enter":
+            return AppState.start_project
+
+    @rx.event
     def handle_chat_key(self, key: str):
         if key == "Enter":
             return AppState.send_chat_message

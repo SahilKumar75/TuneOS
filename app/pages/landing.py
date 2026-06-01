@@ -3,6 +3,7 @@
 import reflex as rx
 
 from app.components.workspace_tabs import workspace_tab_bar
+from app.pages.finetune import finetune_page
 from app.state.app_state import AppState
 from app.styles import c
 
@@ -669,7 +670,6 @@ def _workspace_content() -> rx.Component:
                                 ),
                                 rx.hstack(
                                     _action_tile("bar-chart-2", "Analyze"),
-                                    _action_tile("activity", "Fine Tuning", on_click=rx.redirect("/finetune")),
                                     _action_tile(
                                         "notebook-pen",
                                         "Notebook",
@@ -859,7 +859,7 @@ def _workspace_content() -> rx.Component:
                             width="100%",
                             padding="24px 28px",
                         ),
-                        display=rx.cond(AppState.active_tab_is_notebook, "none", "block"),
+                        display=rx.cond(AppState.active_tab_is_overlay, "none", "block"),
                         width="100%",
                         height="100%",
                         overflow_y="auto",
@@ -884,6 +884,22 @@ def _workspace_content() -> rx.Component:
                             left="0",
                             width="100%",
                             height="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # ── Fine-tune wizard layer ────────────────────────────
+                    # Mounted once when a finetune tab opens; hidden when not active.
+                    rx.cond(
+                        AppState.has_finetune_tab,
+                        rx.box(
+                            finetune_page(),
+                            display=rx.cond(AppState.active_tab_is_finetune, "block", "none"),
+                            position="absolute",
+                            top="0",
+                            left="0",
+                            width="100%",
+                            height="100%",
+                            overflow_y="auto",
                         ),
                         rx.fragment(),
                     ),

@@ -1,0 +1,112 @@
+"""Pydantic schemas / response models for the TuneOS API."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+_VERSION = "0.2.0"
+
+
+class HealthResponse(BaseModel):
+    status: str = "ok"
+    version: str = _VERSION
+
+
+class GpuInfo(BaseModel):
+    available: bool
+    backend: str
+    name: str
+    detail: str = ""
+
+
+class ModelInfo(BaseModel):
+    name: str
+    hf_id: str
+    notes: str = ""
+
+
+class JobConfig(BaseModel):
+    model_id: str
+    model_source: str = "hub"
+    local_model_path: str = ""
+    hf_token: str = ""
+    dataset_path: str = ""
+    hub_dataset_id: str = ""
+    hub_dataset_split: str = "train"
+    instruction_col: str = "instruction"
+    output_col: str = "output"
+    technique: str = "qlora"
+    use_4bit: bool = True
+    lora_rank: int = Field(default=16, ge=1, le=256)
+    lora_alpha: int = Field(default=32, ge=1)
+    lora_dropout: float = Field(default=0.05, ge=0.0, le=0.5)
+    learning_rate: float = Field(default=2e-4, gt=0)
+    epochs: int = Field(default=3, ge=1, le=100)
+    batch_size: int = Field(default=4, ge=1)
+    max_seq_length: int = Field(default=512, ge=64)
+    gradient_accumulation_steps: int = Field(default=4, ge=1)
+    warmup_ratio: float = Field(default=0.03, ge=0.0, le=0.5)
+    lr_scheduler_type: str = "cosine"
+    bf16: bool = False
+    user_intent: str = ""
+    experiment_name: str = ""
+    experiment_id: str = ""
+
+
+class JobStatus(BaseModel):
+    job_id: str
+    status: str
+    progress: float = 0.0
+    message: str = ""
+    output_path: str = ""
+    error: str = ""
+
+
+class JobCreated(BaseModel):
+    job_id: str
+    status: str = "queued"
+
+
+class ModelValidateRequest(BaseModel):
+    model_id: str
+    hf_token: str = ""
+
+
+class DatasetGenRequest(BaseModel):
+    user_intent: str
+    method: str = "self_instruct"
+    n_samples: int = Field(default=50, ge=5, le=500)
+    seed_examples: list[dict] = []
+    hf_token: str = ""
+
+
+class CommentaryRequest(BaseModel):
+    epoch: float
+    total_epochs: int
+    loss_drop_pct: float
+    current_loss: float
+    intent: str = ""
+
+
+class PushHubRequest(BaseModel):
+    repo_name: str
+    hf_token: str = ""
+
+
+class InferRequest(BaseModel):
+    prompt: str
+    max_new_tokens: int = 300
+    temperature: float = 0.7
+
+
+class MergeRequest(BaseModel):
+    hf_token: str = ""
+
+
+class GgufRequest(BaseModel):
+    quant_type: str = "Q4_K_M"
+
+
+class GitHubPushRequest(BaseModel):
+    repo_url: str
+    github_token: str

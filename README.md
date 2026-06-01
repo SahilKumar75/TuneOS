@@ -26,6 +26,14 @@ The application ships in two forms from one codebase:
 
 ---
 
+## What's New
+
+- **7-step fine-tuning wizard** — a guided end-to-end flow from model selection through dataset, technique (LoRA/QLoRA), hyperparameters, live training, and deployment. Opens as a first-class workspace tab.
+- **Experiment tracking** — every training run is recorded in a local SQLite database (`storage/experiments.db`). Run history, hyperparameters, loss curves, and final metrics persist across restarts and are browsable in the Experiments view.
+- **Deploy tab** — after training completes, step 7 provides one-click actions: download the adapter weights, push to Hugging Face Hub, export to GGUF for local inference engines, push to a GitHub repository, and test the model in a built-in chat interface.
+
+---
+
 ## Capabilities
 
 | Domain | Description |
@@ -34,6 +42,8 @@ The application ships in two forms from one codebase:
 | Dataset preparation | Generate, format, and validate instruction and chat datasets prior to training. |
 | Model conversion | Convert weights between Hugging Face, SafeTensors, and GGUF formats for downstream inference engines. |
 | Training analysis | Track loss curves, evaluation metrics, and run history in real time. |
+| Experiment tracking | Persist every fine-tuning run (hyperparameters, loss history, metrics) in a local SQLite database, with comparison and filtering across runs. |
+| Model deployment | Download adapter weights, push to Hugging Face Hub or GitHub, export to GGUF, and test the fine-tuned model via a built-in inference chat. |
 | Model inspection | Explore architecture, tokenization behavior, and configuration of any supported checkpoint. |
 
 ---

@@ -8,8 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Mock heavy ML deps before importing the module
-sys.modules.setdefault("torch", MagicMock())
+# Mock heavy ML deps before importing the module.
+# torch sub-modules must be registered individually so Python's import
+# machinery doesn't try to traverse the MagicMock as a real package.
+_torch_mock = MagicMock()
+for _mod in ["torch", "torch.utils", "torch.utils.data", "torch.nn", "torch.cuda"]:
+    sys.modules.setdefault(_mod, _torch_mock)
 sys.modules.setdefault("transformers", MagicMock())
 sys.modules.setdefault("evaluate", MagicMock())
 

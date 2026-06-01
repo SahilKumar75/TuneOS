@@ -224,7 +224,7 @@ def _expanded_sidebar() -> rx.Component:
                 active=AppState.current_view == "datasets",
                 on_click=AppState.set_view("datasets"),
             ),
-            _nav_item("flask-conical", "Fine-tune", on_click=rx.redirect("/finetune")),
+            _nav_item("flask-conical", "Fine-tune", on_click=AppState.open_finetune_tab),
             spacing="1",
             width="100%",
             padding_x="8px",
@@ -334,7 +334,7 @@ def _collapsed_sidebar() -> rx.Component:
             active=AppState.current_view == "datasets",
             on_click=AppState.set_view("datasets"),
         ),
-        _collapsed_icon_btn("flask-conical", on_click=rx.redirect("/finetune")),
+        _collapsed_icon_btn("flask-conical", on_click=AppState.open_finetune_tab),
         rx.spacer(),
         _collapsed_icon_btn(
             "settings",

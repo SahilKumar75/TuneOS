@@ -20,11 +20,20 @@ def _tab_item(tab: WorkspaceTab) -> rx.Component:
                     color=rx.cond(is_active, c("accent"), c("text_muted")),
                     flex_shrink="0",
                 ),
-                rx.icon(
-                    "cpu",
-                    size=13,
-                    color=rx.cond(is_active, c("accent"), c("text_muted")),
-                    flex_shrink="0",
+                rx.cond(
+                    tab.tab_type == "finetune",
+                    rx.icon(
+                        "activity",
+                        size=13,
+                        color=rx.cond(is_active, c("accent"), c("text_muted")),
+                        flex_shrink="0",
+                    ),
+                    rx.icon(
+                        "cpu",
+                        size=13,
+                        color=rx.cond(is_active, c("accent"), c("text_muted")),
+                        flex_shrink="0",
+                    ),
                 ),
             ),
             # Title: inline input when editing, plain text otherwise

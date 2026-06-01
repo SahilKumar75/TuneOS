@@ -259,6 +259,25 @@ class AppState(rx.State):
         return any(t.tab_type == "notebook" for t in self.workspace_tabs)
 
     @rx.var
+    def active_tab_is_finetune(self) -> bool:
+        for tab in self.workspace_tabs:
+            if tab.id == self.active_workspace_tab_id:
+                return tab.tab_type == "finetune"
+        return False
+
+    @rx.var
+    def has_finetune_tab(self) -> bool:
+        return any(t.tab_type == "finetune" for t in self.workspace_tabs)
+
+    @rx.var
+    def active_tab_is_overlay(self) -> bool:
+        """True when the active tab takes over the full content area."""
+        for tab in self.workspace_tabs:
+            if tab.id == self.active_workspace_tab_id:
+                return tab.tab_type in ("notebook", "finetune")
+        return False
+
+    @rx.var
     def notebook_starter_code(self) -> str:
         model_id = self.preview_model_id or self.preview_title or "your/model"
         pipeline = self.preview_pipeline or "text-generation"
@@ -359,6 +378,22 @@ class AppState(rx.State):
         )
         self.workspace_tabs = [*self.workspace_tabs, new_tab]
         self.active_workspace_tab_id = nb_id
+
+    @rx.event
+    def open_finetune_tab(self):
+        """Open the Fine-tune wizard as a tab. Only one instance at a time."""
+        existing = next((t for t in self.workspace_tabs if t.tab_type == "finetune"), None)
+        if existing:
+            self.active_workspace_tab_id = existing.id
+            return
+        ft_tab = WorkspaceTab(
+            id="finetune-main",
+            title="Fine-tune",
+            tab_type="finetune",
+            closeable=True,
+        )
+        self.workspace_tabs = [*self.workspace_tabs, ft_tab]
+        self.active_workspace_tab_id = "finetune-main"
 
     @rx.event
     def start_editing_tab(self, tab_id: str, current_title: str):

@@ -671,6 +671,11 @@ def _workspace_content() -> rx.Component:
                                 rx.hstack(
                                     _action_tile("bar-chart-2", "Analyze"),
                                     _action_tile(
+                                        "activity",
+                                        "Fine Tuning",
+                                        on_click=AppState.open_finetune_tab,
+                                    ),
+                                    _action_tile(
                                         "notebook-pen",
                                         "Notebook",
                                         on_click=AppState.open_notebook_tab,

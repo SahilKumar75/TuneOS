@@ -127,9 +127,10 @@ def test_create_job_missing_model_id_fails():
     assert resp.status_code == 422
 
 
-def test_create_job_missing_dataset_path_fails():
+def test_create_job_without_dataset_path_succeeds():
+    # dataset_path is optional — hub dataset jobs omit it
     resp = client.post("/jobs", json={"model_id": "google/gemma-2b"})
-    assert resp.status_code == 422
+    assert resp.status_code == 201
 
 
 def test_get_job_status_returns_200():

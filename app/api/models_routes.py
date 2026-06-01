@@ -21,10 +21,12 @@ async def list_models():
 async def validate_model(req: ModelValidateRequest):
     """Validate that a model ID is loadable (HF Hub or local path)."""
     import asyncio
+
     token = req.hf_token or os.getenv("HF_TOKEN") or None
 
     def _check():
         from transformers import AutoConfig
+
         cfg = AutoConfig.from_pretrained(req.model_id, token=token, trust_remote_code=False)
         return cfg.model_type, getattr(cfg, "num_parameters", lambda: None)()
 

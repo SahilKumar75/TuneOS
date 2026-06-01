@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import reflex as rx
 
+from app.components.finetune.shared import (
+    _card,
+    _label,
+    _nav_buttons,
+    _preview_table,
+    _section_heading,
+)
 from app.state.finetune_state import FinetuneState
 from app.styles import c
-from app.components.finetune.shared import (
-    _card, _label, _nav_buttons, _section_heading, _preview_table,
-)
 
 
 def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
@@ -17,7 +21,8 @@ def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
         rx.hstack(rx.icon(icon, size=14), rx.text(label), spacing="2", align="center"),
         on_click=FinetuneState.set_data_source(mode),
         variant=rx.cond(is_active, "solid", "soft"),
-        color_scheme="blue", size="2",
+        color_scheme="blue",
+        size="2",
     )
 
 
@@ -30,17 +35,26 @@ def _upload_panel() -> rx.Component:
                     rx.icon("upload", size=28, color=c("text_muted")),
                     rx.text("Drag & drop or click to select a file", color=c("text_secondary")),
                     rx.text(".csv · .jsonl · .json", font_size="0.75rem", color=c("text_muted")),
-                    spacing="2", align="center",
+                    spacing="2",
+                    align="center",
                 ),
                 id="dataset_upload",
                 border=f"2px dashed {c('border')}",
-                border_radius="10px", padding="24px", width="100%", cursor="pointer",
+                border_radius="10px",
+                padding="24px",
+                width="100%",
+                cursor="pointer",
                 on_drop=FinetuneState.handle_dataset_upload(
-                    rx.upload_files(upload_id="dataset_upload")),
+                    rx.upload_files(upload_id="dataset_upload")
+                ),
             ),
-            rx.cond(FinetuneState.is_uploading,
-                    rx.hstack(rx.spinner(size="2"), rx.text("Uploading...", font_size="0.84rem"),
-                              spacing="2"), rx.fragment()),
+            rx.cond(
+                FinetuneState.is_uploading,
+                rx.hstack(
+                    rx.spinner(size="2"), rx.text("Uploading...", font_size="0.84rem"), spacing="2"
+                ),
+                rx.fragment(),
+            ),
             rx.cond(
                 FinetuneState.dataset_error != "",
                 rx.callout(FinetuneState.dataset_error, color_scheme="red", size="1"),
@@ -64,33 +78,53 @@ def _hub_dataset_panel() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("database", size=16, color=c("accent")),
-                        rx.text(FinetuneState.hub_dataset_id, font_weight="500",
-                                color=c("text_primary")),
-                        spacing="2", align="center",
+                        rx.text(
+                            FinetuneState.hub_dataset_id, font_weight="500", color=c("text_primary")
+                        ),
+                        spacing="2",
+                        align="center",
                     ),
                     rx.hstack(
                         rx.vstack(
                             _label("Instruction column"),
-                            rx.input(value=FinetuneState.hub_dataset_instruction_col,
-                                     on_change=FinetuneState.set_hub_instruction_col,
-                                     size="2", width="180px"),
+                            rx.input(
+                                value=FinetuneState.hub_dataset_instruction_col,
+                                on_change=FinetuneState.set_hub_instruction_col,
+                                size="2",
+                                width="180px",
+                            ),
                             spacing="1",
                         ),
                         rx.vstack(
                             _label("Output column"),
-                            rx.input(value=FinetuneState.hub_dataset_output_col,
-                                     on_change=FinetuneState.set_hub_output_col,
-                                     size="2", width="180px"),
+                            rx.input(
+                                value=FinetuneState.hub_dataset_output_col,
+                                on_change=FinetuneState.set_hub_output_col,
+                                size="2",
+                                width="180px",
+                            ),
                             spacing="1",
                         ),
-                        rx.button("Load preview", size="2", color_scheme="blue", variant="soft",
-                                  on_click=FinetuneState.load_hub_dataset_preview,
-                                  align_self="flex-end"),
-                        spacing="4", wrap="wrap",
+                        rx.button(
+                            "Load preview",
+                            size="2",
+                            color_scheme="blue",
+                            variant="soft",
+                            on_click=FinetuneState.load_hub_dataset_preview,
+                            align_self="flex-end",
+                        ),
+                        spacing="4",
+                        wrap="wrap",
                     ),
-                    rx.cond(FinetuneState.is_loading_hub_preview,
-                            rx.hstack(rx.spinner(size="2"), rx.text("Loading...", font_size="0.84rem"),
-                                      spacing="2"), rx.fragment()),
+                    rx.cond(
+                        FinetuneState.is_loading_hub_preview,
+                        rx.hstack(
+                            rx.spinner(size="2"),
+                            rx.text("Loading...", font_size="0.84rem"),
+                            spacing="2",
+                        ),
+                        rx.fragment(),
+                    ),
                     rx.cond(
                         FinetuneState.hub_preview_error != "",
                         rx.callout(FinetuneState.hub_preview_error, color_scheme="red", size="1"),
@@ -101,15 +135,23 @@ def _hub_dataset_panel() -> rx.Component:
                         _preview_table(FinetuneState.hub_dataset_preview),
                         rx.fragment(),
                     ),
-                    spacing="3", width="100%",
+                    spacing="3",
+                    width="100%",
                 ),
                 rx.vstack(
                     rx.text("No dataset selected yet.", color=c("text_muted"), font_size="0.86rem"),
-                    rx.text('Go to the Datasets tab and click "Use in Fine-tune" on any dataset.',
-                            color=c("text_muted"), font_size="0.82rem"),
-                    rx.button("Browse Datasets →",
-                              on_click=rx.redirect("/datasets"),
-                              color_scheme="blue", variant="soft", size="2"),
+                    rx.text(
+                        'Go to the Datasets tab and click "Use in Fine-tune" on any dataset.',
+                        color=c("text_muted"),
+                        font_size="0.82rem",
+                    ),
+                    rx.button(
+                        "Browse Datasets →",
+                        on_click=rx.redirect("/datasets"),
+                        color_scheme="blue",
+                        variant="soft",
+                        size="2",
+                    ),
                     spacing="3",
                 ),
             ),
@@ -123,21 +165,30 @@ def _generate_panel() -> rx.Component:
         rx.vstack(
             rx.hstack(
                 rx.icon("sparkles", size=16, color=c("accent")),
-                rx.text("Generate synthetic training data", font_weight="500",
-                        color=c("text_primary")),
-                spacing="2", align="center",
+                rx.text(
+                    "Generate synthetic training data", font_weight="500", color=c("text_primary")
+                ),
+                spacing="2",
+                align="center",
             ),
             rx.text(
                 "TuneOS will create instruction/output pairs tailored to your stated goal using "
                 "the Self-Instruct method (the same approach used to create Stanford Alpaca).",
-                font_size="0.82rem", color=c("text_secondary"),
+                font_size="0.82rem",
+                color=c("text_secondary"),
             ),
             rx.cond(
                 FinetuneState.user_intent != "",
                 rx.box(
-                    rx.text(f'Goal: "{FinetuneState.user_intent}"',
-                            font_size="0.82rem", color=c("text_muted"), font_style="italic"),
-                    background=c("bg_input"), border_radius="6px", padding="8px 12px",
+                    rx.text(
+                        f'Goal: "{FinetuneState.user_intent}"',
+                        font_size="0.82rem",
+                        color=c("text_muted"),
+                        font_style="italic",
+                    ),
+                    background=c("bg_input"),
+                    border_radius="6px",
+                    padding="8px 12px",
                 ),
                 rx.fragment(),
             ),
@@ -171,22 +222,27 @@ def _generate_panel() -> rx.Component:
                     ),
                     spacing="1",
                 ),
-                spacing="4", wrap="wrap",
+                spacing="4",
+                wrap="wrap",
             ),
             rx.button(
                 rx.cond(
                     FinetuneState.is_generating,
                     rx.hstack(rx.spinner(size="2"), rx.text("Generating..."), spacing="2"),
-                    rx.hstack(rx.icon("sparkles", size=14), rx.text("Generate examples"), spacing="2"),
+                    rx.hstack(
+                        rx.icon("sparkles", size=14), rx.text("Generate examples"), spacing="2"
+                    ),
                 ),
                 on_click=FinetuneState.generate_starter_dataset,
                 disabled=FinetuneState.is_generating,
-                color_scheme="blue", size="3",
+                color_scheme="blue",
+                size="3",
             ),
             rx.cond(
                 FinetuneState.generation_status != "",
-                rx.text(FinetuneState.generation_status, font_size="0.82rem",
-                        color=c("text_secondary")),
+                rx.text(
+                    FinetuneState.generation_status, font_size="0.82rem", color=c("text_secondary")
+                ),
                 rx.fragment(),
             ),
             rx.cond(
@@ -206,7 +262,8 @@ def _step3() -> rx.Component:
             _data_mode_btn("upload", "Upload a file", "upload"),
             _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
             _data_mode_btn("generate", "Generate with AI", "sparkles"),
-            spacing="2", margin_bottom="16px",
+            spacing="2",
+            margin_bottom="16px",
         ),
         rx.match(
             FinetuneState.data_source,
@@ -219,5 +276,7 @@ def _step3() -> rx.Component:
             next_label="Next: Configure →",
             next_disabled=~FinetuneState.can_go_to_configure,
         ),
-        spacing="0", width="100%", align_items="flex-start",
+        spacing="0",
+        width="100%",
+        align_items="flex-start",
     )

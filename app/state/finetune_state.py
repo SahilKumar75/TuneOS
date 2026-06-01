@@ -23,21 +23,21 @@ class FinetuneState(rx.State):
     current_step: int = 1  # 1–7
 
     # ── Step 1: Model source ──────────────────────────────────────
-    model_source: str = "hub"           # "hub" | "local" | "custom_string"
+    model_source: str = "hub"  # "hub" | "local" | "custom_string"
     selected_model_id: str = ""
     selected_model_name: str = ""
     custom_model_str: str = ""
     local_model_path: str = ""
     model_url_error: str = ""
     is_validating_model: bool = False
-    hf_token: str = ""                  # for gated models
-    selected_technique: str = "qlora"   # "qlora" | "lora"
+    hf_token: str = ""  # for gated models
+    selected_technique: str = "qlora"  # "qlora" | "lora"
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""
 
     # ── Step 3: Data ──────────────────────────────────────────────
-    data_source: str = "upload"         # "upload" | "hub_dataset" | "generate"
+    data_source: str = "upload"  # "upload" | "hub_dataset" | "generate"
     dataset_path: str = ""
     dataset_filename: str = ""
     dataset_preview: list[dict[str, Any]] = []
@@ -63,7 +63,7 @@ class FinetuneState(rx.State):
     seed_examples: list[dict[str, Any]] = []
 
     # ── Step 4: Configure ─────────────────────────────────────────
-    ui_mode: str = "simple"             # "simple" | "advanced"
+    ui_mode: str = "simple"  # "simple" | "advanced"
     lora_r: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.05
@@ -82,7 +82,7 @@ class FinetuneState(rx.State):
     is_starting: bool = False
     start_error: str = ""
     training_start_time: str = ""
-    training_status: str = "idle"       # idle | running | done | failed
+    training_status: str = "idle"  # idle | running | done | failed
     current_epoch: float = 0.0
     total_steps: int = 0
     elapsed_seconds: int = 0
@@ -99,7 +99,7 @@ class FinetuneState(rx.State):
     # ── Step 6: Results ───────────────────────────────────────────
     eval_perplexity: float = 0.0
     eval_bleu: float = 0.0
-    eval_status: str = "idle"           # idle | running | done | error | not_ready
+    eval_status: str = "idle"  # idle | running | done | error | not_ready
     test_chat_history: list[dict[str, Any]] = []
     chat_input: str = ""
     chat_loading: bool = False
@@ -136,7 +136,11 @@ class FinetuneState(rx.State):
     @rx.var
     def can_go_to_configure(self) -> bool:
         has_data = (
-            (self.data_source == "upload" and bool(self.dataset_path) and not bool(self.dataset_error))
+            (
+                self.data_source == "upload"
+                and bool(self.dataset_path)
+                and not bool(self.dataset_error)
+            )
             or (self.data_source == "hub_dataset" and bool(self.hub_dataset_id))
             or (self.data_source == "generate" and bool(self.dataset_path))
         )
@@ -327,9 +331,7 @@ class FinetuneState(rx.State):
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.get(
-                    f"{API_BASE}/api/datasets/{self.hub_dataset_id}/preview"
-                )
+                resp = await client.get(f"{API_BASE}/api/datasets/{self.hub_dataset_id}/preview")
             if resp.status_code == 200:
                 data = resp.json()
                 async with self:
@@ -357,8 +359,7 @@ class FinetuneState(rx.State):
             self.existing_datasets = []
             return
         self.existing_datasets = [
-            f for f in os.listdir(DATASET_DIR)
-            if os.path.isfile(os.path.join(DATASET_DIR, f))
+            f for f in os.listdir(DATASET_DIR) if os.path.isfile(os.path.join(DATASET_DIR, f))
         ]
 
     @rx.event
@@ -400,6 +401,7 @@ class FinetuneState(rx.State):
                 df = pd.read_csv(path, nrows=10)
             elif path.endswith(".json") and not path.endswith(".jsonl"):
                 import json as _json
+
                 with open(path) as fh:
                     raw = _json.load(fh)
                 df = pd.DataFrame(raw if isinstance(raw, list) else [raw])
@@ -479,15 +481,16 @@ class FinetuneState(rx.State):
                     n = stats.get("final_count", len(samples))
                     div = stats.get("diversity_score", 0)
                     self.generation_diversity_score = div
-                    self.generation_status = (
-                        f"Generated {n} examples"
-                        + (f" · diversity {div:.2f}" if div else "")
+                    self.generation_status = f"Generated {n} examples" + (
+                        f" · diversity {div:.2f}" if div else ""
                     )
                     self.is_generating = False
                     self.data_source = "generate"
             else:
                 async with self:
-                    self.generation_status = f"Generation failed: {resp.json().get('detail', 'Unknown error')}"
+                    self.generation_status = (
+                        f"Generation failed: {resp.json().get('detail', 'Unknown error')}"
+                    )
                     self.is_generating = False
         except Exception as exc:
             async with self:
@@ -580,7 +583,10 @@ class FinetuneState(rx.State):
             return
 
         exp_id = str(uuid.uuid4())
-        exp_name = self.experiment_name or f"{self.effective_model_name}-{datetime.now().strftime('%m%d-%H%M')}"
+        exp_name = (
+            self.experiment_name
+            or f"{self.effective_model_name}-{datetime.now().strftime('%m%d-%H%M')}"
+        )
 
         async with self:
             self.is_starting = True
@@ -661,13 +667,15 @@ class FinetuneState(rx.State):
             current_epoch = data.get("epoch", 0)
 
             async with self:
-                self.loss_history.append({
-                    "step": data.get("step", 0),
-                    "loss": current_loss,
-                    "epoch": current_epoch,
-                    "learning_rate": data.get("learning_rate", 0),
-                    "eval_loss": data.get("eval_loss"),
-                })
+                self.loss_history.append(
+                    {
+                        "step": data.get("step", 0),
+                        "loss": current_loss,
+                        "epoch": current_epoch,
+                        "learning_rate": data.get("learning_rate", 0),
+                        "eval_loss": data.get("eval_loss"),
+                    }
+                )
                 self.current_epoch = current_epoch
                 self.total_steps = data.get("total_steps", 0)
                 self.elapsed_seconds = data.get("elapsed_seconds", 0)
@@ -676,15 +684,19 @@ class FinetuneState(rx.State):
             # Detect epoch boundary and log a summary
             if int(current_epoch) > int(prev_epoch):
                 if epoch_start_loss is not None and self.loss_history:
-                    drop_pct = round((epoch_start_loss - current_loss) / max(epoch_start_loss, 1e-9) * 100, 1)
+                    drop_pct = round(
+                        (epoch_start_loss - current_loss) / max(epoch_start_loss, 1e-9) * 100, 1
+                    )
                     async with self:
-                        self.epoch_log.append({
-                            "epoch": int(prev_epoch) + 1,
-                            "loss_start": round(epoch_start_loss, 4),
-                            "loss_end": round(current_loss, 4),
-                            "drop_pct": drop_pct,
-                            "elapsed_seconds": self.elapsed_seconds,
-                        })
+                        self.epoch_log.append(
+                            {
+                                "epoch": int(prev_epoch) + 1,
+                                "loss_start": round(epoch_start_loss, 4),
+                                "loss_end": round(current_loss, 4),
+                                "drop_pct": drop_pct,
+                                "elapsed_seconds": self.elapsed_seconds,
+                            }
+                        )
                     # Refresh AI commentary
                     await self._refresh_commentary(current_loss, drop_pct, int(current_epoch))
                 epoch_start_loss = current_loss
@@ -746,6 +758,7 @@ class FinetuneState(rx.State):
     async def _auto_eval(self):
         for _ in range(30):
             import asyncio
+
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     resp = await client.get(f"{API_BASE}/api/jobs/{self.job_id}/eval")
@@ -765,26 +778,28 @@ class FinetuneState(rx.State):
 
     async def _save_experiment_record(self):
         final_loss = self.loss_history[-1]["loss"] if self.loss_history else 0.0
-        save_experiment_run({
-            "id": self.experiment_id,
-            "name": self.experiment_name,
-            "model_id": self.effective_model_id,
-            "model_source": self.model_source,
-            "technique": self.selected_technique,
-            "epochs": self.epochs,
-            "learning_rate": self.learning_rate,
-            "lora_r": self.lora_r,
-            "batch_size": self.batch_size,
-            "dataset_name": self.dataset_name,
-            "user_intent": self.user_intent,
-            "final_loss": final_loss,
-            "perplexity": self.eval_perplexity,
-            "started_at": self.training_start_time,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "status": self.training_status,
-            "output_path": self.output_path,
-            "loss_history": self.loss_history,
-        })
+        save_experiment_run(
+            {
+                "id": self.experiment_id,
+                "name": self.experiment_name,
+                "model_id": self.effective_model_id,
+                "model_source": self.model_source,
+                "technique": self.selected_technique,
+                "epochs": self.epochs,
+                "learning_rate": self.learning_rate,
+                "lora_r": self.lora_r,
+                "batch_size": self.batch_size,
+                "dataset_name": self.dataset_name,
+                "user_intent": self.user_intent,
+                "final_loss": final_loss,
+                "perplexity": self.eval_perplexity,
+                "started_at": self.training_start_time,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "status": self.training_status,
+                "output_path": self.output_path,
+                "loss_history": self.loss_history,
+            }
+        )
         async with self:
             pass
         return ExperimentState.load_runs()

@@ -75,6 +75,7 @@ async def create_job(config: JobConfig):
 
     try:
         from workers.train_task import run_finetune
+
         run_finetune.apply_async(
             kwargs={
                 "job_id": job_id,
@@ -112,6 +113,7 @@ async def get_job(job_id: str):
 async def cancel_job(job_id: str):
     try:
         from workers.celery_app import celery_app
+
         celery_app.control.revoke(job_id, terminate=True, signal="SIGTERM")
     except Exception:
         pass
@@ -132,8 +134,11 @@ async def download_adapter(job_id: str):
                 arcname = os.path.relpath(full, adapter_dir)
                 zf.write(full, arcname)
     buf.seek(0)
-    return StreamingResponse(buf, media_type="application/zip",
-                             headers={"Content-Disposition": f"attachment; filename=adapter_{job_id[:8]}.zip"})
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=adapter_{job_id[:8]}.zip"},
+    )
 
 
 @router.post("/jobs/{job_id}/push_hub")
@@ -148,6 +153,7 @@ async def push_to_hub(job_id: str, req: PushHubRequest):
 
     try:
         from huggingface_hub import HfApi
+
         api = HfApi(token=token)
         api.create_repo(repo_id=req.repo_name, repo_type="model", exist_ok=True, private=True)
         api.upload_folder(folder_path=adapter_dir, repo_id=req.repo_name, repo_type="model")
@@ -175,6 +181,7 @@ async def merge_adapter(job_id: str, req: MergeRequest):
 
     try:
         from workers.merge_task import merge_adapter_task
+
         merge_adapter_task.apply_async(
             kwargs={
                 "job_id": job_id,
@@ -204,8 +211,11 @@ async def download_merged(job_id: str):
                 arcname = os.path.relpath(full, merged_dir)
                 zf.write(full, arcname)
     buf.seek(0)
-    return StreamingResponse(buf, media_type="application/zip",
-                             headers={"Content-Disposition": f"attachment; filename=merged_{job_id[:8]}.zip"})
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=merged_{job_id[:8]}.zip"},
+    )
 
 
 @router.post("/jobs/{job_id}/export-gguf", status_code=202)
@@ -216,8 +226,13 @@ async def export_gguf(job_id: str, req: GgufRequest):
 
     try:
         from workers.merge_task import export_gguf_task
+
         export_gguf_task.apply_async(
-            kwargs={"job_id": job_id, "merged_model_path": merged_dir, "quant_type": req.quant_type},
+            kwargs={
+                "job_id": job_id,
+                "merged_model_path": merged_dir,
+                "quant_type": req.quant_type,
+            },
             task_id=f"{job_id}-gguf",
         )
     except Exception as exc:
@@ -234,6 +249,7 @@ async def push_github(job_id: str, req: GitHubPushRequest):
 
     try:
         from workers.merge_task import push_github_task
+
         push_github_task.apply_async(
             kwargs={
                 "job_id": job_id,
@@ -255,7 +271,9 @@ async def get_commentary(job_id: str, req: CommentaryRequest):
     epoch_frac = req.epoch / max(req.total_epochs, 1)
     drop = req.loss_drop_pct
 
-    quality = "great" if drop > 40 else ("healthy" if drop > 20 else ("slow" if drop > 5 else "stalled"))
+    quality = (
+        "great" if drop > 40 else ("healthy" if drop > 20 else ("slow" if drop > 5 else "stalled"))
+    )
     phase = "early" if epoch_frac < 0.33 else ("middle" if epoch_frac < 0.67 else "final")
     intent_frag = f" for your {req.intent}" if req.intent else ""
     loss_verb = {
@@ -266,23 +284,46 @@ async def get_commentary(job_id: str, req: CommentaryRequest):
     }[quality]
 
     templates = {
-        ("great", "early"): f"Strong start! Loss {loss_verb} — the model is picking up patterns{intent_frag} quickly.",
-        ("great", "middle"): f"Training is going well. Loss {loss_verb} and the model is solidifying its skills{intent_frag}.",
-        ("great", "final"): f"Excellent run! Loss {loss_verb}. Your model looks ready{intent_frag}.",
-        ("healthy", "early"): f"Good progress. Loss {loss_verb} — on track for a solid result{intent_frag}.",
+        (
+            "great",
+            "early",
+        ): f"Strong start! Loss {loss_verb} — the model is picking up patterns{intent_frag} quickly.",
+        (
+            "great",
+            "middle",
+        ): f"Training is going well. Loss {loss_verb} and the model is solidifying its skills{intent_frag}.",
+        (
+            "great",
+            "final",
+        ): f"Excellent run! Loss {loss_verb}. Your model looks ready{intent_frag}.",
+        (
+            "healthy",
+            "early",
+        ): f"Good progress. Loss {loss_verb} — on track for a solid result{intent_frag}.",
         ("healthy", "middle"): f"Training looks healthy. Loss {loss_verb}. Keep it running.",
         ("healthy", "final"): f"Looking good in the final stretch. Loss {loss_verb}.",
         ("slow", "early"): f"Loss {loss_verb} — a slow start is normal. Give it a few more epochs.",
         ("slow", "middle"): f"Loss {loss_verb}. Consider a higher learning rate if this continues.",
-        ("slow", "final"): f"Loss {loss_verb}. The model may need more data or more epochs next time.",
-        ("stalled", "early"): f"Loss {loss_verb} yet. Try a higher learning rate or check your dataset.",
-        ("stalled", "middle"): f"Loss {loss_verb}. Training may be stuck — check the learning rate.",
-        ("stalled", "final"): f"Loss {loss_verb} much. Try more epochs or a larger learning rate next run.",
+        (
+            "slow",
+            "final",
+        ): f"Loss {loss_verb}. The model may need more data or more epochs next time.",
+        (
+            "stalled",
+            "early",
+        ): f"Loss {loss_verb} yet. Try a higher learning rate or check your dataset.",
+        (
+            "stalled",
+            "middle",
+        ): f"Loss {loss_verb}. Training may be stuck — check the learning rate.",
+        (
+            "stalled",
+            "final",
+        ): f"Loss {loss_verb} much. Try more epochs or a larger learning rate next run.",
     }
 
     commentary = templates.get(
-        (quality, phase),
-        f"Training in progress. Current loss: {req.current_loss:.4f}."
+        (quality, phase), f"Training in progress. Current loss: {req.current_loss:.4f}."
     )
     return {"commentary": commentary}
 
@@ -290,6 +331,7 @@ async def get_commentary(job_id: str, req: CommentaryRequest):
 @router.get("/jobs/{job_id}/eval")
 async def get_eval(job_id: str):
     import redis.asyncio as aioredis
+
     r = aioredis.from_url(REDIS_URL)
     try:
         raw = await r.get(f"job:{job_id}:eval")
@@ -330,8 +372,10 @@ async def infer(job_id: str, req: InferRequest):
         try:
             from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer
+
             base_model = AutoModelForCausalLM.from_pretrained(
-                base_model_name, device_map="auto", torch_dtype=torch.float16)
+                base_model_name, device_map="auto", torch_dtype=torch.float16
+            )
             tokenizer = AutoTokenizer.from_pretrained(base_model_name)
             model = PeftModel.from_pretrained(base_model, adapter_dir)
             model.eval()
@@ -350,7 +394,9 @@ async def infer(job_id: str, req: InferRequest):
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        response = tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+        response = tokenizer.decode(
+            out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
 

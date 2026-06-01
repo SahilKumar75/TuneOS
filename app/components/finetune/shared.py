@@ -22,13 +22,15 @@ def _card(*children, padding: str = "20px", width: str = "100%", **props) -> rx.
 
 
 def _label(text: str) -> rx.Component:
-    return rx.text(text, font_size="0.8rem", font_weight="500",
-                   color=c("text_secondary"), margin_bottom="6px")
+    return rx.text(
+        text, font_size="0.8rem", font_weight="500", color=c("text_secondary"), margin_bottom="6px"
+    )
 
 
 def _section_heading(text: str) -> rx.Component:
-    return rx.text(text, font_size="1.05rem", font_weight="600",
-                   color=c("text_primary"), margin_bottom="16px")
+    return rx.text(
+        text, font_size="1.05rem", font_weight="600", color=c("text_primary"), margin_bottom="16px"
+    )
 
 
 def _nav_buttons(
@@ -39,8 +41,15 @@ def _nav_buttons(
     show_back: bool = True,
 ) -> rx.Component:
     return rx.hstack(
-        rx.button(back_label, on_click=FinetuneState.prev_step,
-                  variant="soft", color_scheme="gray", size="2") if show_back else rx.fragment(),
+        rx.button(
+            back_label,
+            on_click=FinetuneState.prev_step,
+            variant="soft",
+            color_scheme="gray",
+            size="2",
+        )
+        if show_back
+        else rx.fragment(),
         rx.spacer(),
         rx.button(
             next_label,
@@ -79,16 +88,33 @@ def _preview_table(rows: list, label: str = "Preview") -> rx.Component:
                 rx.foreach(
                     rows,
                     lambda row: rx.table.row(
-                        rx.table.cell(rx.text(row["instruction"], font_size="0.78rem",
-                                              overflow="hidden", text_overflow="ellipsis",
-                                              white_space="nowrap", max_width="300px")),
-                        rx.table.cell(rx.text(row["output"], font_size="0.78rem",
-                                              overflow="hidden", text_overflow="ellipsis",
-                                              white_space="nowrap", max_width="260px")),
-                    )
+                        rx.table.cell(
+                            rx.text(
+                                row["instruction"],
+                                font_size="0.78rem",
+                                overflow="hidden",
+                                text_overflow="ellipsis",
+                                white_space="nowrap",
+                                max_width="300px",
+                            )
+                        ),
+                        rx.table.cell(
+                            rx.text(
+                                row["output"],
+                                font_size="0.78rem",
+                                overflow="hidden",
+                                text_overflow="ellipsis",
+                                white_space="nowrap",
+                                max_width="260px",
+                            )
+                        ),
+                    ),
                 )
             ),
-            width="100%", variant="surface", size="1",
+            width="100%",
+            variant="surface",
+            size="1",
         ),
-        width="100%", spacing="2",
+        width="100%",
+        spacing="2",
     )

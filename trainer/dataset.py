@@ -9,7 +9,9 @@ PROMPT_TEMPLATE = """### Instruction:
 {output}"""
 
 
-def format_prompt(row: dict, instruction_col: str = "instruction", output_col: str = "output") -> str:
+def format_prompt(
+    row: dict, instruction_col: str = "instruction", output_col: str = "output"
+) -> str:
     return PROMPT_TEMPLATE.format(
         instruction=row.get(instruction_col, row.get("instruction", "")),
         output=row.get(output_col, row.get("output", "")),
@@ -36,6 +38,7 @@ def load_and_tokenize(
         raw = Dataset.from_pandas(df)
     elif file_path.endswith(".json") and not file_path.endswith(".jsonl"):
         import json
+
         with open(file_path) as f:
             data = json.load(f)
         raw = Dataset.from_list(data if isinstance(data, list) else [data])

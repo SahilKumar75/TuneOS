@@ -34,9 +34,13 @@ def finetune(
 
     # 2. Load dataset
     dataset = load_and_tokenize(
-        dataset_path, tokenizer, model_cfg.max_seq_length,
-        hub_dataset_id=hub_dataset_id, hub_split=hub_split,
-        instruction_col=instruction_col, output_col=output_col,
+        dataset_path,
+        tokenizer,
+        model_cfg.max_seq_length,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
     )
 
     # 3. Training arguments

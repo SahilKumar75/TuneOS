@@ -13,21 +13,31 @@ OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
 DATASET_DIR = os.getenv("DATASET_DIR", "./storage/datasets")
 
 _SUPPORTED_MODELS: list[dict] = [
-    {"name": "Mistral 7B", "hf_id": "mistralai/Mistral-7B-v0.1", "notes": "Primary target, well-tested with QLoRA"},
+    {
+        "name": "Mistral 7B",
+        "hf_id": "mistralai/Mistral-7B-v0.1",
+        "notes": "Primary target, well-tested with QLoRA",
+    },
     {"name": "Llama 3 8B", "hf_id": "meta-llama/Meta-Llama-3-8B", "notes": "Requires HF token"},
-    {"name": "Phi-3 Mini", "hf_id": "microsoft/Phi-3-mini-4k-instruct", "notes": "Fast, runs on smaller GPUs"},
+    {
+        "name": "Phi-3 Mini",
+        "hf_id": "microsoft/Phi-3-mini-4k-instruct",
+        "notes": "Fast, runs on smaller GPUs",
+    },
     {"name": "Gemma 2B", "hf_id": "google/gemma-2b", "notes": "Good for low-VRAM environments"},
 ]
 
 
 def _redis_sync():
     import redis
+
     return redis.from_url(REDIS_URL)
 
 
 def _get_job_status_from_redis(job_id: str) -> dict:
     try:
         from workers.status import get_job_status
+
         return get_job_status(job_id)
     except Exception:
         return {"status": "unknown", "job_id": job_id}
@@ -37,23 +47,35 @@ def _detect_gpu() -> GpuInfo:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
-            return GpuInfo(available=True, backend="cuda",
-                           name=result.stdout.strip().split("\n")[0],
-                           detail=result.stdout.strip())
+            return GpuInfo(
+                available=True,
+                backend="cuda",
+                name=result.stdout.strip().split("\n")[0],
+                detail=result.stdout.strip(),
+            )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
     if platform.system() == "Darwin":
         try:
-            result = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
-                                    capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
             if result.returncode == 0 and "Apple" in result.stdout:
-                return GpuInfo(available=True, backend="mps",
-                               name=result.stdout.strip(),
-                               detail="Apple Metal Performance Shaders")
+                return GpuInfo(
+                    available=True,
+                    backend="mps",
+                    name=result.stdout.strip(),
+                    detail="Apple Metal Performance Shaders",
+                )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 

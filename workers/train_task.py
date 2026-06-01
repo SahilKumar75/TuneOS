@@ -12,6 +12,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 try:
     import spaces
+
     _gpu_decorator = spaces.GPU
 except ImportError:
     _gpu_decorator = lambda fn: fn  # noqa: E731
@@ -19,9 +20,16 @@ except ImportError:
 
 @_gpu_decorator
 def _run_finetune_impl(
-    task_self, job_id: str, model_cfg: dict, lora_cfg: dict, train_cfg: dict, dataset_path: str,
-    hub_dataset_id: str = "", hub_split: str = "train",
-    instruction_col: str = "instruction", output_col: str = "output",
+    task_self,
+    job_id: str,
+    model_cfg: dict,
+    lora_cfg: dict,
+    train_cfg: dict,
+    dataset_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
 ):
     """Core logic, separated so it can be unit-tested without a live Celery broker."""
     r = redis.from_url(REDIS_URL)
@@ -49,9 +57,13 @@ def _run_finetune_impl(
             from trainer.evaluate import evaluate_model
 
             full_dataset = load_and_tokenize(
-                dataset_path, tokenizer, cfg.max_seq_length,
-                hub_dataset_id=hub_dataset_id, hub_split=hub_split,
-                instruction_col=instruction_col, output_col=output_col,
+                dataset_path,
+                tokenizer,
+                cfg.max_seq_length,
+                hub_dataset_id=hub_dataset_id,
+                hub_split=hub_split,
+                instruction_col=instruction_col,
+                output_col=output_col,
             )
             n_eval = max(1, int(0.2 * len(full_dataset)))
             eval_sample = full_dataset.shuffle(seed=42).select(range(n_eval))
@@ -90,12 +102,26 @@ def _run_finetune_impl(
 
 @celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200)
 def run_finetune(
-    self, job_id: str, model_cfg: dict, lora_cfg: dict, train_cfg: dict, dataset_path: str,
-    hub_dataset_id: str = "", hub_split: str = "train",
-    instruction_col: str = "instruction", output_col: str = "output",
+    self,
+    job_id: str,
+    model_cfg: dict,
+    lora_cfg: dict,
+    train_cfg: dict,
+    dataset_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
 ):
     return _run_finetune_impl(
-        self, job_id, model_cfg, lora_cfg, train_cfg, dataset_path,
-        hub_dataset_id=hub_dataset_id, hub_split=hub_split,
-        instruction_col=instruction_col, output_col=output_col,
+        self,
+        job_id,
+        model_cfg,
+        lora_cfg,
+        train_cfg,
+        dataset_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
     )

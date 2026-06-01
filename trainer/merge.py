@@ -64,9 +64,8 @@ def export_gguf(
     # Try to find llama.cpp convert script via llama-cpp-python package
     try:
         import llama_cpp
-        convert_script = os.path.join(
-            os.path.dirname(llama_cpp.__file__), "convert_hf_to_gguf.py"
-        )
+
+        convert_script = os.path.join(os.path.dirname(llama_cpp.__file__), "convert_hf_to_gguf.py")
     except ImportError:
         convert_script = shutil.which("convert_hf_to_gguf.py") or ""
 

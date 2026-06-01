@@ -88,9 +88,7 @@ class ExperimentState(rx.State):
     def load_runs(self):
         try:
             with _get_conn() as conn:
-                rows = conn.execute(
-                    "SELECT * FROM runs ORDER BY started_at DESC"
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
             self.runs = [
                 ExperimentRun(
                     id=r["id"],

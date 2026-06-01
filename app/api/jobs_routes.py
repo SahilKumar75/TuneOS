@@ -27,6 +27,16 @@ from app.api.schemas import (
 router = APIRouter()
 
 _INFER_CACHE: dict = {}
+_INFER_CACHE_LOCK: dict = {}  # per-job threading.Lock acquired during model load
+
+
+def _resolve_job_dir(job_id: str) -> str:
+    """Resolve job_id to an absolute path inside OUTPUT_DIR, rejecting traversal."""
+    base = os.path.abspath(OUTPUT_DIR)
+    candidate = os.path.abspath(os.path.join(base, job_id))
+    if os.path.commonpath([base, candidate]) != base:
+        raise HTTPException(status_code=400, detail="Invalid job id")
+    return candidate
 
 
 @router.get("/jobs", response_model=list[JobStatus])
@@ -122,7 +132,7 @@ async def cancel_job(job_id: str):
 
 @router.get("/jobs/{job_id}/download")
 async def download_adapter(job_id: str):
-    adapter_dir = os.path.join(OUTPUT_DIR, job_id)
+    adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
@@ -147,7 +157,7 @@ async def push_to_hub(job_id: str, req: PushHubRequest):
     if not token:
         raise HTTPException(status_code=400, detail="HF token required")
 
-    adapter_dir = os.path.join(OUTPUT_DIR, job_id)
+    adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
@@ -165,7 +175,7 @@ async def push_to_hub(job_id: str, req: PushHubRequest):
 
 @router.post("/jobs/{job_id}/merge", status_code=202)
 async def merge_adapter(job_id: str, req: MergeRequest):
-    adapter_dir = os.path.join(OUTPUT_DIR, job_id)
+    adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
@@ -199,7 +209,7 @@ async def merge_adapter(job_id: str, req: MergeRequest):
 
 @router.get("/jobs/{job_id}/download-merged")
 async def download_merged(job_id: str):
-    merged_dir = os.path.join(OUTPUT_DIR, job_id, "merged")
+    merged_dir = os.path.join(_resolve_job_dir(job_id), "merged")
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=404, detail="Merged model not found — run merge first")
 
@@ -220,7 +230,7 @@ async def download_merged(job_id: str):
 
 @router.post("/jobs/{job_id}/export-gguf", status_code=202)
 async def export_gguf(job_id: str, req: GgufRequest):
-    merged_dir = os.path.join(OUTPUT_DIR, job_id, "merged")
+    merged_dir = os.path.join(_resolve_job_dir(job_id), "merged")
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=400, detail="Merge the model first before exporting GGUF")
 
@@ -243,7 +253,7 @@ async def export_gguf(job_id: str, req: GgufRequest):
 
 @router.post("/jobs/{job_id}/push-github")
 async def push_github(job_id: str, req: GitHubPushRequest):
-    adapter_dir = os.path.join(OUTPUT_DIR, job_id)
+    adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
@@ -353,35 +363,42 @@ async def infer(job_id: str, req: InferRequest):
     if state.get("status") != "done":
         raise HTTPException(status_code=400, detail="Job not complete")
 
-    adapter_dir = state.get("output_path") or os.path.join(OUTPUT_DIR, job_id)
+    adapter_dir = state.get("output_path") or _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter directory not found")
 
-    global _INFER_CACHE
+    import threading
+
+    global _INFER_CACHE, _INFER_CACHE_LOCK
     if job_id not in _INFER_CACHE:
-        _INFER_CACHE.clear()
-        config_path = os.path.join(adapter_dir, "adapter_config.json")
-        if not os.path.exists(config_path):
-            raise HTTPException(status_code=404, detail="adapter_config.json not found")
-        with open(config_path) as f:
-            adapter_cfg = json.load(f)
-        base_model_name = adapter_cfg.get("base_model_name_or_path", "")
-        if not base_model_name:
-            raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
+        lock = _INFER_CACHE_LOCK.setdefault(job_id, threading.Lock())
+        with lock:
+            # Double-checked: another thread may have loaded it while we waited
+            if job_id not in _INFER_CACHE:
+                config_path = os.path.join(adapter_dir, "adapter_config.json")
+                if not os.path.exists(config_path):
+                    raise HTTPException(status_code=404, detail="adapter_config.json not found")
+                with open(config_path) as f:
+                    adapter_cfg = json.load(f)
+                base_model_name = adapter_cfg.get("base_model_name_or_path", "")
+                if not base_model_name:
+                    raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
 
-        try:
-            from peft import PeftModel
-            from transformers import AutoModelForCausalLM, AutoTokenizer
+                try:
+                    from peft import PeftModel
+                    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-            base_model = AutoModelForCausalLM.from_pretrained(
-                base_model_name, device_map="auto", torch_dtype=torch.float16
-            )
-            tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-            model = PeftModel.from_pretrained(base_model, adapter_dir)
-            model.eval()
-            _INFER_CACHE[job_id] = (model, tokenizer)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to load model: {exc}") from exc
+                    base_model = AutoModelForCausalLM.from_pretrained(
+                        base_model_name, device_map="auto", torch_dtype=torch.float16
+                    )
+                    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+                    model = PeftModel.from_pretrained(base_model, adapter_dir)
+                    model.eval()
+                    _INFER_CACHE[job_id] = (model, tokenizer)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500, detail=f"Failed to load model: {exc}"
+                    ) from exc
 
     model, tokenizer = _INFER_CACHE[job_id]
     try:

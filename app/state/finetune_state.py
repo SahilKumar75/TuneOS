@@ -290,11 +290,19 @@ class FinetuneState(rx.State):
         data = await file.read()
         dest_dir = os.path.join("./storage/models", uuid.uuid4().hex)
         os.makedirs(dest_dir, exist_ok=True)
-        dest_path = os.path.join(dest_dir, file.filename)
+        safe_name = os.path.basename(file.filename)
+        dest_path = os.path.join(dest_dir, safe_name)
         with open(dest_path, "wb") as f:
             f.write(data)
 
-        self.local_model_path = dest_dir if file.filename.endswith(".zip") else dest_path
+        if safe_name.endswith(".zip"):
+            import zipfile
+
+            with zipfile.ZipFile(dest_path) as archive:
+                archive.extractall(dest_dir)
+            self.local_model_path = dest_dir
+        else:
+            self.local_model_path = dest_path
         self.model_source = "local"
         self.is_validating_model = False
 
@@ -382,7 +390,7 @@ class FinetuneState(rx.State):
         file = files[0]
         data = await file.read()
         os.makedirs(DATASET_DIR, exist_ok=True)
-        out_path = os.path.join(DATASET_DIR, file.filename)
+        out_path = os.path.join(DATASET_DIR, os.path.basename(file.filename))
         with open(out_path, "wb") as f:
             f.write(data)
 

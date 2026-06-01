@@ -49,7 +49,7 @@ async def preview_dataset(dataset_id: str):
     def _load():
         from datasets import load_dataset
 
-        ds = load_dataset(dataset_id, split="train[:5]", trust_remote_code=True)
+        ds = load_dataset(dataset_id, split="train[:5]", trust_remote_code=False)
         rows = [
             dict(zip(ds.column_names, [ds[col][i] for col in ds.column_names], strict=False))
             for i in range(len(ds))

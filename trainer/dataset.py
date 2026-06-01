@@ -32,7 +32,7 @@ def load_and_tokenize(
     format as instruction prompts, and tokenize.
     """
     if hub_dataset_id:
-        raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=True)
+        raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=False)
     elif file_path.endswith(".csv"):
         df = pd.read_csv(file_path)
         raw = Dataset.from_pandas(df)
@@ -45,8 +45,19 @@ def load_and_tokenize(
     else:
         raw = load_dataset("json", data_files=file_path, split="train")
 
+    # Validate columns exist before renaming
+    if instruction_col not in raw.column_names:
+        raise ValueError(
+            f"Instruction column '{instruction_col}' not found. "
+            f"Available columns: {raw.column_names}"
+        )
+    if output_col not in raw.column_names:
+        raise ValueError(
+            f"Output column '{output_col}' not found. Available columns: {raw.column_names}"
+        )
+
     # Normalise column names so format_prompt always sees "instruction" / "output"
-    if instruction_col != "instruction" and instruction_col in raw.column_names:
+    if instruction_col != "instruction":
         raw = raw.rename_column(instruction_col, "instruction")
     if output_col != "output" and output_col in raw.column_names:
         raw = raw.rename_column(output_col, "output")

@@ -84,52 +84,89 @@ def push_github_task(
 
     r = redis.from_url(REDIS_URL)
 
+    # Only allow GitHub HTTPS remotes — reject arbitrary hosts
+    if not repo_url.startswith("https://github.com/"):
+        raise ValueError(f"Only https://github.com/ remotes are supported, got: {repo_url}")
+
     try:
         _publish_deploy_log(r, job_id, "Pushing adapter to GitHub...")
 
-        # Inject token into URL
-        if "https://" in repo_url:
-            auth_url = repo_url.replace("https://", f"https://{github_token}@")
-        else:
-            auth_url = repo_url
+        # Provide the token via a credential helper so it never appears in
+        # command args, process listings, or error output.
+        import stat
+        import textwrap
 
         with tempfile.TemporaryDirectory() as tmp:
-            subprocess.run(["git", "clone", auth_url, tmp], check=True, capture_output=True)
+            # Write a one-shot credential helper script
+            helper_path = os.path.join(tmp, "git-credential-tuneos")
+            helper_script = textwrap.dedent(f"""\
+                #!/bin/sh
+                echo username=x-token
+                echo password={github_token}
+            """)
+            with open(helper_path, "w") as fh:
+                fh.write(helper_script)
+            os.chmod(helper_path, stat.S_IRWXU)
 
-            # Copy adapter files
+            clone_env = {
+                **os.environ,
+                "GIT_ASKPASS": helper_path,
+                "GIT_TERMINAL_PROMPT": "0",
+            }
+
+            repo_dir = os.path.join(tmp, "repo")
+            subprocess.run(
+                ["git", "clone", repo_url, repo_dir], check=True, capture_output=True, env=clone_env
+            )
+
+            # Copy adapter files into the cloned repo
             import shutil
 
-            dest = os.path.join(tmp, "adapter")
+            dest = os.path.join(repo_dir, "adapter")
             shutil.copytree(adapter_path, dest, dirs_exist_ok=True)
 
             # Set up LFS for large files
-            subprocess.run(["git", "-C", tmp, "lfs", "install"], check=True, capture_output=True)
             subprocess.run(
-                ["git", "-C", tmp, "lfs", "track", "*.safetensors"], check=True, capture_output=True
+                ["git", "-C", repo_dir, "lfs", "install"], check=True, capture_output=True
             )
             subprocess.run(
-                ["git", "-C", tmp, "add", ".gitattributes"], check=True, capture_output=True
+                ["git", "-C", repo_dir, "lfs", "track", "*.safetensors"],
+                check=True,
+                capture_output=True,
             )
-            subprocess.run(["git", "-C", tmp, "add", "adapter/"], check=True, capture_output=True)
             subprocess.run(
-                ["git", "-C", tmp, "commit", "-m", commit_message],
+                ["git", "-C", repo_dir, "add", ".gitattributes"], check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "-C", repo_dir, "add", "adapter/"], check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "-C", repo_dir, "commit", "-m", commit_message],
                 check=True,
                 capture_output=True,
                 env={
-                    **os.environ,
+                    **clone_env,
                     "GIT_AUTHOR_NAME": "TuneOS",
                     "GIT_AUTHOR_EMAIL": "tuneos@bot.local",
                     "GIT_COMMITTER_NAME": "TuneOS",
                     "GIT_COMMITTER_EMAIL": "tuneos@bot.local",
                 },
             )
-            subprocess.run(["git", "-C", tmp, "push"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "-C", repo_dir, "push"],
+                check=True,
+                capture_output=True,
+                env=clone_env,
+            )
 
         _publish_deploy_log(r, job_id, f"Pushed adapter to {repo_url}")
     except subprocess.CalledProcessError as e:
-        msg = e.stderr.decode() if e.stderr else str(e)
-        _publish_deploy_log(r, job_id, f"GitHub push failed: {msg}")
-        raise RuntimeError(msg) from e
+        # Strip any token that might appear in error output before logging
+        raw_msg = e.stderr.decode() if e.stderr else str(e)
+        safe_msg = raw_msg.replace(github_token, "***") if github_token else raw_msg
+        _publish_deploy_log(r, job_id, f"GitHub push failed: {safe_msg}")
+        raise RuntimeError(safe_msg) from e
     except Exception as e:
-        _publish_deploy_log(r, job_id, f"GitHub push failed: {e}")
+        safe_e = str(e).replace(github_token, "***") if github_token else str(e)
+        _publish_deploy_log(r, job_id, f"GitHub push failed: {safe_e}")
         raise

@@ -12,6 +12,7 @@ from app.pages.finetune import finetune_page
 from app.pages.results import results_page
 from app.pages.training import training_page
 from app.pages.upload import upload_page
+from app.state.theme_state import ThemeState
 from app.styles import GLOBAL_STYLES, STYLESHEETS
 
 
@@ -23,22 +24,20 @@ def index() -> rx.Component:
 _SYNC_THEME_SCRIPT = """
 (function(){
   try {
-    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var saved = localStorage.getItem('theme');
+    // First visit: seed key as 'system' so ThemeProvider follows OS preference.
+    if (saved === null) {
+      localStorage.setItem('theme', 'system');
+      saved = 'system';
+    }
+    // Apply correct classes immediately to avoid flash before React hydrates.
+    var dark = (saved === 'dark') ||
+               (saved !== 'light' &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches);
     var mode = dark ? 'dark' : 'light';
-    // Overwrite whatever Reflex / Radix stored previously
-    localStorage.setItem('color_mode', mode);
-    document.cookie = 'color_mode=' + mode + ';path=/;SameSite=Lax';
-    // Immediately apply so there is zero flash
-    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(mode);
     document.documentElement.style.colorScheme = mode;
-    // Keep in sync if the user changes their OS theme while the tab is open
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
-      var m = e.matches ? 'dark' : 'light';
-      localStorage.setItem('color_mode', m);
-      document.cookie = 'color_mode=' + m + ';path=/;SameSite=Lax';
-      document.documentElement.classList.toggle('dark', e.matches);
-      document.documentElement.style.colorScheme = m;
-    });
   } catch(e) {}
 })();
 """
@@ -55,7 +54,7 @@ app = rx.App(
     head_components=[rx.el.script(_SYNC_THEME_SCRIPT)],
 )
 
-app.add_page(index, route="/", title="TuneOS — Fine-tune LLMs")
+app.add_page(index, route="/", title="TuneOS — Fine-tune LLMs", on_load=ThemeState.init_theme)
 app.add_page(upload_page, route="/upload", title="Upload Dataset — TuneOS")
 app.add_page(configure_page, route="/configure", title="Configure — TuneOS")
 app.add_page(training_page, route="/training", title="Training — TuneOS")

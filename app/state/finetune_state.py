@@ -191,12 +191,12 @@ class FinetuneState(rx.State):
 
     # ── Step 3 setters ────────────────────────────────────────────
     @rx.event
-    def set_lora_r(self, value: int):
-        self.lora_r = int(value)
+    def set_lora_r(self, value: list[float]):
+        self.lora_r = int(value[0])
 
     @rx.event
-    def set_lora_alpha(self, value: int):
-        self.lora_alpha = int(value)
+    def set_lora_alpha(self, value: list[float]):
+        self.lora_alpha = int(value[0])
 
     @rx.event
     def set_epochs(self, value: str):

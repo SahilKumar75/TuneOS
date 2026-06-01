@@ -8,6 +8,9 @@ class ModelConfig:
     use_8bit: bool = False
     trust_remote_code: bool = False
     max_seq_length: int = 512
+    hf_token: str = ""
+    local_model_path: str = ""
+    model_source: str = "hub"  # "hub" | "local" | "custom_string"
 
 
 @dataclass

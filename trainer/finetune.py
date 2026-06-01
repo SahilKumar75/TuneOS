@@ -16,20 +16,28 @@ def finetune(
     train_cfg: TrainingConfig,
     dataset_path: str,
     job_id: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
 ) -> str:
     """
     Full fine-tuning pipeline:
-      1. Load QLoRA model
-      2. Load + tokenize dataset
+      1. Load model (any source: HF Hub, local, custom string)
+      2. Load + tokenize dataset (local file or HF Hub dataset)
       3. Train with SFTTrainer
       4. Save adapter weights
-    Returns path to saved adapter.
+    Returns (output_path, model, tokenizer).
     """
-    # 1. Prepare QLoRA model
+    # 1. Prepare model
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
     # 2. Load dataset
-    dataset = load_and_tokenize(dataset_path, tokenizer, model_cfg.max_seq_length)
+    dataset = load_and_tokenize(
+        dataset_path, tokenizer, model_cfg.max_seq_length,
+        hub_dataset_id=hub_dataset_id, hub_split=hub_split,
+        instruction_col=instruction_col, output_col=output_col,
+    )
 
     # 3. Training arguments
     output_path = os.path.join(train_cfg.output_dir, job_id)

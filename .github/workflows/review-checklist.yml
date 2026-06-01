@@ -1,0 +1,53 @@
+name: Review Checklist
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  post-checklist:
+    name: Post review checklist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## Automated Review Checklist
+
+            Before approving this PR, confirm each item:
+
+            **Code quality**
+            - [ ] Logic is correct and edge cases are handled
+            - [ ] No debug logs, dead code, or commented-out blocks left in
+            - [ ] Naming is clear — no abbreviations that need a comment to decode
+
+            **Tests**
+            - [ ] New behaviour is covered by tests, or existing tests updated
+            - [ ] \`poetry run pytest\` passes locally
+
+            **Frontend (if applicable)**
+            - [ ] UI renders correctly across light/dark mode
+            - [ ] No layout regressions on narrow viewports
+
+            **Infrastructure / config (if applicable)**
+            - [ ] Secrets/env vars are not hardcoded
+            - [ ] Docker build still passes (\`docker build .\`)
+
+            **Docs**
+            - [ ] CHANGELOG or PR description explains the *why*, not just the *what*
+            - [ ] Public API changes are reflected in docs
+
+            ---
+            _Review, check off what applies, then submit your formal Approve or Request Changes._`;
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              body,
+              event: 'COMMENT',
+            });

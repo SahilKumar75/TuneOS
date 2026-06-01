@@ -1,0 +1,34 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tuneos/components/**"
+          - "tuneos/pages/**"
+          - "**/*.css"
+          - "assets/**"
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "api/**"
+          - "packages/**"
+          - "**/*.py"
+
+infra:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+          - "docker-compose*"
+          - ".github/**"
+          - "*.sh"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "poetry.lock"
+          - "pyproject.toml"

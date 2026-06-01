@@ -119,6 +119,7 @@ def _composer() -> rx.Component:
                 placeholder="Paste a Hugging Face link, GitHub URL, or local model path...",
                 value=AppState.current_input_value,
                 on_change=AppState.handle_input_change,
+                on_key_down=AppState.handle_composer_key,
                 variant="soft",
                 size="3",
                 width="100%",

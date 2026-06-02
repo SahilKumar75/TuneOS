@@ -1188,7 +1188,11 @@ def _epoch_log_row(entry) -> rx.Component:
             flex="1",
         ),
         rx.text(
-            rx.cond(entry.drop_pct > 0, "↓" + entry.drop_pct.to_string() + "%", "Δ" + entry.drop_pct.to_string() + "%"),
+            rx.cond(
+                entry.drop_pct > 0,
+                "↓" + entry.drop_pct.to_string() + "%",
+                "Δ" + entry.drop_pct.to_string() + "%",
+            ),
             font_size="0.78rem",
             color=rx.cond(entry.drop_pct > 10, c("success"), c("warning")),
             width="60px",
@@ -1506,9 +1510,7 @@ def _step6() -> rx.Component:
                                 ExperimentState.completed_runs,
                                 lambda r: rx.table.row(
                                     rx.table.cell(rx.text(r.name, font_size="0.8rem")),
-                                    rx.table.cell(
-                                        rx.text(r.model_id, font_size="0.8rem")
-                                    ),
+                                    rx.table.cell(rx.text(r.model_id, font_size="0.8rem")),
                                     rx.table.cell(
                                         rx.text(r.epochs.to_string(), font_size="0.8rem")
                                     ),

@@ -7,14 +7,24 @@ from peft import (
     prepare_model_for_kbit_training,
 )
 
-from trainer.config import LoraConfig
+from trainer.config import LoraConfig, get_target_modules
 
 
 def inject_lora(model, lora_cfg: LoraConfig):
-    """
-    Prepare model for k-bit training then inject LoRA adapters.
+    """Prepare model for k-bit training then inject LoRA adapters.
+
+    If lora_cfg.target_modules is None, the correct modules are
+    auto-detected from model.config.model_type so Gemma, Phi-3,
+    Falcon etc. don't silently receive wrong projection names.
     """
     model = prepare_model_for_kbit_training(model)
+
+    if lora_cfg.target_modules is None:
+        # Coerce to str — custom configs may carry a non-string model_type.
+        model_type = str(getattr(getattr(model, "config", None), "model_type", "") or "")
+        target_modules = get_target_modules(model_type)
+    else:
+        target_modules = lora_cfg.target_modules
 
     peft_config = PeftLoraConfig(
         r=lora_cfg.r,
@@ -22,7 +32,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
         lora_dropout=lora_cfg.lora_dropout,
         bias=lora_cfg.bias,
         task_type=TaskType.CAUSAL_LM,
-        target_modules=lora_cfg.target_modules,
+        target_modules=target_modules,
     )
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()  # log how many params are trainable

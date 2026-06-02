@@ -7,6 +7,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
 import httpx
 import reflex as rx
 from pydantic import BaseModel
@@ -43,6 +44,7 @@ class EpochLogEntry(BaseModel):
 class SeedExample(BaseModel):
     instruction: str = ""
     output: str = ""
+
 
 DATASET_DIR = os.getenv("DATASET_DIR", "./storage/datasets")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -381,9 +383,7 @@ class FinetuneState(rx.State):
                     self.hub_dataset_columns = data.get("columns", [])
                     raw_rows = data.get("rows", [])
                     self.hub_dataset_preview = [
-                        DatasetRow(
-                            instruction=r.get("instruction", ""), output=r.get("output", "")
-                        )
+                        DatasetRow(instruction=r.get("instruction", ""), output=r.get("output", ""))
                         for r in raw_rows
                     ]
                     self.is_loading_hub_preview = False
@@ -530,9 +530,7 @@ class FinetuneState(rx.State):
                     self.dataset_path = data.get("dataset_path", "")
                     self.dataset_filename = os.path.basename(self.dataset_path)
                     preview_rows = [
-                        DatasetRow(
-                            instruction=s.get("instruction", ""), output=s.get("output", "")
-                        )
+                        DatasetRow(instruction=s.get("instruction", ""), output=s.get("output", ""))
                         for s in samples[:5]
                     ]
                     self.generated_samples = preview_rows

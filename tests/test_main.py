@@ -1,6 +1,6 @@
 import pytest
 
-from trainer.config import LoraConfig, ModelConfig, TrainingConfig
+from trainer.config import LoraConfig, ModelConfig, TrainingConfig, get_target_modules
 
 # --- ModelConfig ---
 
@@ -36,8 +36,8 @@ def test_lora_config_defaults():
     assert cfg.lora_dropout == 0.05
     assert cfg.bias == "none"
     assert cfg.task_type == "CAUSAL_LM"
-    assert "q_proj" in cfg.target_modules
-    assert "v_proj" in cfg.target_modules
+    # target_modules now defaults to None — auto-detected per architecture at inject time
+    assert cfg.target_modules is None
 
 
 def test_lora_config_custom_rank():
@@ -46,11 +46,20 @@ def test_lora_config_custom_rank():
     assert cfg.lora_alpha == 128
 
 
-def test_lora_config_target_modules_mutable():
-    cfg1 = LoraConfig()
-    cfg2 = LoraConfig()
-    cfg1.target_modules.append("k_proj")
-    assert "k_proj" not in cfg2.target_modules  # default_factory ensures no shared state
+def test_lora_config_explicit_target_modules():
+    cfg = LoraConfig(target_modules=["q_proj", "k_proj"])
+    assert cfg.target_modules == ["q_proj", "k_proj"]
+
+
+def test_get_target_modules_per_architecture():
+    # Known architectures resolve to their correct projection names
+    assert "q_proj" in get_target_modules("mistral")
+    assert "q_proj" in get_target_modules("llama")
+    assert get_target_modules("phi3") == ["qkv_proj", "o_proj"]
+    assert get_target_modules("falcon") == ["query_key_value"]
+    assert get_target_modules("gpt2") == ["c_attn"]
+    # Unknown architecture falls back to the safe default
+    assert get_target_modules("some-future-arch") == ["q_proj", "v_proj"]
 
 
 def test_lora_config_dropout_range():

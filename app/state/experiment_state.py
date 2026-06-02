@@ -1,51 +1,30 @@
-"""Experiment tracking — persists all fine-tuning runs across sessions in SQLite."""
+"""Experiment tracking — Reflex state layer over the SQLite persistence in experiments_db."""
 
 from __future__ import annotations
-
-import json
-import os
-import sqlite3
-from typing import Any
 
 import reflex as rx
 from pydantic import BaseModel
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_PATH = os.getenv("EXPERIMENT_DB", os.path.join(_PROJECT_ROOT, "storage", "experiments.db"))
+from app.state.experiments_db import (
+    DB_PATH,
+    _get_conn,
+    _init_db,
+    save_experiment_run,
+    save_run_metrics,
+    save_run_params,
+    write_job_status,
+)
 
-
-def _get_conn() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def _init_db():
-    with _get_conn() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS runs (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                model_id TEXT,
-                model_source TEXT,
-                technique TEXT,
-                epochs INTEGER,
-                learning_rate TEXT,
-                lora_r INTEGER,
-                batch_size INTEGER,
-                dataset_name TEXT,
-                user_intent TEXT,
-                final_loss REAL,
-                perplexity REAL,
-                started_at TEXT,
-                finished_at TEXT,
-                status TEXT,
-                output_path TEXT,
-                loss_history TEXT
-            )
-        """)
-
+# Re-exported for backward compatibility with existing imports.
+__all__ = [
+    "DB_PATH",
+    "ExperimentRun",
+    "ExperimentState",
+    "save_experiment_run",
+    "save_run_metrics",
+    "save_run_params",
+    "write_job_status",
+]
 
 _init_db()
 
@@ -130,41 +109,3 @@ class ExperimentState(rx.State):
             self.selected_run_ids = [i for i in self.selected_run_ids if i != run_id]
         except Exception:
             pass
-
-
-def save_experiment_run(run_data: dict[str, Any]):
-    """Called from FinetuneState._save_experiment_record() — writes to SQLite."""
-    try:
-        _init_db()
-        with _get_conn() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO runs
-                (id, name, model_id, model_source, technique, epochs, learning_rate,
-                 lora_r, batch_size, dataset_name, user_intent, final_loss, perplexity,
-                 started_at, finished_at, status, output_path, loss_history)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_data.get("id", ""),
-                    run_data.get("name", ""),
-                    run_data.get("model_id", ""),
-                    run_data.get("model_source", "hub"),
-                    run_data.get("technique", "qlora"),
-                    run_data.get("epochs", 3),
-                    run_data.get("learning_rate", "2e-4"),
-                    run_data.get("lora_r", 16),
-                    run_data.get("batch_size", 4),
-                    run_data.get("dataset_name", ""),
-                    run_data.get("user_intent", ""),
-                    run_data.get("final_loss", 0.0),
-                    run_data.get("perplexity", 0.0),
-                    run_data.get("started_at", ""),
-                    run_data.get("finished_at", ""),
-                    run_data.get("status", "unknown"),
-                    run_data.get("output_path", ""),
-                    json.dumps(run_data.get("loss_history", [])),
-                ),
-            )
-    except Exception:
-        pass

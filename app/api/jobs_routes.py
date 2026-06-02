@@ -41,7 +41,10 @@ def _resolve_job_dir(job_id: str) -> str:
 
 @router.get("/jobs", response_model=list[JobStatus])
 async def list_jobs():
-    return []
+    """Return all runs from the durable SQLite store, most-recent first."""
+    from app.state.experiments_db import list_runs
+
+    return [JobStatus(**row) for row in list_runs()]
 
 
 @router.post("/jobs", response_model=JobCreated, status_code=201)
@@ -65,7 +68,7 @@ async def create_job(config: JobConfig):
         "lora_dropout": config.lora_dropout,
         "bias": "none",
         "task_type": "CAUSAL_LM",
-        "target_modules": ["q_proj", "v_proj"],
+        "target_modules": None,  # auto-detected from model architecture in trainer/lora.py
     }
     train_cfg = {
         "output_dir": OUTPUT_DIR,

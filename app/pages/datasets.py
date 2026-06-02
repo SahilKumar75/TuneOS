@@ -20,6 +20,7 @@ class DatasetResult(BaseModel):
     id: str = ""
     tags: list[str] = []
 
+
 CATEGORIES = ["All", "NLP", "Code", "Math", "Science", "Chat", "Instruction"]
 
 # Curated starter cards (shown before search)

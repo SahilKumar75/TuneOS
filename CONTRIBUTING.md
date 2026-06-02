@@ -90,6 +90,25 @@ TuneOS/
 └── tests/            # Test suite
 ```
 
+### State Data Models
+
+Any data class used **inside** a Reflex `rx.State` var (e.g. a list of records
+bound to `rx.foreach`) must inherit from `pydantic.BaseModel`:
+
+```python
+from pydantic import BaseModel
+
+class ExperimentRun(BaseModel):
+    id: str = ""
+    name: str = ""
+```
+
+Do **not** use `rx.Base` — it was removed in newer Reflex versions. Pydantic
+models also give Reflex a concrete element type, which `rx.foreach` requires;
+an untyped `list[dict[str, Any]]` state var will fail to compile. Always
+annotate state vars with a concrete type (e.g. `list[ExperimentRun]`), never
+`Any`.
+
 ## Pull Requests
 
 1. Create a new branch from `main` for your feature or bugfix:

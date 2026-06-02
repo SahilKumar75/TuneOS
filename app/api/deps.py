@@ -5,12 +5,38 @@ from __future__ import annotations
 import os
 import platform
 import subprocess
+from pathlib import Path
 
 from app.api.schemas import GpuInfo
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
 DATASET_DIR = os.getenv("DATASET_DIR", "./storage/datasets")
+
+
+def artifact_path(job_id: str, artifact: str) -> Path:
+    """Return the canonical path for a job artifact (adapter, merged, gguf, …).
+
+    All workers and API routes should use this instead of constructing paths
+    ad-hoc. The resolved path is validated to stay within the job's own
+    directory so that absolute values or ``..`` segments in ``job_id`` /
+    ``artifact`` cannot escape ``OUTPUT_DIR``.
+
+    Raises:
+        ValueError: if the resolved path escapes the job directory.
+    """
+    base = Path(OUTPUT_DIR).resolve()
+    job_root = (base / job_id).resolve()
+    candidate = (job_root / artifact).resolve()
+    try:
+        # job_root must stay under base (guards `..` in job_id), and the final
+        # candidate must stay under job_root (guards `..`/absolute artifact).
+        job_root.relative_to(base)
+        candidate.relative_to(job_root)
+    except ValueError as exc:
+        raise ValueError(f"Unsafe artifact path for job {job_id!r}: {artifact!r}") from exc
+    return candidate
+
 
 _SUPPORTED_MODELS: list[dict] = [
     {

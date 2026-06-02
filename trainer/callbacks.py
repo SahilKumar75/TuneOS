@@ -47,6 +47,8 @@ class RedisLossCallback(TrainerCallback):
             "status": "running",
         }
         self.redis.publish(self.channel, json.dumps(payload))
+        # Also accumulate in a list key so the worker can persist to run_metrics
+        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
 
     def on_train_end(self, args, state, control, **kwargs):
         payload = {

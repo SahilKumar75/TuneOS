@@ -88,10 +88,42 @@ def test_models_contains_mistral():
 # ── /jobs ────────────────────────────────────────────────────────
 
 
-def test_list_jobs_returns_empty_list():
+def test_list_jobs_returns_list():
+    # GET /jobs now returns all runs from the durable SQLite store. The shape is
+    # always a list of JobStatus objects (empty when no runs exist yet).
     resp = client.get("/jobs")
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert isinstance(body, list)
+    for item in body:
+        assert "job_id" in item
+        assert "status" in item
+
+
+# ── artifact_path traversal safety ───────────────────────────────
+
+
+def test_artifact_path_allows_normal_paths():
+    from app.api.deps import OUTPUT_DIR, artifact_path
+
+    p = artifact_path("job123", "adapter")
+    assert p.name == "adapter"
+    assert str(p).startswith(str(__import__("pathlib").Path(OUTPUT_DIR).resolve()))
+
+
+def test_artifact_path_blocks_traversal():
+    import pytest
+
+    from app.api.deps import artifact_path
+
+    for job_id, artifact in [
+        ("../../etc", "passwd"),  # `..` in job_id
+        ("job123", "../../../etc/passwd"),  # `..` in artifact
+        ("job123", "/etc/passwd"),  # absolute artifact
+        ("..", "x"),
+    ]:
+        with pytest.raises(ValueError):
+            artifact_path(job_id, artifact)
 
 
 def test_create_job_returns_201():

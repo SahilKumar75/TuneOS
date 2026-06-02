@@ -33,7 +33,7 @@ def _run_finetune_impl(
     output_col: str = "output",
 ):
     """Core logic, separated so it can be unit-tested without a live Celery broker."""
-    from app.state.experiment_state import save_run_metrics, write_job_status
+    from app.state.experiments_db import save_run_metrics, write_job_status
 
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"

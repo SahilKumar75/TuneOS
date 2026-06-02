@@ -88,10 +88,16 @@ def test_models_contains_mistral():
 # ── /jobs ────────────────────────────────────────────────────────
 
 
-def test_list_jobs_returns_empty_list():
+def test_list_jobs_returns_list():
+    # GET /jobs now returns all runs from the durable SQLite store. The shape is
+    # always a list of JobStatus objects (empty when no runs exist yet).
     resp = client.get("/jobs")
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert isinstance(body, list)
+    for item in body:
+        assert "job_id" in item
+        assert "status" in item
 
 
 def test_create_job_returns_201():

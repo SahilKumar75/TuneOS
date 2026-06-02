@@ -42,7 +42,7 @@ def _resolve_job_dir(job_id: str) -> str:
 @router.get("/jobs", response_model=list[JobStatus])
 async def list_jobs():
     """Return all runs from the durable SQLite store, most-recent first."""
-    from app.state.experiment_state import _get_conn, _init_db
+    from app.state.experiments_db import _get_conn, _init_db
 
     try:
         _init_db()

@@ -11,7 +11,7 @@ import zipfile
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import OUTPUT_DIR, REDIS_URL, _get_job_status_from_redis, artifact_path
+from app.api.deps import OUTPUT_DIR, REDIS_URL, _get_job_status_from_redis
 from app.api.schemas import (
     CommentaryRequest,
     GgufRequest,

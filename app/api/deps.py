@@ -23,6 +23,7 @@ def artifact_path(job_id: str, artifact: str) -> Path:
     base = Path(OUTPUT_DIR).resolve()
     return base / job_id / artifact
 
+
 _SUPPORTED_MODELS: list[dict] = [
     {
         "name": "Mistral 7B",

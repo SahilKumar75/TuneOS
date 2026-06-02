@@ -43,12 +43,6 @@ _SYNC_THEME_SCRIPT = """
 """
 
 app = rx.App(
-    theme=rx.theme(
-        appearance="inherit",
-        accent_color="blue",
-        radius="medium",
-        has_background=True,
-    ),
     style=GLOBAL_STYLES,
     stylesheets=STYLESHEETS,
     head_components=[rx.el.script(_SYNC_THEME_SCRIPT)],

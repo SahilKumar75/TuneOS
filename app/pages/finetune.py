@@ -78,10 +78,16 @@ _GGUF_QUANTS = ["Q4_K_M", "Q5_K_M", "Q8_0", "F16"]
 
 
 # ── Shared helpers ────────────────────────────────────────────────
-def _card(*children, padding: str = "20px", width: str = "100%", **props) -> rx.Component:
+def _card(
+    *children,
+    padding: str = "20px",
+    width: str = "100%",
+    background: str | None = None,
+    **props,
+) -> rx.Component:
     return rx.box(
         *children,
-        background=c("bg_card"),
+        background=c("bg_card") if background is None else background,
         border="1px solid",
         border_color=c("border"),
         border_radius="12px",
@@ -339,7 +345,7 @@ def _step1() -> rx.Component:
                         FinetuneState.selected_model_id != "",
                         rx.callout(
                             rx.hstack(
-                                rx.icon("check-circle", size=14),
+                                rx.icon("circle-check", size=14),
                                 rx.text(f"Model ready: {FinetuneState.selected_model_id}"),
                                 spacing="2",
                             ),
@@ -430,7 +436,7 @@ def _step1() -> rx.Component:
                             ),
                             rx.cond(
                                 FinetuneState.selected_technique == tech,
-                                rx.icon("check-circle", size=14, color=c("accent")),
+                                rx.icon("circle-check", size=14, color=c("accent")),
                                 rx.fragment(),
                             ),
                             rx.cond(
@@ -556,7 +562,7 @@ def _preview_table(rows: list, label: str = "Preview") -> rx.Component:
                     lambda row: rx.table.row(
                         rx.table.cell(
                             rx.text(
-                                row["instruction"],
+                                row.instruction,
                                 font_size="0.78rem",
                                 overflow="hidden",
                                 text_overflow="ellipsis",
@@ -566,7 +572,7 @@ def _preview_table(rows: list, label: str = "Preview") -> rx.Component:
                         ),
                         rx.table.cell(
                             rx.text(
-                                row["output"],
+                                row.output,
                                 font_size="0.78rem",
                                 overflow="hidden",
                                 text_overflow="ellipsis",
@@ -863,7 +869,7 @@ def _step4() -> rx.Component:
                 rx.text("Simple", font_size="0.82rem", color=c("text_secondary")),
                 rx.switch(
                     checked=FinetuneState.ui_mode == "advanced",
-                    on_change=lambda v: FinetuneState.set_ui_mode(rx.cond(v, "advanced", "simple")),
+                    on_change=FinetuneState.toggle_ui_mode,
                     size="2",
                 ),
                 rx.text("Advanced", font_size="0.82rem", color=c("text_secondary")),
@@ -1166,25 +1172,25 @@ def _metric_tile(label: str, value) -> rx.Component:
     )
 
 
-def _epoch_log_row(entry: dict) -> rx.Component:
+def _epoch_log_row(entry) -> rx.Component:
     return rx.hstack(
         rx.text(
-            f"Epoch {entry['epoch']}",
+            "Epoch " + entry.epoch.to_string(),
             font_size="0.78rem",
             font_weight="500",
             color=c("text_primary"),
             width="60px",
         ),
         rx.text(
-            f"loss {entry['loss_start']} → {entry['loss_end']}",
+            "loss " + entry.loss_start.to_string() + " → " + entry.loss_end.to_string(),
             font_size="0.78rem",
             color=c("text_secondary"),
             flex="1",
         ),
         rx.text(
-            rx.cond(entry["drop_pct"] > 0, f"↓{entry['drop_pct']}%", f"Δ{entry['drop_pct']}%"),
+            rx.cond(entry.drop_pct > 0, "↓" + entry.drop_pct.to_string() + "%", "Δ" + entry.drop_pct.to_string() + "%"),
             font_size="0.78rem",
-            color=rx.cond(entry["drop_pct"] > 10, c("success"), c("warning")),
+            color=rx.cond(entry.drop_pct > 10, c("success"), c("warning")),
             width="60px",
             text_align="right",
         ),
@@ -1252,7 +1258,7 @@ def _step5() -> rx.Component:
                         FinetuneState.ai_commentary, font_size="0.86rem", color=c("text_primary")
                     ),
                     spacing="2",
-                    align="flex-start",
+                    align="start",
                 )
             ),
             rx.fragment(),
@@ -1281,7 +1287,7 @@ def _step5() -> rx.Component:
             rx.vstack(
                 rx.callout(
                     rx.hstack(
-                        rx.icon("check-circle", size=16),
+                        rx.icon("circle-check", size=16),
                         rx.text("Training complete! Advancing to results..."),
                         spacing="2",
                     ),
@@ -1409,27 +1415,27 @@ def _step6() -> rx.Component:
                             FinetuneState.test_chat_history,
                             lambda msg: rx.box(
                                 rx.text(
-                                    msg["content"],
+                                    msg.content,
                                     font_size="0.84rem",
                                     color=rx.cond(
-                                        msg["role"] == "user",
+                                        msg.role == "user",
                                         c("text_primary"),
                                         c("text_secondary"),
                                     ),
                                     padding="8px 12px",
                                     background=rx.cond(
-                                        msg["role"] == "user",
+                                        msg.role == "user",
                                         c("accent_soft"),
                                         c("bg_input"),
                                     ),
                                     border_radius="8px",
                                     align_self=rx.cond(
-                                        msg["role"] == "user", "flex-end", "flex-start"
+                                        msg.role == "user", "flex-end", "flex-start"
                                     ),
                                     max_width="80%",
                                 ),
                                 display="flex",
-                                flex_direction=rx.cond(msg["role"] == "user", "row-reverse", "row"),
+                                flex_direction=rx.cond(msg.role == "user", "row-reverse", "row"),
                                 width="100%",
                                 margin_bottom="6px",
                             ),
@@ -1449,11 +1455,7 @@ def _step6() -> rx.Component:
                         placeholder="Type a test message...",
                         value=FinetuneState.chat_input,
                         on_change=FinetuneState.set_chat_input,
-                        on_key_down=lambda e: rx.cond(
-                            e == "Enter",
-                            FinetuneState.send_test_chat,
-                            rx.prevent_default,
-                        ),
+                        on_key_down=FinetuneState.handle_chat_key,
                         flex="1",
                     ),
                     rx.button(
@@ -1505,7 +1507,7 @@ def _step6() -> rx.Component:
                                 lambda r: rx.table.row(
                                     rx.table.cell(rx.text(r.name, font_size="0.8rem")),
                                     rx.table.cell(
-                                        rx.text(r.model_id.split("/")[-1], font_size="0.8rem")
+                                        rx.text(r.model_id, font_size="0.8rem")
                                     ),
                                     rx.table.cell(
                                         rx.text(r.epochs.to_string(), font_size="0.8rem")
@@ -1555,7 +1557,7 @@ def _deploy_target_row(
             spacing="0",
         ),
         spacing="3",
-        align="flex-start",
+        align="start",
         padding="10px 0",
         border_bottom="1px solid",
         border_color=c("border"),
@@ -1665,7 +1667,7 @@ def _step7() -> rx.Component:
                         FinetuneState.push_status == "done",
                         rx.callout(
                             rx.hstack(
-                                rx.icon("check-circle", size=14),
+                                rx.icon("circle-check", size=14),
                                 rx.text(f"Pushed to {FinetuneState.push_repo_url}"),
                                 spacing="2",
                             ),
@@ -1729,7 +1731,7 @@ def _step7() -> rx.Component:
                             align_self="flex-end",
                         ),
                         spacing="3",
-                        align="flex-end",
+                        align="end",
                     ),
                     spacing="3",
                 )

@@ -37,7 +37,7 @@ def loss_chart() -> rx.Component:
         rx.recharts.cartesian_grid(stroke_dasharray="3 3", opacity=0.3),
         rx.recharts.legend(),
         rx.recharts.graphing_tooltip(),
-        data=FinetuneState.loss_history,
+        data=FinetuneState.loss_history_chart_data,
         width="100%",
         height=280,
     )

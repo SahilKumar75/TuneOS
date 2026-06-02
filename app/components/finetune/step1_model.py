@@ -181,7 +181,7 @@ def _step1() -> rx.Component:
                         FinetuneState.selected_model_id != "",
                         rx.callout(
                             rx.hstack(
-                                rx.icon("check-circle", size=14),
+                                rx.icon("circle-check", size=14),
                                 rx.text(f"Model ready: {FinetuneState.selected_model_id}"),
                                 spacing="2",
                             ),
@@ -272,7 +272,7 @@ def _step1() -> rx.Component:
                             ),
                             rx.cond(
                                 FinetuneState.selected_technique == tech,
-                                rx.icon("check-circle", size=14, color=c("accent")),
+                                rx.icon("circle-check", size=14, color=c("accent")),
                                 rx.fragment(),
                             ),
                             rx.cond(

@@ -7,11 +7,42 @@ import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-
 import httpx
 import reflex as rx
+from pydantic import BaseModel
 
 from app.state.experiment_state import ExperimentState, save_experiment_run
+
+
+class DatasetRow(BaseModel):
+    instruction: str = ""
+    output: str = ""
+
+
+class ChatMessage(BaseModel):
+    role: str = "user"
+    content: str = ""
+
+
+class LossPoint(BaseModel):
+    step: int = 0
+    loss: float = 0.0
+    epoch: float = 0.0
+    learning_rate: float = 0.0
+    eval_loss: float | None = None
+
+
+class EpochLogEntry(BaseModel):
+    epoch: int = 0
+    loss_start: float = 0.0
+    loss_end: float = 0.0
+    drop_pct: float = 0.0
+    elapsed_seconds: int = 0
+
+
+class SeedExample(BaseModel):
+    instruction: str = ""
+    output: str = ""
 
 DATASET_DIR = os.getenv("DATASET_DIR", "./storage/datasets")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -40,7 +71,7 @@ class FinetuneState(rx.State):
     data_source: str = "upload"  # "upload" | "hub_dataset" | "generate"
     dataset_path: str = ""
     dataset_filename: str = ""
-    dataset_preview: list[dict[str, Any]] = []
+    dataset_preview: list[DatasetRow] = []
     dataset_error: str = ""
     is_uploading: bool = False
     existing_datasets: list[str] = []
@@ -49,7 +80,7 @@ class FinetuneState(rx.State):
     hub_dataset_split: str = "train"
     hub_dataset_instruction_col: str = "instruction"
     hub_dataset_output_col: str = "output"
-    hub_dataset_preview: list[dict[str, Any]] = []
+    hub_dataset_preview: list[DatasetRow] = []
     hub_dataset_columns: list[str] = []
     is_loading_hub_preview: bool = False
     hub_preview_error: str = ""
@@ -58,9 +89,9 @@ class FinetuneState(rx.State):
     generation_method: str = "self_instruct"  # "self_instruct" | "few_shot" | "template"
     generation_n: int = 50
     generation_status: str = ""
-    generated_samples: list[dict[str, Any]] = []
+    generated_samples: list[DatasetRow] = []
     generation_diversity_score: float = 0.0
-    seed_examples: list[dict[str, Any]] = []
+    seed_examples: list[SeedExample] = []
 
     # ── Step 4: Configure ─────────────────────────────────────────
     ui_mode: str = "simple"  # "simple" | "advanced"
@@ -90,8 +121,8 @@ class FinetuneState(rx.State):
     ai_commentary: str = ""
     output_path: str = ""
     error_msg: str = ""
-    loss_history: list[dict[str, Any]] = []
-    epoch_log: list[dict[str, Any]] = []  # one entry per completed epoch
+    loss_history: list[LossPoint] = []
+    epoch_log: list[EpochLogEntry] = []  # one entry per completed epoch
 
     # Experiment tracking
     experiment_id: str = ""
@@ -100,7 +131,7 @@ class FinetuneState(rx.State):
     eval_perplexity: float = 0.0
     eval_bleu: float = 0.0
     eval_status: str = "idle"  # idle | running | done | error | not_ready
-    test_chat_history: list[dict[str, Any]] = []
+    test_chat_history: list[ChatMessage] = []
     chat_input: str = ""
     chat_loading: bool = False
     chat_error: str = ""
@@ -198,10 +229,14 @@ class FinetuneState(rx.State):
         return f"{self.gpu_memory_used_gb:.1f} GB"
 
     @rx.var
-    def epoch_progress_pct(self) -> float:
+    def epoch_progress_pct(self) -> int:
         if self.epochs == 0:
-            return 0.0
-        return min(100.0, round((self.current_epoch / self.epochs) * 100, 1))
+            return 0
+        return min(100, int(round((self.current_epoch / self.epochs) * 100, 0)))
+
+    @rx.var
+    def loss_history_chart_data(self) -> list[dict[str, Any]]:
+        return [pt.model_dump() for pt in self.loss_history]
 
     @rx.var
     def current_epoch_display(self) -> str:
@@ -344,7 +379,13 @@ class FinetuneState(rx.State):
                 data = resp.json()
                 async with self:
                     self.hub_dataset_columns = data.get("columns", [])
-                    self.hub_dataset_preview = data.get("rows", [])
+                    raw_rows = data.get("rows", [])
+                    self.hub_dataset_preview = [
+                        DatasetRow(
+                            instruction=r.get("instruction", ""), output=r.get("output", "")
+                        )
+                        for r in raw_rows
+                    ]
                     self.is_loading_hub_preview = False
                     # Auto-detect instruction/output columns
                     cols = data.get("columns", [])
@@ -436,13 +477,17 @@ class FinetuneState(rx.State):
             out_col = "output" if "output" in df.columns else df.columns[1]
 
             self.dataset_error = ""
-            self.dataset_preview = (
+            records = (
                 df[[inst_col, out_col]]
                 .head(5)
                 .fillna("")
                 .rename(columns={inst_col: "instruction", out_col: "output"})
                 .to_dict("records")
             )
+            self.dataset_preview = [
+                DatasetRow(instruction=r.get("instruction", ""), output=r.get("output", ""))
+                for r in records
+            ]
         except Exception as exc:
             self.dataset_error = f"Could not read file: {exc}"
             self.dataset_preview = []
@@ -484,8 +529,14 @@ class FinetuneState(rx.State):
                 async with self:
                     self.dataset_path = data.get("dataset_path", "")
                     self.dataset_filename = os.path.basename(self.dataset_path)
-                    self.generated_samples = samples[:5]  # preview
-                    self.dataset_preview = samples[:5]
+                    preview_rows = [
+                        DatasetRow(
+                            instruction=s.get("instruction", ""), output=s.get("output", "")
+                        )
+                        for s in samples[:5]
+                    ]
+                    self.generated_samples = preview_rows
+                    self.dataset_preview = preview_rows
                     n = stats.get("final_count", len(samples))
                     div = stats.get("diversity_score", 0)
                     self.generation_diversity_score = div
@@ -525,12 +576,19 @@ class FinetuneState(rx.State):
         self.ui_mode = mode
 
     @rx.event
+    def toggle_ui_mode(self, advanced: bool):
+        self.ui_mode = "advanced" if advanced else "simple"
+
+    @rx.event
     def set_lora_r(self, value: list[float]):
         self.lora_r = int(value[0])
 
     @rx.event
-    def set_lora_alpha(self, value: list[float]):
-        self.lora_alpha = int(value[0])
+    def set_lora_alpha(self, value: str):
+        try:
+            self.lora_alpha = max(1, int(value))
+        except ValueError:
+            pass
 
     @rx.event
     def set_lora_dropout(self, value: list[float]):
@@ -676,13 +734,13 @@ class FinetuneState(rx.State):
 
             async with self:
                 self.loss_history.append(
-                    {
-                        "step": data.get("step", 0),
-                        "loss": current_loss,
-                        "epoch": current_epoch,
-                        "learning_rate": data.get("learning_rate", 0),
-                        "eval_loss": data.get("eval_loss"),
-                    }
+                    LossPoint(
+                        step=data.get("step", 0),
+                        loss=current_loss,
+                        epoch=current_epoch,
+                        learning_rate=data.get("learning_rate", 0),
+                        eval_loss=data.get("eval_loss"),
+                    )
                 )
                 self.current_epoch = current_epoch
                 self.total_steps = data.get("total_steps", 0)
@@ -697,13 +755,13 @@ class FinetuneState(rx.State):
                     )
                     async with self:
                         self.epoch_log.append(
-                            {
-                                "epoch": int(prev_epoch) + 1,
-                                "loss_start": round(epoch_start_loss, 4),
-                                "loss_end": round(current_loss, 4),
-                                "drop_pct": drop_pct,
-                                "elapsed_seconds": self.elapsed_seconds,
-                            }
+                            EpochLogEntry(
+                                epoch=int(prev_epoch) + 1,
+                                loss_start=round(epoch_start_loss, 4),
+                                loss_end=round(current_loss, 4),
+                                drop_pct=drop_pct,
+                                elapsed_seconds=self.elapsed_seconds,
+                            )
                         )
                     # Refresh AI commentary
                     await self._refresh_commentary(current_loss, drop_pct, int(current_epoch))
@@ -785,7 +843,7 @@ class FinetuneState(rx.State):
             self.eval_status = "not_ready"
 
     async def _save_experiment_record(self):
-        final_loss = self.loss_history[-1]["loss"] if self.loss_history else 0.0
+        final_loss = self.loss_history[-1].loss if self.loss_history else 0.0
         save_experiment_run(
             {
                 "id": self.experiment_id,
@@ -805,7 +863,7 @@ class FinetuneState(rx.State):
                 "finished_at": datetime.now(timezone.utc).isoformat(),
                 "status": self.training_status,
                 "output_path": self.output_path,
-                "loss_history": self.loss_history,
+                "loss_history": [pt.model_dump() for pt in self.loss_history],
             }
         )
         async with self:
@@ -823,6 +881,11 @@ class FinetuneState(rx.State):
     def set_chat_input(self, value: str):
         self.chat_input = value
 
+    @rx.event
+    def handle_chat_key(self, key: str):
+        if key == "Enter":
+            return FinetuneState.send_test_chat
+
     @rx.event(background=True)
     async def send_test_chat(self):
         prompt = self.chat_input.strip()
@@ -837,7 +900,7 @@ class FinetuneState(rx.State):
             self.chat_error = ""
             self.test_chat_history = [
                 *self.test_chat_history,
-                {"role": "user", "content": prompt},
+                ChatMessage(role="user", content=prompt),
             ]
 
         try:
@@ -851,7 +914,7 @@ class FinetuneState(rx.State):
                 async with self:
                     self.test_chat_history = [
                         *self.test_chat_history,
-                        {"role": "assistant", "content": response},
+                        ChatMessage(role="assistant", content=response),
                     ]
                     self.chat_input = ""
                     self.chat_loading = False

@@ -18,12 +18,12 @@ class ModelState(rx.State):
         self.model_name = name
 
     @rx.event
-    def set_lora_r(self, value: list[int]):
-        self.lora_r = value
+    def set_lora_r(self, value: list[float]):
+        self.lora_r = [int(v) for v in value]
 
     @rx.event
-    def set_lora_alpha(self, value: list[int]):
-        self.lora_alpha = value
+    def set_lora_alpha(self, value: list[float]):
+        self.lora_alpha = [int(v) for v in value]
 
     @rx.event
     def set_epochs(self, value: str):
@@ -32,3 +32,8 @@ class ModelState(rx.State):
     @rx.event
     def set_learning_rate(self, value: str):
         self.learning_rate = value
+
+    @rx.event
+    def start_training(self):
+        """Stub — legacy pages redirect to /finetune for actual training."""
+        return rx.redirect("/finetune")

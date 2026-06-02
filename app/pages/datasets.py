@@ -6,11 +6,19 @@ from typing import Any
 
 import httpx
 import reflex as rx
+from pydantic import BaseModel
 
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
 API_BASE = "http://localhost:8000"
+
+
+class DatasetResult(BaseModel):
+    """Typed search result — required so rx.foreach can infer list[str] for tags."""
+
+    id: str = ""
+    tags: list[str] = []
 
 CATEGORIES = ["All", "NLP", "Code", "Math", "Science", "Chat", "Instruction"]
 
@@ -93,7 +101,7 @@ STARTER_DATASETS = [
 
 class DatasetState(rx.State):
     search_query: str = ""
-    search_results: list[dict[str, Any]] = []
+    search_results: list[DatasetResult] = []
     is_searching: bool = False
     selected_category: str = "All"
 
@@ -126,7 +134,14 @@ class DatasetState(rx.State):
                 )
             if resp.status_code == 200:
                 async with self:
-                    self.search_results = resp.json().get("results", [])
+                    raw = resp.json().get("results", [])
+                    self.search_results = [
+                        DatasetResult(
+                            id=item.get("id", ""),
+                            tags=(item.get("tags") or [])[:4],
+                        )
+                        for item in raw
+                    ]
                     self.is_searching = False
             else:
                 async with self:
@@ -243,27 +258,27 @@ def _dataset_card(ds: dict) -> rx.Component:
     )
 
 
-def _search_result_card(ds: dict) -> rx.Component:
+def _search_result_card(ds: DatasetResult) -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.hstack(
-                rx.text(ds["id"], font_size="0.88rem", font_weight="600", color=c("text_primary")),
+                rx.text(ds.id, font_size="0.88rem", font_weight="600", color=c("text_primary")),
                 rx.spacer(),
                 rx.button(
                     "Use in Fine-tune →",
                     size="1",
                     variant="solid",
                     color_scheme="blue",
-                    on_click=DatasetState.use_in_finetune(ds["id"]),
+                    on_click=DatasetState.use_in_finetune(ds.id),
                 ),
                 align="center",
                 width="100%",
             ),
             rx.hstack(
-                *[
-                    rx.badge(tag, size="1", variant="soft", color_scheme="gray")
-                    for tag in (ds.get("tags") or [])[:4]
-                ],
+                rx.foreach(
+                    ds.tags,
+                    lambda tag: rx.badge(tag, size="1", variant="soft", color_scheme="gray"),
+                ),
                 spacing="1",
                 wrap="wrap",
             ),

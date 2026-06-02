@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **MLflow-inspired observability layer (Phase 1).** Step-level metrics are now
+- **Observability layer (Phase 1).** Step-level metrics are now
   persisted to queryable `run_metrics` and `run_params` tables in
   `storage/experiments.db`, instead of only living in a JSON blob.
 - `GET /api/jobs` now returns all runs from the durable SQLite store (was a stub

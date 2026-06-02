@@ -1,53 +1,116 @@
 # TuneOS API Documentation
 
-This document outlines the API endpoints provided by the TuneOS backend. The backend is built to support the Reflex UI and manage background training tasks.
+This document outlines the HTTP API exposed by the TuneOS backend (FastAPI),
+mounted under the `/api` prefix. It backs the Reflex UI and manages background
+training jobs via Celery + Redis.
 
-## Training Endpoints
+> *Note: This API is intended for use by the TuneOS UI. Endpoint stability is
+> not yet guaranteed for external integrations.*
 
-The primary interactions involve submitting and managing fine-tuning tasks.
+## System
 
-### `POST /api/train`
-Starts a new fine-tuning job.
+### `GET /api/health`
+Liveness probe. Returns `{ "status": "ok", "version": "<semver>" }`.
 
-**Request Body:**
+### `GET /api/gpu`
+Detects the available accelerator (CUDA, Apple Metal/MPS, or CPU).
+
+## Models
+
+### `GET /api/models`
+Lists the curated set of supported base models.
+
+### `POST /api/models/validate`
+Validates that a model id is loadable. Body: `{ "model_id": "...", "hf_token": "" }`.
+
+## Datasets
+
+### `GET /api/datasets/search?q=<query>`
+Searches the Hugging Face Hub for datasets.
+
+### `GET /api/datasets/{dataset_id}/preview`
+Returns the first few rows and column names of a Hub dataset.
+
+### `POST /api/datasets/generate`
+Generates a synthetic instruction dataset (self-instruct or template-based).
+
+## Jobs
+
+### `POST /api/jobs`
+Creates and enqueues a fine-tuning job.
+
+**Request body** (`JobConfig`, abbreviated):
 ```json
 {
-  "model": "string (e.g., 'meta-llama/Llama-2-7b')",
-  "dataset": "string (path or huggingface dataset id)",
-  "epochs": "integer",
-  "batch_size": "integer",
-  "learning_rate": "float",
-  "lora_config": {
-    "r": "integer",
-    "lora_alpha": "integer",
-    "lora_dropout": "float"
-  }
+  "model_id": "mistralai/Mistral-7B-v0.1",
+  "model_source": "hub",
+  "dataset_path": "string",
+  "technique": "qlora",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "learning_rate": 2e-4,
+  "epochs": 3,
+  "batch_size": 4,
+  "max_seq_length": 512
 }
 ```
+LoRA `target_modules` are auto-detected from the model architecture, so they
+are not part of the request.
 
-**Response:**
-```json
-{
-  "job_id": "string",
-  "status": "queued"
-}
-```
+**Response:** `{ "job_id": "string", "status": "queued" }`
 
-### `GET /api/train/{job_id}/status`
-Retrieves the status of a specific training job.
+### `GET /api/jobs`
+Lists all runs from the durable SQLite store, most-recent first. Each item is a
+`JobStatus` (`job_id`, `status`, `output_path`). Job status is persisted to
+SQLite at start/completion/failure, so this endpoint works even if Redis is
+unavailable.
 
-**Response:**
-```json
-{
-  "job_id": "string",
-  "status": "string (e.g., 'queued', 'running', 'completed', 'failed')",
-  "progress": "float (0.0 to 1.0)",
-  "logs": "string"
-}
-```
+### `GET /api/jobs/{job_id}`
+Returns live status for one job (`status`, `progress`, `output_path`, `error`).
+
+### `DELETE /api/jobs/{job_id}`
+Cancels a running job (Celery revoke).
+
+### `GET /api/jobs/{job_id}/eval`
+Returns evaluation metrics (e.g. perplexity) computed after training.
+
+### `GET /api/jobs/{job_id}/download` · `GET /api/jobs/{job_id}/download-merged`
+Streams the adapter (or merged model) as a ZIP archive.
+
+### `POST /api/jobs/{job_id}/infer`
+Runs inference against the fine-tuned model. Body: `{ "prompt": "...", "max_new_tokens": 300, "temperature": 0.7 }`.
+
+### `POST /api/jobs/{job_id}/merge` · `/export-gguf` · `/push-github` · `/push_hub`
+Deployment actions: merge the adapter into the base model, export GGUF,
+push to a GitHub repo, or push to the Hugging Face Hub.
+
+### `POST /api/jobs/{job_id}/commentary`
+Returns templated progress commentary based on the loss trajectory.
+
+## Experiments
+
+### `GET /api/experiments`
+Lists all recorded runs (hyperparameters, final metrics, status).
+
+### `DELETE /api/experiments/{experiment_id}`
+Deletes a recorded run.
+
+## Storage Model
+
+Run history is persisted in `storage/experiments.db` (SQLite):
+
+| Table | Purpose |
+| --- | --- |
+| `runs` | One row per run: config, final loss/perplexity, status, output path |
+| `run_metrics` | Step-level metrics `(run_id, key, value, step, timestamp)` — queryable training curves |
+| `run_params` | Immutable hyperparameter snapshot `(run_id, key, value)` |
+
+The pure-SQLite persistence layer lives in `app/state/experiments_db.py` and has
+no Reflex dependency, so the headless Celery worker can write to it directly.
 
 ## Internal Architecture
 
-The TuneOS API relies on Celery and Redis to handle asynchronous training tasks. When a request is made to `/api/train`, a new task is pushed to the Redis queue, which is then picked up by one of the background workers (`trainer/workers`).
-
-*Note: This API is intended for internal use by the TuneOS UI. Stability of the endpoints is not guaranteed for external integrations yet.*
+`POST /api/jobs` enqueues a Celery task onto Redis; a background worker
+(`workers/train_task.py`) runs the training stack (`trainer/`) and streams
+step-level metrics back over a Redis channel, which the UI consumes live.

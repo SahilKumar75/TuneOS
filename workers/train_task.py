@@ -79,16 +79,6 @@ def _run_finetune_impl(
             # Eval failure must not fail the whole job
             r.set(f"job:{job_id}:eval", json.dumps({"perplexity": None, "bleu": None}))
 
-        # Persist step-level metrics to the queryable run_metrics table.
-        # The callback appends JSON payloads to a Redis list; read them all.
-        try:
-            raw_entries = r.lrange(f"job:{job_id}:loss_history", 0, -1)
-            if raw_entries:
-                loss_history = [json.loads(e) for e in raw_entries]
-                save_run_metrics(job_id, loss_history)
-        except Exception:
-            pass
-
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart
         write_job_status(job_id, "done", finished_at=finished_at, output_path=output_path)
@@ -119,6 +109,19 @@ def _run_finetune_impl(
             ),
         )
         raise
+
+    finally:
+        # Persist accumulated step-level metrics even if training failed, then
+        # drop the Redis list so it doesn't grow unboundedly across jobs.
+        try:
+            key = f"job:{job_id}:loss_history"
+            raw_entries = r.lrange(key, 0, -1)
+            if raw_entries:
+                loss_history = [json.loads(e) for e in raw_entries]
+                save_run_metrics(job_id, loss_history)
+                r.delete(key)
+        except Exception:
+            pass
 
 
 @celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200)

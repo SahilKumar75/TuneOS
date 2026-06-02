@@ -20,7 +20,8 @@ def inject_lora(model, lora_cfg: LoraConfig):
     model = prepare_model_for_kbit_training(model)
 
     if lora_cfg.target_modules is None:
-        model_type = getattr(getattr(model, "config", None), "model_type", "")
+        # Coerce to str — custom configs may carry a non-string model_type.
+        model_type = str(getattr(getattr(model, "config", None), "model_type", "") or "")
         target_modules = get_target_modules(model_type)
     else:
         target_modules = lora_cfg.target_modules

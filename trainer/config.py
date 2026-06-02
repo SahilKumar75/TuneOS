@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+
+_logger = logging.getLogger(__name__)
 
 # Enumerate the correct LoRA projection names per architecture rather than
 # silently using a default that breaks Gemma / Phi-3 / Falcon.
@@ -22,8 +25,19 @@ _DEFAULT_TARGET_MODULES = ["q_proj", "v_proj"]
 
 
 def get_target_modules(model_type: str) -> list[str]:
-    """Return LoRA target modules for a given HF model_type string."""
-    return _TARGET_MODULES_BY_ARCH.get(model_type.lower(), _DEFAULT_TARGET_MODULES)
+    """Return LoRA target modules for a given HF model_type string.
+
+    Falls back to a conservative default for unknown architectures, but logs
+    a warning so the misconfiguration is discoverable rather than silent.
+    """
+    key = (model_type or "").lower()
+    if key not in _TARGET_MODULES_BY_ARCH:
+        _logger.warning(
+            "No LoRA target_modules mapping for model_type=%r; falling back to default %s",
+            model_type,
+            _DEFAULT_TARGET_MODULES,
+        )
+    return _TARGET_MODULES_BY_ARCH.get(key, _DEFAULT_TARGET_MODULES)
 
 
 @dataclass

@@ -11,10 +11,13 @@ and adds the ``rx.State`` class on top.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import time
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.getenv("EXPERIMENT_DB", os.path.join(_PROJECT_ROOT, "storage", "experiments.db"))
@@ -82,10 +85,12 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
     """
     if not loss_history:
         return
-    ts = time.time()
+    now = time.time()
     rows = []
     for pt in loss_history:
         step = int(pt.get("step", 0))
+        # Prefer a per-step timestamp from the callback payload if present.
+        ts = float(pt.get("timestamp") or pt.get("ts") or now)
         for key in ("loss", "eval_loss", "learning_rate", "epoch"):
             val = pt.get(key)
             if val is not None:
@@ -101,7 +106,7 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
                 rows,
             )
     except Exception:
-        pass
+        _logger.exception("Failed to save run_metrics for run_id=%s", run_id)
 
 
 def save_run_params(run_id: str, params: dict[str, Any]) -> None:
@@ -117,7 +122,7 @@ def save_run_params(run_id: str, params: dict[str, Any]) -> None:
                 rows,
             )
     except Exception:
-        pass
+        _logger.exception("Failed to save run_params for run_id=%s", run_id)
 
 
 def write_job_status(
@@ -129,7 +134,6 @@ def write_job_status(
     started_at: str = "",
     finished_at: str = "",
     output_path: str = "",
-    error: str = "",
 ) -> None:
     """Durable (SQLite) job lifecycle record — complementary to ephemeral Redis status.
 
@@ -151,7 +155,32 @@ def write_job_status(
                 (run_id, name, model_id, status, started_at, finished_at, output_path),
             )
     except Exception:
-        pass
+        _logger.exception("Failed to write job status for run_id=%s", run_id)
+
+
+def list_runs() -> list[dict[str, Any]]:
+    """Return all runs as plain dicts, most-recent first (empty list on error).
+
+    Public accessor so callers (e.g. the API layer) don't reach into the
+    private connection helpers.
+    """
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
+            ).fetchall()
+        return [
+            {
+                "job_id": r["id"],
+                "status": r["status"] or "unknown",
+                "output_path": r["output_path"] or "",
+            }
+            for r in rows
+        ]
+    except Exception:
+        _logger.exception("Failed to list runs")
+        return []
 
 
 def save_experiment_run(run_data: dict[str, Any]):
@@ -189,4 +218,4 @@ def save_experiment_run(run_data: dict[str, Any]):
                 ),
             )
     except Exception:
-        pass
+        _logger.exception("Failed to save experiment run %s", run_data.get("id", ""))

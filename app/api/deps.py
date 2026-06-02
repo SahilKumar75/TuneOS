@@ -18,10 +18,24 @@ def artifact_path(job_id: str, artifact: str) -> Path:
     """Return the canonical path for a job artifact (adapter, merged, gguf, …).
 
     All workers and API routes should use this instead of constructing paths
-    ad-hoc, so the layout is consistent and path-traversal safe.
+    ad-hoc. The resolved path is validated to stay within the job's own
+    directory so that absolute values or ``..`` segments in ``job_id`` /
+    ``artifact`` cannot escape ``OUTPUT_DIR``.
+
+    Raises:
+        ValueError: if the resolved path escapes the job directory.
     """
     base = Path(OUTPUT_DIR).resolve()
-    return base / job_id / artifact
+    job_root = (base / job_id).resolve()
+    candidate = (job_root / artifact).resolve()
+    try:
+        # job_root must stay under base (guards `..` in job_id), and the final
+        # candidate must stay under job_root (guards `..`/absolute artifact).
+        job_root.relative_to(base)
+        candidate.relative_to(job_root)
+    except ValueError as exc:
+        raise ValueError(f"Unsafe artifact path for job {job_id!r}: {artifact!r}") from exc
+    return candidate
 
 
 _SUPPORTED_MODELS: list[dict] = [

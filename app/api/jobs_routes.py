@@ -42,24 +42,9 @@ def _resolve_job_dir(job_id: str) -> str:
 @router.get("/jobs", response_model=list[JobStatus])
 async def list_jobs():
     """Return all runs from the durable SQLite store, most-recent first."""
-    from app.state.experiments_db import _get_conn, _init_db
+    from app.state.experiments_db import list_runs
 
-    try:
-        _init_db()
-        with _get_conn() as conn:
-            rows = conn.execute(
-                "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
-            ).fetchall()
-        return [
-            JobStatus(
-                job_id=r["id"],
-                status=r["status"] or "unknown",
-                output_path=r["output_path"] or "",
-            )
-            for r in rows
-        ]
-    except Exception:
-        return []
+    return [JobStatus(**row) for row in list_runs()]
 
 
 @router.post("/jobs", response_model=JobCreated, status_code=201)

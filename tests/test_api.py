@@ -100,6 +100,32 @@ def test_list_jobs_returns_list():
         assert "status" in item
 
 
+# ── artifact_path traversal safety ───────────────────────────────
+
+
+def test_artifact_path_allows_normal_paths():
+    from app.api.deps import OUTPUT_DIR, artifact_path
+
+    p = artifact_path("job123", "adapter")
+    assert p.name == "adapter"
+    assert str(p).startswith(str(__import__("pathlib").Path(OUTPUT_DIR).resolve()))
+
+
+def test_artifact_path_blocks_traversal():
+    import pytest
+
+    from app.api.deps import artifact_path
+
+    for job_id, artifact in [
+        ("../../etc", "passwd"),  # `..` in job_id
+        ("job123", "../../../etc/passwd"),  # `..` in artifact
+        ("job123", "/etc/passwd"),  # absolute artifact
+        ("..", "x"),
+    ]:
+        with pytest.raises(ValueError):
+            artifact_path(job_id, artifact)
+
+
 def test_create_job_returns_201():
     payload = {
         "model_id": "mistralai/Mistral-7B-v0.1",

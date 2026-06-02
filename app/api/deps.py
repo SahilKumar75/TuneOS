@@ -5,12 +5,23 @@ from __future__ import annotations
 import os
 import platform
 import subprocess
+from pathlib import Path
 
 from app.api.schemas import GpuInfo
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
 DATASET_DIR = os.getenv("DATASET_DIR", "./storage/datasets")
+
+
+def artifact_path(job_id: str, artifact: str) -> Path:
+    """Return the canonical path for a job artifact (adapter, merged, gguf, …).
+
+    All workers and API routes should use this instead of constructing paths
+    ad-hoc, so the layout is consistent and path-traversal safe.
+    """
+    base = Path(OUTPUT_DIR).resolve()
+    return base / job_id / artifact
 
 _SUPPORTED_MODELS: list[dict] = [
     {

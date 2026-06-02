@@ -1,4 +1,29 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+
+# Enumerate the correct LoRA projection names per architecture rather than
+# silently using a default that breaks Gemma / Phi-3 / Falcon.
+_TARGET_MODULES_BY_ARCH: dict[str, list[str]] = {
+    "mistral":   ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "llama":     ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "phi3":      ["qkv_proj", "o_proj"],
+    "phi":       ["q_proj", "v_proj"],
+    "gemma":     ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "gemma2":    ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "falcon":    ["query_key_value"],
+    "gpt2":      ["c_attn"],
+    "gpt_neox":  ["query_key_value"],
+    "bloom":     ["query_key_value"],
+    "t5":        ["q", "v"],
+    "qwen2":     ["q_proj", "v_proj", "k_proj", "o_proj"],
+}
+_DEFAULT_TARGET_MODULES = ["q_proj", "v_proj"]
+
+
+def get_target_modules(model_type: str) -> list[str]:
+    """Return LoRA target modules for a given HF model_type string."""
+    return _TARGET_MODULES_BY_ARCH.get(model_type.lower(), _DEFAULT_TARGET_MODULES)
 
 
 @dataclass
@@ -20,7 +45,8 @@ class LoraConfig:
     lora_dropout: float = 0.05
     bias: str = "none"
     task_type: str = "CAUSAL_LM"
-    target_modules: list[str] = field(default_factory=lambda: ["q_proj", "v_proj"])
+    # None → auto-detected from model.config.model_type in inject_lora()
+    target_modules: list[str] | None = None
 
 
 @dataclass

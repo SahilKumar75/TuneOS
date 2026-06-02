@@ -45,6 +45,26 @@ def _init_db():
                 loss_history TEXT
             )
         """)
+        # Step-level metrics table for queryable run history
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS run_metrics (
+                run_id TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value REAL NOT NULL,
+                step INTEGER NOT NULL DEFAULT 0,
+                timestamp REAL NOT NULL DEFAULT 0,
+                PRIMARY KEY (run_id, key, step)
+            )
+        """)
+        # Immutable hyperparameter snapshot per run
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS run_params (
+                run_id TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                PRIMARY KEY (run_id, key)
+            )
+        """)
 
 
 _init_db()
@@ -130,6 +150,89 @@ class ExperimentState(rx.State):
             self.selected_run_ids = [i for i in self.selected_run_ids if i != run_id]
         except Exception:
             pass
+
+
+def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
+    """Unpack a loss_history list into per-step rows in run_metrics.
+
+    Each entry must have at least {step, loss}; optional keys: epoch,
+    learning_rate, eval_loss.  Safe to call multiple times — uses
+    INSERT OR REPLACE so re-runs overwrite stale rows.
+    """
+    if not loss_history:
+        return
+    import time
+
+    ts = time.time()
+    rows = []
+    for pt in loss_history:
+        step = int(pt.get("step", 0))
+        for key in ("loss", "eval_loss", "learning_rate", "epoch"):
+            val = pt.get(key)
+            if val is not None:
+                rows.append((run_id, key, float(val), step, ts))
+    if not rows:
+        return
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO run_metrics (run_id, key, value, step, timestamp) "
+                "VALUES (?, ?, ?, ?, ?)",
+                rows,
+            )
+    except Exception:
+        pass
+
+
+def save_run_params(run_id: str, params: dict[str, Any]) -> None:
+    """Persist hyperparameter key/value pairs for a run (immutable snapshot)."""
+    if not params:
+        return
+    rows = [(run_id, str(k), str(v)) for k, v in params.items()]
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO run_params (run_id, key, value) VALUES (?, ?, ?)",
+                rows,
+            )
+    except Exception:
+        pass
+
+
+def write_job_status(
+    run_id: str,
+    status: str,
+    *,
+    name: str = "",
+    model_id: str = "",
+    started_at: str = "",
+    finished_at: str = "",
+    output_path: str = "",
+    error: str = "",
+) -> None:
+    """Durable (SQLite) job lifecycle record — complementary to ephemeral Redis status.
+
+    Called by the worker at job start, completion, and failure so the API
+    can serve job state even when Redis is unavailable.
+    """
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO runs (id, name, model_id, status, started_at, finished_at, output_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    status=excluded.status,
+                    finished_at=COALESCE(NULLIF(excluded.finished_at,''), finished_at),
+                    output_path=COALESCE(NULLIF(excluded.output_path,''), output_path)
+                """,
+                (run_id, name, model_id, status, started_at, finished_at, output_path),
+            )
+    except Exception:
+        pass
 
 
 def save_experiment_run(run_data: dict[str, Any]):

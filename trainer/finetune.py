@@ -59,7 +59,7 @@ def finetune(
         lr_scheduler_type=train_cfg.lr_scheduler_type,
         optim=train_cfg.optim,
         max_grad_norm=train_cfg.max_grad_norm,
-        report_to="none",  # disable wandb/mlflow by default
+        report_to="none",  # disable external experiment trackers by default
         gradient_checkpointing=True,
     )
 

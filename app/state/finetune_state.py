@@ -65,20 +65,21 @@ _PRESET_META: dict[str, dict[str, str]] = {
     },
 }
 
-# Organisation badge colours and initials (keyed lowercase).
+# Organisation meta — keyed lowercase HF org name.
+# `github` is the GitHub org slug used for avatar URLs.
 _ORG_META: dict[str, dict[str, str]] = {
-    "mistralai": {"initial": "Mi", "color": "#FF7000"},
-    "meta-llama": {"initial": "M", "color": "#0668E1"},
-    "microsoft": {"initial": "Ms", "color": "#00A4EF"},
-    "google": {"initial": "G", "color": "#4285F4"},
-    "eleutherai": {"initial": "EA", "color": "#6E40C9"},
-    "bigcode": {"initial": "BC", "color": "#0EA5E9"},
-    "huggingface": {"initial": "HF", "color": "#FF9D00"},
-    "stabilityai": {"initial": "SA", "color": "#6366F1"},
-    "tiiuae": {"initial": "FA", "color": "#059669"},
-    "qwen": {"initial": "Q", "color": "#7C3AED"},
-    "cohere": {"initial": "Co", "color": "#39594D"},
-    "openai": {"initial": "Oa", "color": "#10A37F"},
+    "mistralai":    {"initial": "Mi", "color": "#FF7000", "github": "mistralai"},
+    "meta-llama":   {"initial": "M",  "color": "#0668E1", "github": "meta-llama"},
+    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "github": "microsoft"},
+    "google":       {"initial": "G",  "color": "#4285F4", "github": "google"},
+    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "github": "EleutherAI"},
+    "bigcode":      {"initial": "BC", "color": "#0EA5E9", "github": "bigcode-project"},
+    "huggingface":  {"initial": "HF", "color": "#FF9D00", "github": "huggingface"},
+    "stabilityai":  {"initial": "SA", "color": "#6366F1", "github": "Stability-AI"},
+    "tiiuae":       {"initial": "FA", "color": "#059669", "github": "tiiuae"},
+    "qwen":         {"initial": "Q",  "color": "#7C3AED", "github": "QwenLM"},
+    "cohere":       {"initial": "Co", "color": "#39594D", "github": "cohere-ai"},
+    "openai":       {"initial": "Oa", "color": "#10A37F", "github": "openai"},
 }
 
 
@@ -366,11 +367,12 @@ class FinetuneState(rx.State):
 
     @rx.var
     def selected_model_org_avatar(self) -> str:
-        """HuggingFace org thumbnail CDN URL — loads if available, silent on error."""
+        """GitHub org avatar — reliable, public, official logos."""
         org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
         if not org:
             return ""
-        return f"https://cdn-thumbnails.huggingface.co/social-thumbnails/orgs/{org}.png"
+        github_slug = _ORG_META.get(org.lower(), {}).get("github", org)
+        return f"https://github.com/{github_slug}.png?size=128"
 
     @rx.var
     def last_train_loss(self) -> float:

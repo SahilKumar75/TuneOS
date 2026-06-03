@@ -425,9 +425,10 @@ def _technique_selector() -> rx.Component:
 def _org_logo(size: str = "56px", radius: str = "50%") -> rx.Component:
     """Circular org logo: GitHub avatar on top of a coloured-initial fallback."""
     return rx.box(
+        # Fallback: org-coloured initial on white circle
         rx.text(
             FinetuneState.selected_model_org_initial,
-            color="white",
+            color=FinetuneState.selected_model_org_color,
             font_size="1.1rem",
             font_weight="800",
             position="absolute",
@@ -437,6 +438,7 @@ def _org_logo(size: str = "56px", radius: str = "50%") -> rx.Component:
             pointer_events="none",
             user_select="none",
         ),
+        # Logo image — white background ensures transparent PNGs look clean
         rx.image(
             src=FinetuneState.selected_model_org_avatar,
             position="absolute",
@@ -445,9 +447,12 @@ def _org_logo(size: str = "56px", radius: str = "50%") -> rx.Component:
             width="100%",
             height="100%",
             object_fit="cover",
+            background="white",
         ),
         position="relative",
-        background=FinetuneState.selected_model_org_color,
+        background="white",
+        border="2px solid",
+        border_color=FinetuneState.selected_model_org_color,
         border_radius=radius,
         width=size,
         height=size,
@@ -461,22 +466,24 @@ def _preset_chip(m: dict) -> rx.Component:
     """Pill chip for a preset model with a mini GitHub org avatar."""
     org_key = m["id"].split("/")[0].lower()
     org_meta = _ORG_META.get(org_key, {})
-    github = org_meta.get("github", m["id"].split("/")[0])
     org_color = org_meta.get("color", "#6366F1")
+    logo_url = org_meta.get("logo", f"https://github.com/{m['id'].split('/')[0]}.png?size=32")
     return rx.button(
         rx.hstack(
             rx.box(
                 rx.image(
-                    src=f"https://github.com/{github}.png?size=32",
+                    src=logo_url,
                     width="100%",
                     height="100%",
                     object_fit="cover",
+                    background="white",
                 ),
                 width="16px",
                 height="16px",
                 border_radius="50%",
                 overflow="hidden",
-                background=org_color,
+                background="white",
+                border=f"1.5px solid {org_color}",
                 flex_shrink="0",
             ),
             rx.text(m["name"], font_size="0.78rem"),
@@ -528,43 +535,68 @@ def _step1_confirm() -> rx.Component:
                     rx.divider(color=c("border")),
                     # Identity row
                     rx.hstack(
-                        _org_logo("60px", "50%"),
-                        rx.vstack(
-                            rx.hstack(
+                        # Left: logo + name
+                        rx.hstack(
+                            _org_logo("60px", "50%"),
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.text(
+                                        FinetuneState.effective_model_name,
+                                        font_size="1.2rem",
+                                        font_weight="700",
+                                        color=c("text_primary"),
+                                    ),
+                                    rx.badge(
+                                        FinetuneState.selected_model_source_label,
+                                        color_scheme="blue",
+                                        variant="soft",
+                                        size="1",
+                                    ),
+                                    spacing="2",
+                                    align="center",
+                                    flex_wrap="wrap",
+                                ),
                                 rx.text(
-                                    FinetuneState.effective_model_name,
-                                    font_size="1.2rem",
-                                    font_weight="700",
-                                    color=c("text_primary"),
+                                    FinetuneState.effective_model_id,
+                                    font_size="0.8rem",
+                                    color=c("text_muted"),
+                                    font_family="monospace",
                                 ),
-                                rx.badge(
-                                    FinetuneState.selected_model_source_label,
-                                    color_scheme="blue",
-                                    variant="soft",
-                                    size="1",
+                                rx.cond(
+                                    FinetuneState.selected_model_notes != "",
+                                    rx.text(
+                                        FinetuneState.selected_model_notes,
+                                        font_size="0.82rem",
+                                        color=c("text_secondary"),
+                                    ),
+                                    rx.fragment(),
                                 ),
-                                spacing="2",
-                                align="center",
-                                flex_wrap="wrap",
+                                spacing="1",
+                                align_items="flex-start",
                             ),
-                            rx.text(
-                                FinetuneState.effective_model_id,
-                                font_size="0.8rem",
-                                color=c("text_muted"),
-                                font_family="monospace",
-                            ),
-                            rx.cond(
-                                FinetuneState.selected_model_notes != "",
-                                rx.text(
-                                    FinetuneState.selected_model_notes,
-                                    font_size="0.82rem",
-                                    color=c("text_secondary"),
-                                ),
-                                rx.fragment(),
-                            ),
-                            spacing="1",
-                            align_items="flex-start",
+                            spacing="4",
+                            align="start",
                             flex="1",
+                            min_width="0",
+                        ),
+                        # Right: bio paragraph
+                        rx.cond(
+                            FinetuneState.model_bio != "",
+                            rx.box(
+                                rx.text(
+                                    FinetuneState.model_bio,
+                                    font_size="0.78rem",
+                                    color=c("text_secondary"),
+                                    line_height="1.55",
+                                ),
+                                padding_left="16px",
+                                border_left="1px solid",
+                                border_left_color=c("border"),
+                                max_width="340px",
+                                min_width="180px",
+                                flex_shrink="0",
+                            ),
+                            rx.fragment(),
                         ),
                         spacing="4",
                         align="start",
@@ -587,6 +619,16 @@ def _step1_confirm() -> rx.Component:
                             ),
                             spacing="3",
                             width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # Debug: show fetch error if any
+                    rx.cond(
+                        FinetuneState.model_fetch_error != "",
+                        rx.callout(
+                            FinetuneState.model_fetch_error,
+                            color_scheme="red",
+                            size="1",
                         ),
                         rx.fragment(),
                     ),

@@ -69,22 +69,22 @@ _PRESET_META: dict[str, dict[str, str]] = {
 # `logo` is the Clearbit CDN URL for a clean official logo.
 # Clearbit provides 128px PNGs of official company marks — consistent, well-cropped.
 _ORG_META: dict[str, dict[str, str]] = {
-    "mistralai":    {"initial": "Mi", "color": "#FF7000", "logo": "https://logo.clearbit.com/mistral.ai?size=128"},
-    "meta-llama":   {"initial": "M",  "color": "#0668E1", "logo": "https://logo.clearbit.com/meta.com?size=128"},
-    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "logo": "https://logo.clearbit.com/microsoft.com?size=128"},
-    "google":       {"initial": "G",  "color": "#4285F4", "logo": "https://logo.clearbit.com/google.com?size=128"},
-    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "logo": "https://logo.clearbit.com/eleuther.ai?size=128"},
+    "mistralai":    {"initial": "Mi", "color": "#FF7000", "logo": "https://github.com/mistralai.png?size=128"},
+    "meta-llama":   {"initial": "M",  "color": "#0668E1", "logo": "https://github.com/meta-llama.png?size=128"},
+    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "logo": "https://github.com/microsoft.png?size=128"},
+    "google":       {"initial": "G",  "color": "#4285F4", "logo": "https://github.com/google.png?size=128"},
+    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "logo": "https://github.com/EleutherAI.png?size=128"},
     "bigcode":      {"initial": "BC", "color": "#0EA5E9", "logo": "https://github.com/bigcode-project.png?size=128"},
-    "huggingface":  {"initial": "HF", "color": "#FF9D00", "logo": "https://logo.clearbit.com/huggingface.co?size=128"},
-    "stabilityai":  {"initial": "SA", "color": "#6366F1", "logo": "https://logo.clearbit.com/stability.ai?size=128"},
-    "tiiuae":       {"initial": "FA", "color": "#059669", "logo": "https://logo.clearbit.com/tii.ae?size=128"},
-    "qwen":         {"initial": "Q",  "color": "#7C3AED", "logo": "https://logo.clearbit.com/qwen.ai?size=128"},
-    "cohere":       {"initial": "Co", "color": "#39594D", "logo": "https://logo.clearbit.com/cohere.com?size=128"},
-    "openai":       {"initial": "Oa", "color": "#10A37F", "logo": "https://logo.clearbit.com/openai.com?size=128"},
-    "nvidia":       {"initial": "Nv", "color": "#76B900", "logo": "https://logo.clearbit.com/nvidia.com?size=128"},
-    "apple":        {"initial": "Ap", "color": "#555555", "logo": "https://logo.clearbit.com/apple.com?size=128"},
-    "deepmind":     {"initial": "DM", "color": "#4285F4", "logo": "https://logo.clearbit.com/deepmind.com?size=128"},
-    "anthropic":    {"initial": "An", "color": "#C97E45", "logo": "https://logo.clearbit.com/anthropic.com?size=128"},
+    "huggingface":  {"initial": "HF", "color": "#FF9D00", "logo": "https://github.com/huggingface.png?size=128"},
+    "stabilityai":  {"initial": "SA", "color": "#6366F1", "logo": "https://github.com/Stability-AI.png?size=128"},
+    "tiiuae":       {"initial": "FA", "color": "#059669", "logo": "https://github.com/tiiuae.png?size=128"},
+    "qwen":         {"initial": "Q",  "color": "#7C3AED", "logo": "https://github.com/QwenLM.png?size=128"},
+    "cohere":       {"initial": "Co", "color": "#39594D", "logo": "https://github.com/cohere-ai.png?size=128"},
+    "openai":       {"initial": "Oa", "color": "#10A37F", "logo": "https://github.com/openai.png?size=128"},
+    "nvidia":       {"initial": "Nv", "color": "#76B900", "logo": "https://github.com/NVIDIA.png?size=128"},
+    "apple":        {"initial": "Ap", "color": "#555555", "logo": "https://github.com/apple.png?size=128"},
+    "deepmind":     {"initial": "DM", "color": "#4285F4", "logo": "https://github.com/google-deepmind.png?size=128"},
+    "anthropic":    {"initial": "An", "color": "#C97E45", "logo": "https://github.com/anthropics.png?size=128"},
 }
 
 
@@ -148,6 +148,8 @@ class FinetuneState(rx.State):
     model_type_hf: str = ""          # model_type from config (gemma, llama, etc.)
     model_languages: str = ""        # comma-joined language codes
     model_last_updated: str = ""     # ISO date string from lastModified
+    model_bio: str = ""              # first paragraph from model README
+    model_fetch_error: str = ""      # debug: last error from fetch_model_info
     is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
@@ -464,6 +466,8 @@ class FinetuneState(rx.State):
         self.model_type_hf = ""
         self.model_languages = ""
         self.model_last_updated = ""
+        self.model_bio = ""
+        self.model_fetch_error = ""
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -573,14 +577,63 @@ class FinetuneState(rx.State):
             self.is_fetching_model_info = True
         try:
             headers = {"Authorization": f"Bearer {token}"} if token else {}
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            _SKIP_STARTS = ("#", "!", "[", "<", "|", "*", "-", ">", "_", ":")
+            def _is_prose(line: str) -> bool:
+                s = line.strip()
+                return (
+                    bool(s)
+                    and len(s) > 60
+                    and not any(s.startswith(c) for c in _SKIP_STARTS)
+                    and not s[0].isdigit()
+                )
+
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 resp = await client.get(
                     f"https://huggingface.co/api/models/{model_id}",
                     headers=headers,
                 )
-            if resp.status_code != 200:
-                return
-            data = resp.json()
+                if resp.status_code != 200:
+                    return
+                data = resp.json()
+
+                # Bio: fetch README inside the same client session
+                bio = ""
+                try:
+                    readme_resp = await client.get(
+                        f"https://huggingface.co/{model_id}/resolve/main/README.md",
+                        headers=headers,
+                    )
+                    if readme_resp.status_code == 200:
+                        readme = readme_resp.text
+                        if readme.startswith("---"):
+                            end = readme.find("---", 3)
+                            if end != -1:
+                                readme = readme[end + 3:].strip()
+                        lines = readme.split("\n")
+                        # Pass 1: first prose line after a description/about/overview heading
+                        in_desc = False
+                        for line in lines:
+                            stripped = line.strip()
+                            if stripped.startswith("#") and any(
+                                kw in stripped.lower()
+                                for kw in ("description", "about", "overview", "introduction", "summary")
+                            ):
+                                in_desc = True
+                                continue
+                            if in_desc:
+                                if stripped.startswith("#"):
+                                    break
+                                if _is_prose(stripped):
+                                    bio = stripped[:300] + ("…" if len(stripped) > 300 else "")
+                                    break
+                        # Pass 2: fall back to first substantial prose line anywhere
+                        if not bio:
+                            for line in lines:
+                                if _is_prose(line.strip()):
+                                    bio = line.strip()[:300] + ("…" if len(line.strip()) > 300 else "")
+                                    break
+                except Exception:
+                    pass
 
             dl    = data.get("downloads", 0) or 0
             likes = data.get("likes", 0) or 0
@@ -621,8 +674,14 @@ class FinetuneState(rx.State):
                 self.model_context_window = f"{ctx:,} tokens" if ctx else ""
                 self.model_languages = lang_str
                 self.model_last_updated = last_mod
-        except Exception:
-            pass
+                self.model_bio = bio
+                self.model_fetch_error = ""
+        except Exception as _exc:
+            import traceback
+            _tb = traceback.format_exc()
+            print("fetch_model_info ERROR:", _tb)
+            async with self:
+                self.model_fetch_error = str(_exc)
         finally:
             async with self:
                 self.is_fetching_model_info = False

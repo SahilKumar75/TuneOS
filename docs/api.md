@@ -52,11 +52,25 @@ Creates and enqueues a fine-tuning job.
   "learning_rate": 2e-4,
   "epochs": 3,
   "batch_size": 4,
-  "max_seq_length": 512
+  "max_seq_length": 512,
+  "eval_split_ratio": 0.1,
+  "early_stopping_patience": 0,
+  "resume_from_checkpoint": ""
 }
 ```
 LoRA `target_modules` are auto-detected from the model architecture, so they
 are not part of the request.
+
+Phase 2 training controls:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `eval_split_ratio` | `0.1` | Fraction of the dataset held out for in-training validation. `0` disables the eval loop. |
+| `early_stopping_patience` | `0` | Stop after this many evals with no `eval_loss` improvement. `0` disables early stopping. Requires a non-zero `eval_split_ratio`. |
+| `resume_from_checkpoint` | `""` | Path to a checkpoint dir to resume from; empty starts fresh. |
+
+If training hits a CUDA out-of-memory error, the job status reports
+`status: "failed"` with a `suggestion` field describing how to reduce memory.
 
 **Response:** `{ "job_id": "string", "status": "queued" }`
 
@@ -73,7 +87,11 @@ Returns live status for one job (`status`, `progress`, `output_path`, `error`).
 Cancels a running job (Celery revoke).
 
 ### `GET /api/jobs/{job_id}/eval`
-Returns evaluation metrics (e.g. perplexity) computed after training.
+Returns evaluation metrics computed after training. Metrics come from the
+pluggable registry in `trainer/metrics.py`: `perplexity` (loss-based, default)
+plus `rouge1` and `bleu` (reference-based). Loss-based metrics run on the
+held-out validation split; reference-based metrics compare generated text
+against the dataset's reference outputs.
 
 ### `GET /api/jobs/{job_id}/download` · `GET /api/jobs/{job_id}/download-merged`
 Streams the adapter (or merged model) as a ZIP archive.

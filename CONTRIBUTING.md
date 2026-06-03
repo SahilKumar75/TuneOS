@@ -109,6 +109,34 @@ an untyped `list[dict[str, Any]]` state var will fail to compile. Always
 annotate state vars with a concrete type (e.g. `list[ExperimentRun]`), never
 `Any`.
 
+### Evaluation Metrics
+
+Evaluation metrics live in a registry in `trainer/metrics.py`. To add a metric,
+register a function with `@register(...)`:
+
+```python
+@register("my_metric", greater_is_better=True, kind="reference")
+def compute_my_metric(predictions: list[str], references: list[str]) -> float | None:
+    ...
+```
+
+Use `kind="loss"` for metrics that take `(model, tokenizer, dataset)` and
+`kind="reference"` for metrics over `(predictions, references)` string pairs.
+Registered metrics are then available by name through `trainer.evaluate`.
+
+### Tests
+
+Run the suite with `poetry run pytest`. Most tests are mocked and need no GPU.
+The trainer **integration test** actually loads a tiny model and runs a training
+step; it is skipped unless you opt in:
+
+```bash
+TUNEOS_INTEGRATION_TESTS=1 poetry run pytest tests/test_trainer_integration.py
+```
+
+`mypy` runs in CI over the pure-logic backend modules (see `[tool.mypy]` in
+`pyproject.toml`); run it locally with `poetry run mypy`.
+
 ## Pull Requests
 
 1. Create a new branch from `main` for your feature or bugfix:

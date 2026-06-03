@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Trainer hardening (Phase 2).** Training now supports an in-training
+  validation split (`eval_split_ratio`), `EarlyStoppingCallback`
+  (`early_stopping_patience`), and resuming from a checkpoint
+  (`resume_from_checkpoint`). These are exposed on `JobConfig` / `POST /api/jobs`.
+- **GPU OOM handling.** A CUDA out-of-memory failure is now caught and reported
+  with a remediation hint (reduce batch size / sequence length / model) in the
+  job status, instead of an opaque crash.
+- **Pluggable evaluation metrics.** New `trainer/metrics.py` registry with
+  `perplexity` (loss-based) plus `rouge1` and `bleu` (reference-based);
+  metrics are requested by name via `trainer.evaluate.evaluate_model`.
+- **Trainer test coverage.** Added `tests/test_metrics.py`, `tests/test_dataset.py`,
+  and a GPU-free integration test (`tests/test_trainer_integration.py`, gated by
+  `TUNEOS_INTEGRATION_TESTS=1`) that runs a real training step on a tiny model.
+- **Static typing in CI.** `mypy` now runs in the lint job over the pure-logic
+  backend modules.
 - **Observability layer (Phase 1).** Step-level metrics are now
   persisted to queryable `run_metrics` and `run_params` tables in
   `storage/experiments.db`, instead of only living in a JSON blob.

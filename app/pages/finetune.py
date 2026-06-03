@@ -291,18 +291,25 @@ def _technique_card(
     recommended: bool = False,
 ) -> rx.Component:
     is_active = FinetuneState.selected_technique == tech
+    is_suggested = FinetuneState.suggested_technique == tech
+    # "Suggested" badge only appears when this card is not already "Recommended"
+    suggested_badge = (
+        rx.fragment()
+        if recommended
+        else rx.cond(
+            is_suggested,
+            rx.badge("Suggested for you", color_scheme="violet", size="1"),
+            rx.fragment(),
+        )
+    )
     return rx.box(
         rx.vstack(
             rx.hstack(
                 rx.box(
-                    rx.icon(
-                        icon,
-                        size=20,
-                        color=rx.cond(is_active, "white", c("accent")),
-                    ),
+                    rx.icon(icon, size=22, color=rx.cond(is_active, "white", c("accent"))),
                     background=rx.cond(is_active, c("accent"), c("accent_soft")),
-                    border_radius="8px",
-                    padding="8px",
+                    border_radius="10px",
+                    padding="9px",
                     display="flex",
                     align_items="center",
                     justify_content="center",
@@ -313,7 +320,7 @@ def _technique_card(
                         rx.text(
                             label,
                             font_size="0.92rem",
-                            font_weight="600",
+                            font_weight="700",
                             color=rx.cond(is_active, c("accent"), c("text_primary")),
                         ),
                         rx.cond(
@@ -321,6 +328,7 @@ def _technique_card(
                             rx.badge("Recommended", color_scheme="green", size="1"),
                             rx.fragment(),
                         ),
+                        suggested_badge,
                         rx.cond(
                             coming_soon,
                             rx.badge("Soon", color_scheme="gray", size="1"),
@@ -330,7 +338,7 @@ def _technique_card(
                         align="center",
                         flex_wrap="wrap",
                     ),
-                    rx.text(desc, font_size="0.76rem", color=c("text_muted")),
+                    rx.text(desc, font_size="0.75rem", color=c("text_muted")),
                     spacing="0",
                     align_items="flex-start",
                 ),
@@ -338,11 +346,34 @@ def _technique_card(
                 align="start",
                 width="100%",
             ),
-            rx.text(
-                detail,
-                font_size="0.72rem",
-                color=rx.cond(is_active, c("text_secondary"), c("text_muted")),
-                padding_top="2px",
+            rx.hstack(
+                rx.icon("memory-stick", size=12, color=c("text_muted")),
+                rx.text(
+                    detail,
+                    font_size="0.72rem",
+                    color=rx.cond(is_active, c("text_secondary"), c("text_muted")),
+                ),
+                spacing="1",
+                align="center",
+                padding_top="4px",
+            ),
+            rx.cond(
+                is_active,
+                rx.box(
+                    rx.hstack(
+                        rx.icon("circle-check", size=12, color=c("accent")),
+                        rx.text(
+                            "Active",
+                            font_size="0.7rem",
+                            font_weight="600",
+                            color=c("accent"),
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    margin_top="4px",
+                ),
+                rx.fragment(),
             ),
             spacing="2",
             align_items="flex-start",
@@ -355,38 +386,33 @@ def _technique_card(
         cursor=rx.cond(coming_soon, "not-allowed", "pointer"),
         opacity=rx.cond(coming_soon, "0.5", "1"),
         on_click=rx.cond(coming_soon, rx.prevent_default, FinetuneState.select_technique(tech)),
-        _hover=rx.cond(
-            coming_soon,
-            {},
-            {"border_color": c("accent"), "background": c("accent_soft")},
-        ),
-        transition="all 0.15s ease",
+        transition="border-color 0.15s ease, background 0.15s ease",
     )
 
 
 def _technique_selector() -> rx.Component:
     return rx.grid(
         _technique_card(
-            "qlora", "QLoRA", "zap",
-            "4-bit quantized LoRA adapter",
-            "~12 GB VRAM · Best for most cases",
+            "qlora", "QLoRA", "gauge",
+            "4-bit quantized LoRA adapter — runs on consumer GPUs",
+            "~12 GB VRAM · Recommended starting point",
             False, recommended=True,
         ),
         _technique_card(
             "lora", "LoRA", "layers",
-            "Float-16 precision LoRA",
+            "Full float-16 precision LoRA adapter",
             "~16 GB VRAM for 7B models",
             False,
         ),
         _technique_card(
-            "full", "Full Fine-tune", "settings-2",
-            "Updates all model weights",
+            "full", "Full Fine-tune", "server",
+            "All model weights updated end-to-end",
             "~80 GB+ VRAM for 7B models",
             True,
         ),
         _technique_card(
-            "dpo", "DPO", "thumbs-up",
-            "Preference alignment",
+            "dpo", "DPO", "scale",
+            "Direct Preference Optimisation (alignment)",
             "Requires ranked preference pairs",
             True,
         ),
@@ -544,7 +570,7 @@ def _step1_confirm() -> rx.Component:
                         align="start",
                         width="100%",
                     ),
-                    # Stat pills
+                    # Stat pills — static metadata
                     rx.cond(
                         FinetuneState.selected_model_size != "",
                         rx.hstack(
@@ -561,6 +587,72 @@ def _step1_confirm() -> rx.Component:
                             ),
                             spacing="3",
                             width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # Live HF Hub stats
+                    rx.cond(
+                        FinetuneState.is_fetching_model_info,
+                        rx.hstack(
+                            rx.spinner(size="1"),
+                            rx.text("Fetching model info…", font_size="0.74rem", color=c("text_muted")),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.cond(
+                                FinetuneState.model_pipeline != "",
+                                rx.hstack(
+                                    rx.icon("terminal", size=12, color=c("accent")),
+                                    rx.text(FinetuneState.model_pipeline, font_size="0.75rem", color=c("text_secondary")),
+                                    spacing="1",
+                                    align="center",
+                                    background=c("accent_soft"),
+                                    border_radius="6px",
+                                    padding="3px 8px",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_downloads != "",
+                                rx.hstack(
+                                    rx.icon("arrow-down-to-line", size=12, color=c("text_muted")),
+                                    rx.text(FinetuneState.model_downloads, font_size="0.75rem", color=c("text_secondary")),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_likes != "",
+                                rx.hstack(
+                                    rx.icon("heart", size=12, color=c("text_muted")),
+                                    rx.text(FinetuneState.model_likes, font_size="0.75rem", color=c("text_secondary")),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="3",
+                            flex_wrap="wrap",
+                            align="center",
+                        ),
+                    ),
+                    # HF tags
+                    rx.cond(
+                        FinetuneState.model_hf_tags.length() > 0,
+                        rx.flex(
+                            rx.foreach(
+                                FinetuneState.model_hf_tags,
+                                lambda tag: rx.badge(
+                                    tag,
+                                    color_scheme="gray",
+                                    variant="soft",
+                                    size="1",
+                                ),
+                            ),
+                            gap="5px",
+                            flex_wrap="wrap",
                         ),
                         rx.fragment(),
                     ),

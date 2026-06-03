@@ -134,6 +134,12 @@ class FinetuneState(rx.State):
     hf_token: str = ""  # for gated models
     selected_technique: str = "qlora"  # "qlora" | "lora"
     step1_show_picker: bool = False  # True = full grid picker (advanced)
+    # Extended preview info fetched live from HF Hub API
+    model_downloads: str = ""
+    model_likes: str = ""
+    model_pipeline: str = ""
+    model_hf_tags: list[str] = []
+    is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""
@@ -375,6 +381,32 @@ class FinetuneState(rx.State):
         return f"https://github.com/{github_slug}.png?size=128"
 
     @rx.var
+    def suggested_technique(self) -> str:
+        """Recommend a technique based on model size + user intent (Step 2)."""
+        intent = self.user_intent.lower()
+        size = self.selected_model_size.lower()
+
+        # Intent-based signal: preference / alignment → DPO
+        if any(k in intent for k in ["preference", "alignment", "reward", "rlhf", "helpful"]):
+            return "dpo"
+
+        # Parse size to float billions
+        size_b = 0.0
+        try:
+            if "b params" in size:
+                size_b = float(size.replace("b params", "").strip())
+            elif "m params" in size:
+                size_b = float(size.replace("m params", "").strip()) / 1000.0
+        except ValueError:
+            pass
+
+        # Small models (< 1.5B) can handle standard LoRA efficiently
+        if 0 < size_b < 1.5:
+            return "lora"
+        # Everything ≥ 1.5B benefits from QLoRA's memory efficiency
+        return "qlora"
+
+    @rx.var
     def last_train_loss(self) -> float:
         if self.loss_history:
             return self.loss_history[-1].loss
@@ -410,6 +442,12 @@ class FinetuneState(rx.State):
         self.model_url_error = ""
         self.step1_show_picker = False
 
+    def _clear_model_preview(self):
+        self.model_downloads = ""
+        self.model_likes = ""
+        self.model_pipeline = ""
+        self.model_hf_tags = []
+
     @rx.event
     def select_preset(self, model_id: str):
         """Select a model by ID from the confirmation-card dropdown."""
@@ -419,6 +457,8 @@ class FinetuneState(rx.State):
         self.model_source = "hub"
         self.custom_model_str = ""
         self.model_url_error = ""
+        self._clear_model_preview()
+        return FinetuneState.fetch_model_info
 
     @rx.event
     def set_custom_confirm_input(self, value: str):
@@ -479,6 +519,8 @@ class FinetuneState(rx.State):
                     self.selected_model_name = data.get("model_type", model_str)
                     self.is_validating_model = False
                     self.step1_show_picker = False
+                    self._clear_model_preview()
+                return FinetuneState.fetch_model_info
             else:
                 async with self:
                     self.model_url_error = data.get("error", "Model not found or inaccessible.")
@@ -487,6 +529,48 @@ class FinetuneState(rx.State):
             async with self:
                 self.model_url_error = f"Validation failed: {exc}"
                 self.is_validating_model = False
+
+    @rx.event(background=True)
+    async def fetch_model_info(self):
+        """Fetch live metadata from HF Hub API and populate extended preview fields."""
+        async with self:
+            model_id = self.selected_model_id
+            token = self.hf_token
+        if not model_id or "/" not in model_id:
+            return
+        async with self:
+            self.is_fetching_model_info = True
+        try:
+            headers = {"Authorization": f"Bearer {token}"} if token else {}
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(
+                    f"https://huggingface.co/api/models/{model_id}",
+                    headers=headers,
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                dl = data.get("downloads", 0) or 0
+                likes = data.get("likes", 0) or 0
+                pipeline = (data.get("pipeline_tag") or "").replace("-", " ").title()
+                raw_tags = data.get("tags") or []
+                keep = {"text-generation", "conversational", "code", "summarization",
+                        "translation", "question-answering", "fill-mask", "rlhf",
+                        "instruction-tuned", "chat", "fine-tuned"}
+                tags = [t for t in raw_tags if t.lower() in keep][:4]
+                async with self:
+                    self.model_downloads = (
+                        f"{dl / 1_000_000:.1f}M" if dl >= 1_000_000
+                        else f"{dl // 1_000}k" if dl >= 1_000
+                        else str(dl)
+                    ) if dl else ""
+                    self.model_likes = str(likes) if likes else ""
+                    self.model_pipeline = pipeline
+                    self.model_hf_tags = tags
+        except Exception:
+            pass
+        finally:
+            async with self:
+                self.is_fetching_model_info = False
 
     async def handle_local_model_upload(self, files: list[rx.UploadFile]):
         self.is_validating_model = True

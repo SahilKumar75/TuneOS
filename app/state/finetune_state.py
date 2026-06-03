@@ -66,20 +66,25 @@ _PRESET_META: dict[str, dict[str, str]] = {
 }
 
 # Organisation meta — keyed lowercase HF org name.
-# `github` is the GitHub org slug used for avatar URLs.
+# `logo` is the Clearbit CDN URL for a clean official logo.
+# Clearbit provides 128px PNGs of official company marks — consistent, well-cropped.
 _ORG_META: dict[str, dict[str, str]] = {
-    "mistralai":    {"initial": "Mi", "color": "#FF7000", "github": "mistralai"},
-    "meta-llama":   {"initial": "M",  "color": "#0668E1", "github": "meta-llama"},
-    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "github": "microsoft"},
-    "google":       {"initial": "G",  "color": "#4285F4", "github": "google"},
-    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "github": "EleutherAI"},
-    "bigcode":      {"initial": "BC", "color": "#0EA5E9", "github": "bigcode-project"},
-    "huggingface":  {"initial": "HF", "color": "#FF9D00", "github": "huggingface"},
-    "stabilityai":  {"initial": "SA", "color": "#6366F1", "github": "Stability-AI"},
-    "tiiuae":       {"initial": "FA", "color": "#059669", "github": "tiiuae"},
-    "qwen":         {"initial": "Q",  "color": "#7C3AED", "github": "QwenLM"},
-    "cohere":       {"initial": "Co", "color": "#39594D", "github": "cohere-ai"},
-    "openai":       {"initial": "Oa", "color": "#10A37F", "github": "openai"},
+    "mistralai":    {"initial": "Mi", "color": "#FF7000", "logo": "https://logo.clearbit.com/mistral.ai?size=128"},
+    "meta-llama":   {"initial": "M",  "color": "#0668E1", "logo": "https://logo.clearbit.com/meta.com?size=128"},
+    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "logo": "https://logo.clearbit.com/microsoft.com?size=128"},
+    "google":       {"initial": "G",  "color": "#4285F4", "logo": "https://logo.clearbit.com/google.com?size=128"},
+    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "logo": "https://logo.clearbit.com/eleuther.ai?size=128"},
+    "bigcode":      {"initial": "BC", "color": "#0EA5E9", "logo": "https://github.com/bigcode-project.png?size=128"},
+    "huggingface":  {"initial": "HF", "color": "#FF9D00", "logo": "https://logo.clearbit.com/huggingface.co?size=128"},
+    "stabilityai":  {"initial": "SA", "color": "#6366F1", "logo": "https://logo.clearbit.com/stability.ai?size=128"},
+    "tiiuae":       {"initial": "FA", "color": "#059669", "logo": "https://logo.clearbit.com/tii.ae?size=128"},
+    "qwen":         {"initial": "Q",  "color": "#7C3AED", "logo": "https://logo.clearbit.com/qwen.ai?size=128"},
+    "cohere":       {"initial": "Co", "color": "#39594D", "logo": "https://logo.clearbit.com/cohere.com?size=128"},
+    "openai":       {"initial": "Oa", "color": "#10A37F", "logo": "https://logo.clearbit.com/openai.com?size=128"},
+    "nvidia":       {"initial": "Nv", "color": "#76B900", "logo": "https://logo.clearbit.com/nvidia.com?size=128"},
+    "apple":        {"initial": "Ap", "color": "#555555", "logo": "https://logo.clearbit.com/apple.com?size=128"},
+    "deepmind":     {"initial": "DM", "color": "#4285F4", "logo": "https://logo.clearbit.com/deepmind.com?size=128"},
+    "anthropic":    {"initial": "An", "color": "#C97E45", "logo": "https://logo.clearbit.com/anthropic.com?size=128"},
 }
 
 
@@ -139,6 +144,10 @@ class FinetuneState(rx.State):
     model_likes: str = ""
     model_pipeline: str = ""
     model_hf_tags: list[str] = []
+    model_context_window: str = ""   # max_position_embeddings from config
+    model_type_hf: str = ""          # model_type from config (gemma, llama, etc.)
+    model_languages: str = ""        # comma-joined language codes
+    model_last_updated: str = ""     # ISO date string from lastModified
     is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
@@ -373,12 +382,12 @@ class FinetuneState(rx.State):
 
     @rx.var
     def selected_model_org_avatar(self) -> str:
-        """GitHub org avatar — reliable, public, official logos."""
+        """Clearbit logo URL for known orgs; GitHub fallback for unknown ones."""
         org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
         if not org:
             return ""
-        github_slug = _ORG_META.get(org.lower(), {}).get("github", org)
-        return f"https://github.com/{github_slug}.png?size=128"
+        meta = _ORG_META.get(org.lower(), {})
+        return meta.get("logo", f"https://github.com/{org}.png?size=128")
 
     @rx.var
     def suggested_technique(self) -> str:
@@ -447,6 +456,10 @@ class FinetuneState(rx.State):
         self.model_likes = ""
         self.model_pipeline = ""
         self.model_hf_tags = []
+        self.model_context_window = ""
+        self.model_type_hf = ""
+        self.model_languages = ""
+        self.model_last_updated = ""
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -462,12 +475,26 @@ class FinetuneState(rx.State):
 
     @rx.event
     def set_custom_confirm_input(self, value: str):
-        """Update the custom model ID from the confirmation card's text input."""
-        self.custom_model_str = value
-        self.selected_model_id = value
-        self.selected_model_name = value
+        """Update model from the text input; auto-strips HF/GitHub URLs to model IDs."""
+        cleaned = value.strip()
+        # Parse HuggingFace URLs → extract org/model slug
+        for prefix in (
+            "https://huggingface.co/",
+            "https://hf.co/",
+            "http://huggingface.co/",
+            "huggingface.co/",
+        ):
+            if cleaned.startswith(prefix):
+                slug = cleaned[len(prefix):].rstrip("/")
+                parts = slug.split("/")
+                cleaned = "/".join(parts[:2]) if len(parts) >= 2 else slug
+                break
+        self.custom_model_str = cleaned
+        self.selected_model_id = cleaned
+        self.selected_model_name = cleaned
         self.model_source = "custom_string"
         self.model_url_error = ""
+        self._clear_model_preview()
 
     @rx.event
     def show_model_picker(self):
@@ -542,30 +569,54 @@ class FinetuneState(rx.State):
             self.is_fetching_model_info = True
         try:
             headers = {"Authorization": f"Bearer {token}"} if token else {}
-            async with httpx.AsyncClient(timeout=8.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
                     f"https://huggingface.co/api/models/{model_id}",
                     headers=headers,
                 )
-            if resp.status_code == 200:
-                data = resp.json()
-                dl = data.get("downloads", 0) or 0
-                likes = data.get("likes", 0) or 0
-                pipeline = (data.get("pipeline_tag") or "").replace("-", " ").title()
-                raw_tags = data.get("tags") or []
-                keep = {"text-generation", "conversational", "code", "summarization",
-                        "translation", "question-answering", "fill-mask", "rlhf",
-                        "instruction-tuned", "chat", "fine-tuned"}
-                tags = [t for t in raw_tags if t.lower() in keep][:4]
-                async with self:
-                    self.model_downloads = (
-                        f"{dl / 1_000_000:.1f}M" if dl >= 1_000_000
-                        else f"{dl // 1_000}k" if dl >= 1_000
-                        else str(dl)
-                    ) if dl else ""
-                    self.model_likes = str(likes) if likes else ""
-                    self.model_pipeline = pipeline
-                    self.model_hf_tags = tags
+            if resp.status_code != 200:
+                return
+            data = resp.json()
+
+            dl    = data.get("downloads", 0) or 0
+            likes = data.get("likes", 0) or 0
+            pipeline = (data.get("pipeline_tag") or "").replace("-", " ").title()
+
+            # Useful capability tags only
+            keep = {
+                "text-generation", "conversational", "code", "summarization",
+                "translation", "question-answering", "fill-mask", "rlhf",
+                "instruction-tuned", "chat", "fine-tuned", "causal-lm",
+            }
+            raw_tags = data.get("tags") or []
+            tags = [t for t in raw_tags if t.lower() in keep][:4]
+
+            # Architecture / config details
+            cfg = data.get("config") or {}
+            model_type_raw = cfg.get("model_type") or ""
+            ctx = cfg.get("max_position_embeddings") or cfg.get("max_seq_len") or 0
+
+            # Languages from card metadata
+            card = data.get("cardData") or {}
+            langs = card.get("language") or []
+            lang_str = ", ".join(str(lg) for lg in langs[:4]) if langs else ""
+
+            # Last-modified date (trim to YYYY-MM-DD)
+            last_mod = (data.get("lastModified") or "")[:10]
+
+            async with self:
+                self.model_downloads = (
+                    f"{dl / 1_000_000:.1f}M" if dl >= 1_000_000
+                    else f"{dl // 1_000}k" if dl >= 1_000
+                    else str(dl)
+                ) if dl else ""
+                self.model_likes = str(likes) if likes else ""
+                self.model_pipeline = pipeline
+                self.model_hf_tags = tags
+                self.model_type_hf = model_type_raw.title() if model_type_raw else ""
+                self.model_context_window = f"{ctx:,} tokens" if ctx else ""
+                self.model_languages = lang_str
+                self.model_last_updated = last_mod
         except Exception:
             pass
         finally:

@@ -590,71 +590,150 @@ def _step1_confirm() -> rx.Component:
                         ),
                         rx.fragment(),
                     ),
-                    # Live HF Hub stats
+                    # Live HF Hub data — spinner while loading, then rich info grid
                     rx.cond(
                         FinetuneState.is_fetching_model_info,
                         rx.hstack(
                             rx.spinner(size="1"),
-                            rx.text("Fetching model info…", font_size="0.74rem", color=c("text_muted")),
+                            rx.text(
+                                "Fetching model info from HuggingFace…",
+                                font_size="0.74rem",
+                                color=c("text_muted"),
+                            ),
                             spacing="2",
                             align="center",
                         ),
-                        rx.hstack(
+                        rx.vstack(
+                            # Row 1: pipeline badge + download + likes + last updated
+                            rx.flex(
+                                rx.cond(
+                                    FinetuneState.model_pipeline != "",
+                                    rx.hstack(
+                                        rx.icon("terminal", size=12, color=c("accent")),
+                                        rx.text(
+                                            FinetuneState.model_pipeline,
+                                            font_size="0.75rem",
+                                            color=c("accent"),
+                                            font_weight="500",
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                        background=c("accent_soft"),
+                                        border_radius="6px",
+                                        padding="3px 9px",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_type_hf != "",
+                                    rx.hstack(
+                                        rx.icon("cpu", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            FinetuneState.model_type_hf,
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_context_window != "",
+                                    rx.hstack(
+                                        rx.icon("scroll-text", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            FinetuneState.model_context_window,
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_downloads != "",
+                                    rx.hstack(
+                                        rx.icon("download", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            FinetuneState.model_downloads + " downloads",
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_likes != "",
+                                    rx.hstack(
+                                        rx.icon("heart", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            FinetuneState.model_likes + " likes",
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_languages != "",
+                                    rx.hstack(
+                                        rx.icon("languages", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            FinetuneState.model_languages,
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_last_updated != "",
+                                    rx.hstack(
+                                        rx.icon("calendar", size=12, color=c("text_muted")),
+                                        rx.text(
+                                            "Updated " + FinetuneState.model_last_updated,
+                                            font_size="0.75rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                gap="12px",
+                                flex_wrap="wrap",
+                                align="center",
+                            ),
+                            # Row 2: capability tags
                             rx.cond(
-                                FinetuneState.model_pipeline != "",
-                                rx.hstack(
-                                    rx.icon("terminal", size=12, color=c("accent")),
-                                    rx.text(FinetuneState.model_pipeline, font_size="0.75rem", color=c("text_secondary")),
-                                    spacing="1",
-                                    align="center",
-                                    background=c("accent_soft"),
-                                    border_radius="6px",
-                                    padding="3px 8px",
+                                FinetuneState.model_hf_tags.length() > 0,
+                                rx.flex(
+                                    rx.foreach(
+                                        FinetuneState.model_hf_tags,
+                                        lambda tag: rx.badge(
+                                            tag,
+                                            color_scheme="gray",
+                                            variant="soft",
+                                            size="1",
+                                        ),
+                                    ),
+                                    gap="5px",
+                                    flex_wrap="wrap",
                                 ),
                                 rx.fragment(),
                             ),
-                            rx.cond(
-                                FinetuneState.model_downloads != "",
-                                rx.hstack(
-                                    rx.icon("arrow-down-to-line", size=12, color=c("text_muted")),
-                                    rx.text(FinetuneState.model_downloads, font_size="0.75rem", color=c("text_secondary")),
-                                    spacing="1",
-                                    align="center",
-                                ),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_likes != "",
-                                rx.hstack(
-                                    rx.icon("heart", size=12, color=c("text_muted")),
-                                    rx.text(FinetuneState.model_likes, font_size="0.75rem", color=c("text_secondary")),
-                                    spacing="1",
-                                    align="center",
-                                ),
-                                rx.fragment(),
-                            ),
-                            spacing="3",
-                            flex_wrap="wrap",
-                            align="center",
+                            spacing="2",
+                            align_items="flex-start",
+                            width="100%",
                         ),
-                    ),
-                    # HF tags
-                    rx.cond(
-                        FinetuneState.model_hf_tags.length() > 0,
-                        rx.flex(
-                            rx.foreach(
-                                FinetuneState.model_hf_tags,
-                                lambda tag: rx.badge(
-                                    tag,
-                                    color_scheme="gray",
-                                    variant="soft",
-                                    size="1",
-                                ),
-                            ),
-                            gap="5px",
-                            flex_wrap="wrap",
-                        ),
-                        rx.fragment(),
                     ),
                     spacing="4",
                     width="100%",

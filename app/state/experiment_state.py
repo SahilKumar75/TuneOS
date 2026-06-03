@@ -9,6 +9,9 @@ from app.state.experiments_db import (
     DB_PATH,
     _get_conn,
     _init_db,
+    get_run_metrics,
+    list_registered_models,
+    register_model,
     save_experiment_run,
     save_run_metrics,
     save_run_params,
@@ -20,6 +23,10 @@ __all__ = [
     "DB_PATH",
     "ExperimentRun",
     "ExperimentState",
+    "RegisteredModel",
+    "get_run_metrics",
+    "list_registered_models",
+    "register_model",
     "save_experiment_run",
     "save_run_metrics",
     "save_run_params",
@@ -107,5 +114,75 @@ class ExperimentState(rx.State):
                 conn.execute("DELETE FROM runs WHERE id = ?", (run_id,))
             self.runs = [r for r in self.runs if r.id != run_id]
             self.selected_run_ids = [i for i in self.selected_run_ids if i != run_id]
+        except Exception:
+            pass
+
+
+# ── Typed model for the chart overlay ────────────────────────────
+
+
+class ComparePoint(BaseModel):
+    """One step-level data point for the comparison chart."""
+
+    step: int = 0
+    value: float = 0.0
+    run_id: str = ""
+
+
+class RegisteredModel(BaseModel):
+    """A named model entry in the registry."""
+
+    name: str = ""
+    run_id: str = ""
+    alias: str = "latest"
+    registered_at: str = ""
+    perplexity: float = 0.0
+    final_loss: float = 0.0
+
+
+class ModelRegistryState(rx.State):
+    """Manages the model registry table and run comparison state."""
+
+    models: list[RegisteredModel] = []
+    is_registering: bool = False
+    register_error: str = ""
+
+    @rx.event
+    def load_models(self):
+        raw = list_registered_models()
+        self.models = [
+            RegisteredModel(
+                name=m["name"],
+                run_id=m["run_id"],
+                alias=m["alias"],
+                registered_at=m["registered_at"],
+                perplexity=float(m["metric_snapshot"].get("perplexity") or 0.0),
+                final_loss=float(m["metric_snapshot"].get("final_loss") or 0.0),
+            )
+            for m in raw
+        ]
+
+    @rx.event
+    def register_current_run(self, run_id: str, name: str, metrics: dict):
+        """Register a completed run under a user-provided name."""
+        if not name.strip():
+            self.register_error = "Model name cannot be empty"
+            return
+        self.is_registering = True
+        self.register_error = ""
+        try:
+            register_model(name.strip(), run_id, alias="latest", metric_snapshot=metrics)
+        except Exception as exc:
+            self.register_error = str(exc)
+        finally:
+            self.is_registering = False
+        return ModelRegistryState.load_models
+
+    @rx.event
+    def delete_model(self, name: str):
+        try:
+            with _get_conn() as conn:
+                conn.execute("DELETE FROM registered_models WHERE name = ?", (name,))
+            self.models = [m for m in self.models if m.name != name]
         except Exception:
             pass

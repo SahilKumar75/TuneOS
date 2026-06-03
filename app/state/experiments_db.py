@@ -74,6 +74,16 @@ def _init_db():
                 PRIMARY KEY (run_id, key)
             )
         """)
+        # Named model registry — points the best/latest run for a model
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS registered_models (
+                name TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                alias TEXT NOT NULL DEFAULT 'latest',
+                metric_snapshot TEXT NOT NULL DEFAULT '{}',
+                registered_at TEXT NOT NULL
+            )
+        """)
 
 
 def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
@@ -180,6 +190,97 @@ def list_runs() -> list[dict[str, Any]]:
         ]
     except Exception:
         _logger.exception("Failed to list runs")
+        return []
+
+
+def get_run_metrics(
+    run_ids: list[str], metric_key: str = "loss"
+) -> dict[str, list[dict[str, Any]]]:
+    """Return step-level metric values for the given runs, keyed by run_id.
+
+    Result shape: {"run_id": [{"step": int, "value": float}, ...], ...}
+    Runs with no data are omitted.
+    """
+    if not run_ids:
+        return {}
+    try:
+        _init_db()
+        placeholders = ",".join("?" * len(run_ids))
+        with _get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT run_id, step, value FROM run_metrics "
+                f"WHERE run_id IN ({placeholders}) AND key = ? "
+                f"ORDER BY run_id, step",
+                (*run_ids, metric_key),
+            ).fetchall()
+        result: dict[str, list[dict[str, Any]]] = {}
+        for r in rows:
+            result.setdefault(r["run_id"], []).append({"step": r["step"], "value": r["value"]})
+        return result
+    except Exception:
+        _logger.exception("Failed to get run_metrics for runs=%s key=%s", run_ids, metric_key)
+        return {}
+
+
+# ── Model registry ────────────────────────────────────────────────
+
+
+def register_model(
+    name: str,
+    run_id: str,
+    *,
+    alias: str = "latest",
+    metric_snapshot: dict[str, Any] | None = None,
+) -> None:
+    """Register or update a named model pointing to a training run."""
+    from datetime import datetime, timezone
+
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO registered_models (name, run_id, alias, metric_snapshot, registered_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET
+                    run_id=excluded.run_id,
+                    alias=excluded.alias,
+                    metric_snapshot=excluded.metric_snapshot,
+                    registered_at=excluded.registered_at
+                """,
+                (
+                    name,
+                    run_id,
+                    alias,
+                    json.dumps(metric_snapshot or {}),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+    except Exception:
+        _logger.exception("Failed to register model name=%s run_id=%s", name, run_id)
+
+
+def list_registered_models() -> list[dict[str, Any]]:
+    """Return all registered models as plain dicts."""
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            rows = conn.execute(
+                "SELECT name, run_id, alias, metric_snapshot, registered_at "
+                "FROM registered_models ORDER BY registered_at DESC"
+            ).fetchall()
+        return [
+            {
+                "name": r["name"],
+                "run_id": r["run_id"],
+                "alias": r["alias"],
+                "metric_snapshot": json.loads(r["metric_snapshot"] or "{}"),
+                "registered_at": r["registered_at"],
+            }
+            for r in rows
+        ]
+    except Exception:
+        _logger.exception("Failed to list registered models")
         return []
 
 

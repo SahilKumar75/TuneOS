@@ -262,7 +262,226 @@ def _source_tab(source: str, label: str, icon: str) -> rx.Component:
     )
 
 
-def _step1() -> rx.Component:
+def _technique_selector() -> rx.Component:
+    return rx.flex(
+        *[
+            rx.box(
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(
+                            label,
+                            font_size="0.88rem",
+                            font_weight="500",
+                            color=rx.cond(
+                                FinetuneState.selected_technique == tech,
+                                c("accent"),
+                                c("text_primary"),
+                            ),
+                        ),
+                        rx.cond(
+                            FinetuneState.selected_technique == tech,
+                            rx.icon("circle-check", size=14, color=c("accent")),
+                            rx.fragment(),
+                        ),
+                        rx.cond(
+                            coming_soon,
+                            rx.badge("Soon", color_scheme="gray", size="1"),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.text(desc, font_size="0.76rem", color=c("text_muted")),
+                    spacing="1",
+                    align_items="flex-start",
+                ),
+                background=rx.cond(
+                    FinetuneState.selected_technique == tech,
+                    c("accent_soft"),
+                    c("bg_input"),
+                ),
+                border="1px solid",
+                border_color=rx.cond(
+                    FinetuneState.selected_technique == tech,
+                    c("accent"),
+                    c("border"),
+                ),
+                border_radius="8px",
+                padding="12px 14px",
+                cursor=rx.cond(coming_soon, "not-allowed", "pointer"),
+                opacity=rx.cond(coming_soon, "0.5", "1"),
+                on_click=rx.cond(
+                    coming_soon, rx.prevent_default, FinetuneState.select_technique(tech)
+                ),
+                flex="1",
+                min_width="140px",
+            )
+            for tech, label, desc, coming_soon in [
+                ("qlora", "QLoRA", "4-bit compressed. Runs on 12 GB+ GPU. Recommended.", False),
+                ("lora", "LoRA", "Float16. Needs ~16 GB GPU for 7B models.", False),
+                ("full", "Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", True),
+                ("dpo", "DPO", "Preference tuning for alignment.", True),
+            ]
+        ],
+        wrap="wrap",
+        gap="10px",
+        width="100%",
+    )
+
+
+def _step1_confirm() -> rx.Component:
+    """Confirmation view — shown when a model has been pre-filled or selected."""
+    return rx.vstack(
+        # ── Model preview card ─────────────────────────────────────
+        _card(
+            rx.vstack(
+                rx.hstack(
+                    rx.box(
+                        rx.icon("bot", size=26, color=c("accent")),
+                        background=c("accent_soft"),
+                        border_radius="10px",
+                        padding="10px",
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                        flex_shrink="0",
+                    ),
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text(
+                                FinetuneState.effective_model_name,
+                                font_size="1.05rem",
+                                font_weight="700",
+                                color=c("text_primary"),
+                            ),
+                            rx.badge(
+                                FinetuneState.selected_model_source_label,
+                                color_scheme="blue",
+                                size="1",
+                            ),
+                            spacing="2",
+                            align="center",
+                            flex_wrap="wrap",
+                        ),
+                        rx.text(
+                            FinetuneState.effective_model_id,
+                            font_size="0.78rem",
+                            color=c("text_muted"),
+                            font_family="monospace",
+                        ),
+                        rx.cond(
+                            FinetuneState.selected_model_size != "",
+                            rx.hstack(
+                                rx.text(
+                                    FinetuneState.selected_model_size,
+                                    font_size="0.78rem",
+                                    color=c("text_secondary"),
+                                ),
+                                rx.text("·", color=c("text_muted"), font_size="0.78rem"),
+                                rx.text(
+                                    FinetuneState.selected_model_notes,
+                                    font_size="0.78rem",
+                                    color=c("text_secondary"),
+                                ),
+                                spacing="1",
+                                flex_wrap="wrap",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="1",
+                        align_items="flex-start",
+                        flex="1",
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%",
+                ),
+                spacing="0",
+            )
+        ),
+        # ── Change model card ──────────────────────────────────────
+        _card(
+            rx.vstack(
+                _label("Change model"),
+                rx.select.root(
+                    rx.select.trigger(
+                        placeholder="Select a different preset…",
+                        width="100%",
+                    ),
+                    rx.select.content(
+                        *[
+                            rx.select.item(m["name"], value=m["id"])
+                            for m in _MODELS
+                        ],
+                    ),
+                    value=rx.cond(
+                        FinetuneState.model_source == "hub",
+                        FinetuneState.selected_model_id,
+                        "",
+                    ),
+                    on_change=FinetuneState.select_preset,
+                    width="100%",
+                ),
+                rx.text(
+                    "Or enter any model ID",
+                    font_size="0.78rem",
+                    font_weight="500",
+                    color=c("text_secondary"),
+                    margin_top="8px",
+                ),
+                rx.hstack(
+                    rx.input(
+                        placeholder='e.g. "EleutherAI/gpt-j-6b"',
+                        value=rx.cond(
+                            FinetuneState.model_source == "custom_string",
+                            FinetuneState.custom_model_str,
+                            "",
+                        ),
+                        on_change=FinetuneState.set_custom_confirm_input,
+                        flex="1",
+                    ),
+                    rx.button(
+                        rx.cond(
+                            FinetuneState.is_validating_model,
+                            rx.hstack(
+                                rx.spinner(size="1"), rx.text("Checking…"), spacing="2"
+                            ),
+                            rx.text("Verify"),
+                        ),
+                        on_click=FinetuneState.validate_and_select_custom_model,
+                        disabled=FinetuneState.is_validating_model
+                        | (FinetuneState.custom_model_str == ""),
+                        variant="soft",
+                        color_scheme="gray",
+                        size="2",
+                    ),
+                    spacing="2",
+                ),
+                rx.cond(
+                    FinetuneState.model_url_error != "",
+                    rx.callout(FinetuneState.model_url_error, color_scheme="red", size="1"),
+                    rx.fragment(),
+                ),
+                spacing="3",
+            )
+        ),
+        # ── Technique selector ─────────────────────────────────────
+        rx.box(height="4px"),
+        _section_heading("Training technique"),
+        _technique_selector(),
+        _nav_buttons(
+            next_label="Confirm & continue →",
+            next_disabled=~FinetuneState.can_go_to_intent,
+            show_back=False,
+        ),
+        spacing="4",
+        width="100%",
+        align_items="flex-start",
+    )
+
+
+def _step1_picker() -> rx.Component:
+    """Full model picker — shown when no model has been selected yet."""
     return rx.vstack(
         _section_heading("Choose your model"),
         rx.text(
@@ -285,7 +504,6 @@ def _step1() -> rx.Component:
             FinetuneState.model_source == "hub",
             rx.vstack(
                 rx.grid(*[_model_card(m) for m in _MODELS], columns="2", spacing="3", width="100%"),
-                # HF token field for gated models
                 rx.box(height="12px"),
                 _card(
                     rx.vstack(
@@ -324,7 +542,7 @@ def _step1() -> rx.Component:
                             rx.cond(
                                 FinetuneState.is_validating_model,
                                 rx.hstack(
-                                    rx.spinner(size="1"), rx.text("Checking..."), spacing="2"
+                                    rx.spinner(size="1"), rx.text("Checking…"), spacing="2"
                                 ),
                                 rx.text("Verify"),
                             ),
@@ -340,19 +558,6 @@ def _step1() -> rx.Component:
                     rx.cond(
                         FinetuneState.model_url_error != "",
                         rx.callout(FinetuneState.model_url_error, color_scheme="red", size="1"),
-                        rx.fragment(),
-                    ),
-                    rx.cond(
-                        FinetuneState.custom_model_str != "",
-                        rx.callout(
-                            rx.hstack(
-                                rx.icon("circle-check", size=14),
-                                rx.text("Model ready: " + FinetuneState.custom_model_str),
-                                spacing="2",
-                            ),
-                            color_scheme="green",
-                            size="1",
-                        ),
                         rx.fragment(),
                     ),
                     _label("HF Token (for gated or private models)"),
@@ -417,73 +622,10 @@ def _step1() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Technique selector (always visible)
+        # Technique selector
         rx.box(height="20px"),
         _section_heading("Training technique"),
-        rx.flex(
-            *[
-                rx.box(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.text(
-                                label,
-                                font_size="0.88rem",
-                                font_weight="500",
-                                color=rx.cond(
-                                    FinetuneState.selected_technique == tech,
-                                    c("accent"),
-                                    c("text_primary"),
-                                ),
-                            ),
-                            rx.cond(
-                                FinetuneState.selected_technique == tech,
-                                rx.icon("circle-check", size=14, color=c("accent")),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                coming_soon,
-                                rx.badge("Soon", color_scheme="gray", size="1"),
-                                rx.fragment(),
-                            ),
-                            spacing="2",
-                            align="center",
-                        ),
-                        rx.text(desc, font_size="0.76rem", color=c("text_muted")),
-                        spacing="1",
-                        align_items="flex-start",
-                    ),
-                    background=rx.cond(
-                        FinetuneState.selected_technique == tech,
-                        c("accent_soft"),
-                        c("bg_input"),
-                    ),
-                    border="1px solid",
-                    border_color=rx.cond(
-                        FinetuneState.selected_technique == tech,
-                        c("accent"),
-                        c("border"),
-                    ),
-                    border_radius="8px",
-                    padding="12px 14px",
-                    cursor=rx.cond(coming_soon, "not-allowed", "pointer"),
-                    opacity=rx.cond(coming_soon, "0.5", "1"),
-                    on_click=rx.cond(
-                        coming_soon, rx.prevent_default, FinetuneState.select_technique(tech)
-                    ),
-                    flex="1",
-                    min_width="140px",
-                )
-                for tech, label, desc, coming_soon in [
-                    ("qlora", "QLoRA", "4-bit compressed. Runs on 12 GB+ GPU. Recommended.", False),
-                    ("lora", "LoRA", "Float16. Needs ~16 GB GPU for 7B models.", False),
-                    ("full", "Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", True),
-                    ("dpo", "DPO", "Preference tuning for alignment.", True),
-                ]
-            ],
-            wrap="wrap",
-            gap="10px",
-            width="100%",
-        ),
+        _technique_selector(),
         _nav_buttons(
             next_label="Next: Intent →",
             next_disabled=~FinetuneState.can_go_to_intent,
@@ -492,6 +634,14 @@ def _step1() -> rx.Component:
         spacing="0",
         width="100%",
         align_items="flex-start",
+    )
+
+
+def _step1() -> rx.Component:
+    return rx.cond(
+        FinetuneState.step1_show_picker,
+        _step1_picker(),
+        _step1_confirm(),
     )
 
 

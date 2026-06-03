@@ -14,6 +14,39 @@ from pydantic import BaseModel
 
 from app.state.experiment_state import ExperimentState, save_experiment_run
 
+_PRESET_META: dict[str, dict[str, str]] = {
+    "mistralai/Mistral-7B-v0.1": {
+        "name": "Mistral 7B",
+        "size": "7B params",
+        "notes": "Well-tested with QLoRA, great all-rounder",
+    },
+    "meta-llama/Meta-Llama-3-8B": {
+        "name": "Llama 3 8B",
+        "size": "8B params",
+        "notes": "Strong general-purpose model",
+    },
+    "microsoft/Phi-3-mini-4k-instruct": {
+        "name": "Phi-3 Mini",
+        "size": "3.8B params",
+        "notes": "Fast, runs on smaller GPUs",
+    },
+    "google/gemma-2b": {
+        "name": "Gemma 2B",
+        "size": "2B params",
+        "notes": "Good for low-VRAM environments",
+    },
+    "EleutherAI/pythia-410m": {
+        "name": "Pythia 410M",
+        "size": "410M params",
+        "notes": "Tiny model — great for testing pipelines fast",
+    },
+    "bigcode/starcoder2-3b": {
+        "name": "StarCoder2 3B",
+        "size": "3B params",
+        "notes": "Excellent for code generation tasks",
+    },
+}
+
 
 class DatasetRow(BaseModel):
     instruction: str = ""
@@ -65,6 +98,7 @@ class FinetuneState(rx.State):
     is_validating_model: bool = False
     hf_token: str = ""  # for gated models
     selected_technique: str = "qlora"  # "qlora" | "lora"
+    step1_show_picker: bool = True  # False = show confirmation card
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""
@@ -258,6 +292,20 @@ class FinetuneState(rx.State):
         return lr_map.get(self.learning_rate, self.learning_rate)
 
     @rx.var
+    def selected_model_size(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("size", "")
+
+    @rx.var
+    def selected_model_notes(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("notes", "")
+
+    @rx.var
+    def selected_model_source_label(self) -> str:
+        return {"hub": "Hub model", "local": "Local file", "custom_string": "Custom ID"}.get(
+            self.model_source, ""
+        )
+
+    @rx.var
     def last_train_loss(self) -> float:
         if self.loss_history:
             return self.loss_history[-1].loss
@@ -268,19 +316,21 @@ class FinetuneState(rx.State):
     def prefill_model(self, model_id: str, model_name: str):
         """Pre-populate model from an external context (e.g. landing page preview).
 
-        If the wizard is already past Step 1 or a model is already set, this is
-        a no-op so we don't clobber an in-progress fine-tune.
+        Lands the wizard on the confirmation card so the user sees what model
+        was chosen and can confirm or swap it — without being dumped back into
+        the full picker.  No-op if the wizard is already in progress.
         """
         if self.current_step > 1 or self.selected_model_id:
             return
         if not model_id:
             return
+        meta = _PRESET_META.get(model_id, {})
         self.selected_model_id = model_id
-        self.selected_model_name = model_name or model_id
+        self.selected_model_name = meta.get("name", model_name or model_id)
         self.model_source = "hub"
         self.custom_model_str = ""
         self.model_url_error = ""
-        self.current_step = 2
+        self.step1_show_picker = False
 
     @rx.event
     def select_model(self, model_id: str, model_name: str):
@@ -289,6 +339,31 @@ class FinetuneState(rx.State):
         self.model_source = "hub"
         self.custom_model_str = ""
         self.model_url_error = ""
+        self.step1_show_picker = False
+
+    @rx.event
+    def select_preset(self, model_id: str):
+        """Select a model by ID from the confirmation-card dropdown."""
+        meta = _PRESET_META.get(model_id, {})
+        self.selected_model_id = model_id
+        self.selected_model_name = meta.get("name", model_id)
+        self.model_source = "hub"
+        self.custom_model_str = ""
+        self.model_url_error = ""
+
+    @rx.event
+    def set_custom_confirm_input(self, value: str):
+        """Update the custom model ID from the confirmation card's text input."""
+        self.custom_model_str = value
+        self.selected_model_id = value
+        self.selected_model_name = value
+        self.model_source = "custom_string"
+        self.model_url_error = ""
+
+    @rx.event
+    def show_model_picker(self):
+        """Switch Step 1 back to the full model picker."""
+        self.step1_show_picker = True
 
     @rx.event
     def select_technique(self, technique: str):
@@ -329,6 +404,7 @@ class FinetuneState(rx.State):
                     self.selected_model_id = model_str
                     self.selected_model_name = data.get("model_type", model_str)
                     self.is_validating_model = False
+                    self.step1_show_picker = False
             else:
                 async with self:
                     self.model_url_error = data.get("error", "Model not found or inaccessible.")

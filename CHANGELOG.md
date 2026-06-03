@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Run comparison & model registry (Phase 3).**
+  `GET /experiments/compare?ids=run1,run2` returns step-level metrics for up to 10
+  runs. `app/components/loss_chart.py` gains `comparison_loss_chart()` for overlaid
+  curves. New `registered_models` table + `POST /experiments/models` API lets you
+  name and alias a training run (the "Register" action on the Results step).
 - **Trainer hardening (Phase 2).** Training now supports an in-training
   validation split (`eval_split_ratio`), `EarlyStoppingCallback`
   (`early_stopping_patience`), and resuming from a checkpoint

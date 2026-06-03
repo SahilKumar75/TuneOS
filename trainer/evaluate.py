@@ -1,39 +1,47 @@
-import math
+"""Model evaluation — thin wrapper over the pluggable metric registry."""
 
-import torch
-from torch.utils.data import DataLoader
-from transformers import PreTrainedModel, PreTrainedTokenizer
+from __future__ import annotations
+
+from trainer.metrics import REGISTRY
 
 
-def evaluate_model(model: PreTrainedModel, tokenizer: PreTrainedTokenizer, test_dataset) -> dict:
+def evaluate_model(
+    model,
+    tokenizer,
+    test_dataset,
+    metrics: list[str] | None = None,
+) -> dict:
+    """Compute the requested loss-based metrics on a held-out dataset.
+
+    Defaults to perplexity. Reference-based metrics (rouge1, bleu) are skipped
+    here because they need generated predictions; request them explicitly via
+    ``evaluate_references`` once predictions are available.
+
+    Returns a dict like ``{"perplexity": 12.3}``. ``bleu`` is kept in the result
+    (as ``None``) for backward compatibility with existing consumers.
     """
-    Compute perplexity on a held-out dataset sample.
-    Returns {"perplexity": float, "bleu": None}.
-    BLEU is omitted — instruction-following datasets have no reference outputs.
-    """
-    model.eval()
-    total_loss = 0.0
-    total_tokens = 0
+    metric_names = metrics or ["perplexity"]
+    results: dict = {"bleu": None}
+    for name in metric_names:
+        metric = REGISTRY.get(name)
+        if metric is None or metric.kind != "loss":
+            continue
+        results[name] = metric.fn(model, tokenizer, test_dataset)
+    results.setdefault("perplexity", None)
+    return results
 
-    loader = DataLoader(test_dataset, batch_size=1)
 
-    with torch.no_grad():
-        for batch in loader:
-            input_ids = batch["input_ids"].to(model.device)
-            labels = batch["labels"].to(model.device)
-            outputs = model(input_ids=input_ids, labels=labels)
-            loss = outputs.loss
-            if loss is None or torch.isnan(loss):
-                continue
-            n_tokens = (labels != -100).sum().item()
-            if n_tokens == 0:
-                continue
-            total_loss += loss.item() * n_tokens
-            total_tokens += n_tokens
-
-    if total_tokens == 0:
-        return {"perplexity": None, "bleu": None}
-
-    avg_loss = total_loss / total_tokens
-    perplexity = math.exp(min(avg_loss, 20))  # cap at e^20 to avoid inf
-    return {"perplexity": round(perplexity, 3), "bleu": None}
+def evaluate_references(
+    predictions: list[str],
+    references: list[str],
+    metrics: list[str] | None = None,
+) -> dict:
+    """Compute reference-based metrics (rouge1, bleu) over prediction/reference pairs."""
+    metric_names = metrics or ["rouge1", "bleu"]
+    results: dict = {}
+    for name in metric_names:
+        metric = REGISTRY.get(name)
+        if metric is None or metric.kind != "reference":
+            continue
+        results[name] = metric.fn(predictions, references)
+    return results

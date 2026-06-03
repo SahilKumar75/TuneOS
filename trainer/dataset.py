@@ -18,6 +18,16 @@ def format_prompt(
     )
 
 
+def _validate_columns(available: list[str], instruction_col: str, output_col: str) -> None:
+    """Raise ValueError if the required columns are missing from ``available``."""
+    if instruction_col not in available:
+        raise ValueError(
+            f"Instruction column '{instruction_col}' not found. Available columns: {available}"
+        )
+    if output_col not in available:
+        raise ValueError(f"Output column '{output_col}' not found. Available columns: {available}")
+
+
 def load_and_tokenize(
     file_path: str,
     tokenizer: PreTrainedTokenizer,
@@ -30,31 +40,30 @@ def load_and_tokenize(
     """
     Load from a local file or HF Hub dataset, apply column mapping,
     format as instruction prompts, and tokenize.
+
+    Column presence is validated as early as possible — on the raw pandas/dict
+    for local files — so an invalid request fails fast before a (potentially
+    expensive) HF Dataset is constructed.
     """
     if hub_dataset_id:
         raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=False)
+        _validate_columns(raw.column_names, instruction_col, output_col)
     elif file_path.endswith(".csv"):
         df = pd.read_csv(file_path)
+        _validate_columns(list(df.columns), instruction_col, output_col)
         raw = Dataset.from_pandas(df)
     elif file_path.endswith(".json") and not file_path.endswith(".jsonl"):
         import json
 
         with open(file_path) as f:
             data = json.load(f)
-        raw = Dataset.from_list(data if isinstance(data, list) else [data])
+        records = data if isinstance(data, list) else [data]
+        available = list(records[0].keys()) if records else []
+        _validate_columns(available, instruction_col, output_col)
+        raw = Dataset.from_list(records)
     else:
         raw = load_dataset("json", data_files=file_path, split="train")
-
-    # Validate columns exist before renaming
-    if instruction_col not in raw.column_names:
-        raise ValueError(
-            f"Instruction column '{instruction_col}' not found. "
-            f"Available columns: {raw.column_names}"
-        )
-    if output_col not in raw.column_names:
-        raise ValueError(
-            f"Output column '{output_col}' not found. Available columns: {raw.column_names}"
-        )
+        _validate_columns(raw.column_names, instruction_col, output_col)
 
     # Normalise column names so format_prompt always sees "instruction" / "output"
     if instruction_col != "instruction":

@@ -97,17 +97,17 @@ def _run_finetune_impl(
     except Exception as e:
         finished_at = datetime.now(timezone.utc).isoformat()
         write_job_status(job_id, "failed", finished_at=finished_at)
-        r.set(
-            status_key,
-            json.dumps(
-                {
-                    "status": "failed",
-                    "job_id": job_id,
-                    "error": str(e),
-                    "traceback": traceback.format_exc(),
-                }
-            ),
-        )
+        # Surface a remediation hint for OOM so the UI can guide the user.
+        suggestion = getattr(e, "suggestion", "")
+        payload = {
+            "status": "failed",
+            "job_id": job_id,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
+        if suggestion:
+            payload["suggestion"] = suggestion
+        r.set(status_key, json.dumps(payload))
         raise
 
     finally:

@@ -212,7 +212,6 @@ def _progress_bar() -> rx.Component:
             for i in range(len(_STEP_LABELS))
         ],
         width="100%",
-        max_width="680px",
         align="center",
         justify="center",
         margin_bottom="32px",
@@ -327,11 +326,13 @@ def _step1() -> rx.Component:
                                 rx.hstack(
                                     rx.spinner(size="1"), rx.text("Checking..."), spacing="2"
                                 ),
-                                rx.text("Validate"),
+                                rx.text("Verify"),
                             ),
                             on_click=FinetuneState.validate_and_select_custom_model,
-                            disabled=FinetuneState.is_validating_model,
-                            color_scheme="blue",
+                            disabled=FinetuneState.is_validating_model
+                            | (FinetuneState.custom_model_str == ""),
+                            variant="soft",
+                            color_scheme="gray",
                             size="2",
                         ),
                         spacing="2",
@@ -342,11 +343,11 @@ def _step1() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        FinetuneState.selected_model_id != "",
+                        FinetuneState.custom_model_str != "",
                         rx.callout(
                             rx.hstack(
                                 rx.icon("circle-check", size=14),
-                                rx.text(f"Model ready: {FinetuneState.selected_model_id}"),
+                                rx.text("Model ready: " + FinetuneState.custom_model_str),
                                 spacing="2",
                             ),
                             color_scheme="green",
@@ -363,7 +364,7 @@ def _step1() -> rx.Component:
                         width="100%",
                     ),
                     rx.text(
-                        "Note: If you skip validation, any errors will appear when training starts.",
+                        "Tip: click Verify to check the model is accessible before training.",
                         font_size="0.75rem",
                         color=c("text_muted"),
                     ),
@@ -1999,7 +2000,6 @@ def finetune_page() -> rx.Component:
             ),
             spacing="0",
             width="100%",
-            max_width="760px",
             align_items="flex-start",
             padding="32px 24px",
         ),

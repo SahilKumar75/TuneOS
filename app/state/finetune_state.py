@@ -265,6 +265,24 @@ class FinetuneState(rx.State):
 
     # ── Step 1 events ─────────────────────────────────────────────
     @rx.event
+    def prefill_model(self, model_id: str, model_name: str):
+        """Pre-populate model from an external context (e.g. landing page preview).
+
+        If the wizard is already past Step 1 or a model is already set, this is
+        a no-op so we don't clobber an in-progress fine-tune.
+        """
+        if self.current_step > 1 or self.selected_model_id:
+            return
+        if not model_id:
+            return
+        self.selected_model_id = model_id
+        self.selected_model_name = model_name or model_id
+        self.model_source = "hub"
+        self.custom_model_str = ""
+        self.model_url_error = ""
+        self.current_step = 2
+
+    @rx.event
     def select_model(self, model_id: str, model_name: str):
         self.selected_model_id = model_id
         self.selected_model_name = model_name

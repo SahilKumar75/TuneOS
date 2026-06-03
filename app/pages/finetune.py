@@ -2091,7 +2091,7 @@ def _step6() -> rx.Component:
                 spacing="3",
             )
         ),
-        # Register to model registry
+        # Register to model registry — only shown once eval metrics are ready
         rx.cond(
             (FinetuneState.training_status == "done") & (FinetuneState.experiment_id != ""),
             _card(
@@ -2113,12 +2113,22 @@ def _step6() -> rx.Component:
                         font_size="0.82rem",
                         color=c("text_secondary"),
                     ),
+                    rx.cond(
+                        FinetuneState.eval_status != "done",
+                        rx.callout(
+                            "Run evaluation first so accurate metrics are captured in the registry.",
+                            color_scheme="amber",
+                            size="1",
+                        ),
+                        rx.fragment(),
+                    ),
                     rx.hstack(
                         rx.input(
                             placeholder="my-chatbot-v1",
                             value=ModelRegistryState.register_name,
                             on_change=ModelRegistryState.set_register_name,
                             flex="1",
+                            disabled=FinetuneState.eval_status != "done",
                         ),
                         rx.button(
                             rx.cond(
@@ -2133,7 +2143,8 @@ def _step6() -> rx.Component:
                                 FinetuneState.eval_perplexity,
                                 FinetuneState.last_train_loss,
                             ),
-                            disabled=ModelRegistryState.is_registering,
+                            disabled=ModelRegistryState.is_registering
+                            | (FinetuneState.eval_status != "done"),
                             color_scheme="blue",
                             size="2",
                         ),
@@ -2146,13 +2157,11 @@ def _step6() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        ModelRegistryState.register_success,
+                        ModelRegistryState.registered_run_id == FinetuneState.experiment_id,
                         rx.callout(
                             rx.hstack(
                                 rx.icon("circle-check", size=14),
-                                rx.text(
-                                    "Registered as "" + ModelRegistryState.register_name + """
-                                ),
+                                rx.text("Registered as " + ModelRegistryState.register_name),
                                 spacing="2",
                             ),
                             color_scheme="green",

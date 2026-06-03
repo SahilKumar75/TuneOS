@@ -185,6 +185,7 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
             )
     except Exception:
         _logger.exception("Failed to save run_metrics for run_id=%s", run_id)
+        raise
 
 
 def save_run_params(run_id: str, params: dict[str, Any]) -> None:

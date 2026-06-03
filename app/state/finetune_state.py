@@ -430,7 +430,11 @@ class FinetuneState(rx.State):
         was chosen and can confirm or swap it — without being dumped back into
         the full picker.  No-op if the wizard is already in progress.
         """
-        if self.current_step > 1 or self.selected_model_id:
+        # Only skip pre-fill when a flow is genuinely in progress (past Step 1).
+        # A stale selected_model_id from a previous closed tab should not block the
+        # new pre-fill — the tab close should reset state, but if it didn't we
+        # still want the new model to take over at Step 1.
+        if self.current_step > 1:
             return
         if not model_id:
             return

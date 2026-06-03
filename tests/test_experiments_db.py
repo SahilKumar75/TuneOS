@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 
 import pytest
@@ -28,11 +27,15 @@ import importlib
 # ── Helpers ────────────────────────────────────────────────────────
 
 
-def _reload_db_module(tmp_path):
-    """Re-import experiments_db pointing at a fresh temp DB file."""
+def _reload_db_module(tmp_path, monkeypatch):
+    """Re-import experiments_db pointing at a fresh temp DB file.
+
+    Uses monkeypatch so env-var changes are automatically undone after the test,
+    preventing cross-test pollution from a stale EXPERIMENT_DB path.
+    """
     db_file = str(tmp_path / "test_experiments.db")
-    os.environ["EXPERIMENT_DB"] = db_file
-    os.environ.pop("EXPERIMENTS_DB_URL", None)
+    monkeypatch.setenv("EXPERIMENT_DB", db_file)
+    monkeypatch.delenv("EXPERIMENTS_DB_URL", raising=False)
 
     import app.state.experiments_db as _old
 
@@ -69,8 +72,8 @@ def test_adapt_sql_postgres_replaces():
 # ── _get_conn / _init_db ───────────────────────────────────────────
 
 
-def test_init_db_creates_tables(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_init_db_creates_tables(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     with db._get_conn() as conn:
         tables = {
             row[0]
@@ -84,8 +87,8 @@ def test_init_db_creates_tables(tmp_path):
 # ── save_run_metrics ───────────────────────────────────────────────
 
 
-def test_save_run_metrics_roundtrip(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_save_run_metrics_roundtrip(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     history = [
         {"step": 0, "loss": 2.5, "epoch": 1.0, "learning_rate": 2e-4},
         {"step": 1, "loss": 2.1, "epoch": 1.0, "learning_rate": 2e-4},
@@ -99,8 +102,8 @@ def test_save_run_metrics_roundtrip(tmp_path):
     assert pytest.approx(values[1], abs=1e-6) == 2.1
 
 
-def test_save_run_metrics_idempotent(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_save_run_metrics_idempotent(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     history = [{"step": 0, "loss": 1.9}]
     db.save_run_metrics("run-idem", history)
     db.save_run_metrics("run-idem", history)  # second write must not duplicate
@@ -111,8 +114,8 @@ def test_save_run_metrics_idempotent(tmp_path):
 # ── save_run_params ────────────────────────────────────────────────
 
 
-def test_save_run_params_roundtrip(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_save_run_params_roundtrip(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.save_run_params("run-p1", {"lr": "2e-4", "epochs": 3, "lora_r": 16})
     with db._get_conn() as conn:
         rows = conn.execute(
@@ -127,8 +130,8 @@ def test_save_run_params_roundtrip(tmp_path):
 # ── save_experiment_run ────────────────────────────────────────────
 
 
-def test_save_experiment_run_upsert(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_save_experiment_run_upsert(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     run = {
         "id": "run-exp1",
         "name": "my-run",
@@ -166,8 +169,8 @@ def test_save_experiment_run_upsert(tmp_path):
 # ── write_job_status ───────────────────────────────────────────────
 
 
-def test_write_job_status_insert_and_update(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_write_job_status_insert_and_update(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.write_job_status("job-1", "running", name="test-job", model_id="m1", started_at="t0")
     with db._get_conn() as conn:
         row = conn.execute("SELECT status FROM runs WHERE id = ?", ("job-1",)).fetchone()
@@ -182,8 +185,8 @@ def test_write_job_status_insert_and_update(tmp_path):
 # ── register_model / list_registered_models ────────────────────────
 
 
-def test_register_model_roundtrip(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_register_model_roundtrip(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.register_model("prod-v1", "run-abc", alias="latest", metric_snapshot={"perplexity": 3.2})
     models = db.list_registered_models()
     assert len(models) == 1
@@ -192,8 +195,8 @@ def test_register_model_roundtrip(tmp_path):
     assert models[0]["metric_snapshot"]["perplexity"] == pytest.approx(3.2, abs=1e-6)
 
 
-def test_register_model_upsert(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_register_model_upsert(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.register_model("prod-v1", "run-old", alias="latest")
     db.register_model("prod-v1", "run-new", alias="champion")
     models = db.list_registered_models()
@@ -205,8 +208,8 @@ def test_register_model_upsert(tmp_path):
 # ── get_run_metrics — multiple runs ────────────────────────────────
 
 
-def test_get_run_metrics_multiple_runs(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_get_run_metrics_multiple_runs(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.save_run_metrics("r1", [{"step": 0, "loss": 2.0}, {"step": 1, "loss": 1.8}])
     db.save_run_metrics("r2", [{"step": 0, "loss": 2.5}])
     result = db.get_run_metrics(["r1", "r2"], metric_key="loss")
@@ -214,16 +217,16 @@ def test_get_run_metrics_multiple_runs(tmp_path):
     assert len(result["r2"]) == 1
 
 
-def test_get_run_metrics_empty_ids(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_get_run_metrics_empty_ids(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     assert db.get_run_metrics([]) == {}
 
 
 # ── list_runs ──────────────────────────────────────────────────────
 
 
-def test_list_runs(tmp_path):
-    db = _reload_db_module(tmp_path)
+def test_list_runs(tmp_path, monkeypatch):
+    db = _reload_db_module(tmp_path, monkeypatch)
     db.write_job_status("j1", "done")
     db.write_job_status("j2", "running")
     runs = db.list_runs()

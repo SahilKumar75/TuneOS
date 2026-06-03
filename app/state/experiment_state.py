@@ -147,7 +147,9 @@ class ModelRegistryState(rx.State):
     is_registering: bool = False
     register_error: str = ""
     register_name: str = ""
-    register_success: bool = False
+    # Tracks the run_id that was most recently registered successfully.
+    # Empty string means no registration has occurred in this session.
+    registered_run_id: str = ""
 
     @rx.event
     def load_models(self):
@@ -183,22 +185,29 @@ class ModelRegistryState(rx.State):
     @rx.event
     def set_register_name(self, value: str):
         self.register_name = value
-        self.register_success = False
+        self.registered_run_id = ""
+        self.register_error = ""
+
+    @rx.event
+    def clear_registration(self):
+        """Reset registration state when a new experiment is started."""
+        self.register_name = ""
+        self.registered_run_id = ""
         self.register_error = ""
 
     @rx.event
     def do_register(self, run_id: str, perplexity: float, final_loss: float):
         """Register the current run using ``self.register_name``.
 
-        Called from the Step 6 UI where the run_id and metrics come from
-        FinetuneState vars passed as event arguments.
+        Only snapshots metrics when they are passed in at click-time (not during
+        render), so perplexity will reflect the actual evaluated value.
         """
         if not self.register_name.strip():
             self.register_error = "Model name cannot be empty"
             return
         self.is_registering = True
         self.register_error = ""
-        self.register_success = False
+        self.registered_run_id = ""
         try:
             register_model(
                 self.register_name.strip(),
@@ -206,7 +215,7 @@ class ModelRegistryState(rx.State):
                 alias="latest",
                 metric_snapshot={"perplexity": perplexity, "final_loss": final_loss},
             )
-            self.register_success = True
+            self.registered_run_id = run_id
         except Exception as exc:
             self.register_error = str(exc)
         finally:

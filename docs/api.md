@@ -137,19 +137,14 @@ Lists all entries in the model registry.
 
 ### `POST /api/experiments/models`
 Registers (or updates) a named model pointing to a training run. This is the
-"Register" action on the Results step.
+**Register** action in Step 6 of the wizard — `ModelRegistryState.do_register`
+calls this endpoint after evaluation completes, storing the run under the provided
+name with `perplexity` and `final_loss` captured in `metric_snapshot`.
 
-Body: `{ "name": "my-chatbot", "run_id": "...", "alias": "latest", "metric_snapshot": {} }`
+Body: `{ "name": "my-chatbot", "run_id": "...", "alias": "latest", "metric_snapshot": {"perplexity": 4.2, "final_loss": 1.1} }`
 
 ### `DELETE /api/experiments/models/{name}`
 Removes a named model from the registry.
-
-### `POST /api/experiments/models` — Register button
-
-The **Register** button in Step 6 of the wizard calls `ModelRegistryState.do_register`
-on the frontend, which in turn hits `POST /api/experiments/models`. The run is stored
-under the provided name and its perplexity/final-loss are captured in
-`metric_snapshot`.
 
 ## Storage Model
 

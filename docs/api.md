@@ -114,6 +114,36 @@ Lists all recorded runs (hyperparameters, final metrics, status).
 ### `DELETE /api/experiments/{experiment_id}`
 Deletes a recorded run.
 
+### `GET /api/experiments/compare?ids=run1,run2&metric=loss`
+Returns step-level metric data for up to 10 runs, suitable for overlaid loss curves.
+
+Query params:
+- `ids` — comma-separated run IDs
+- `metric` — metric key: `loss` (default), `eval_loss`, `learning_rate`, `epoch`
+
+Response:
+```json
+{
+  "metric": "loss",
+  "runs": {
+    "run_id_1": [{"step": 0, "value": 1.23}, ...],
+    "run_id_2": [...]
+  }
+}
+```
+
+### `GET /api/experiments/models`
+Lists all entries in the model registry.
+
+### `POST /api/experiments/models`
+Registers (or updates) a named model pointing to a training run. This is the
+"Register" action on the Results step.
+
+Body: `{ "name": "my-chatbot", "run_id": "...", "alias": "latest", "metric_snapshot": {} }`
+
+### `DELETE /api/experiments/models/{name}`
+Removes a named model from the registry.
+
 ## Storage Model
 
 Run history is persisted in `storage/experiments.db` (SQLite):
@@ -123,6 +153,7 @@ Run history is persisted in `storage/experiments.db` (SQLite):
 | `runs` | One row per run: config, final loss/perplexity, status, output path |
 | `run_metrics` | Step-level metrics `(run_id, key, value, step, timestamp)` — queryable training curves |
 | `run_params` | Immutable hyperparameter snapshot `(run_id, key, value)` |
+| `registered_models` | Named model registry `(name, run_id, alias, metric_snapshot, registered_at)` |
 
 The pure-SQLite persistence layer lives in `app/state/experiments_db.py` and has
 no Reflex dependency, so the headless Celery worker can write to it directly.

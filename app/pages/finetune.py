@@ -533,94 +533,167 @@ def _step1_confirm() -> rx.Component:
                         width="100%",
                     ),
                     rx.divider(color=c("border")),
-                    # Identity row
+                    # Main content: left column (identity + stat boxes) | right (bio)
                     rx.hstack(
-                        # Left: logo + name
-                        rx.hstack(
-                            _org_logo("60px", "50%"),
-                            rx.vstack(
-                                rx.hstack(
+                        # ── Left column ─────────────────────────────────
+                        rx.vstack(
+                            # Identity: logo + name/id/notes
+                            rx.hstack(
+                                _org_logo("52px", "50%"),
+                                rx.vstack(
+                                    rx.hstack(
+                                        rx.text(
+                                            FinetuneState.effective_model_name,
+                                            font_size="1.1rem",
+                                            font_weight="700",
+                                            color=c("text_primary"),
+                                        ),
+                                        rx.badge(
+                                            FinetuneState.selected_model_source_label,
+                                            color_scheme="blue",
+                                            variant="soft",
+                                            size="1",
+                                        ),
+                                        spacing="2",
+                                        align="center",
+                                        flex_wrap="wrap",
+                                    ),
                                     rx.text(
-                                        FinetuneState.effective_model_name,
-                                        font_size="1.2rem",
-                                        font_weight="700",
-                                        color=c("text_primary"),
+                                        FinetuneState.effective_model_id,
+                                        font_size="0.78rem",
+                                        color=c("text_muted"),
+                                        font_family="monospace",
                                     ),
-                                    rx.badge(
-                                        FinetuneState.selected_model_source_label,
-                                        color_scheme="blue",
-                                        variant="soft",
-                                        size="1",
+                                    rx.cond(
+                                        FinetuneState.selected_model_notes != "",
+                                        rx.text(
+                                            FinetuneState.selected_model_notes,
+                                            font_size="0.78rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        rx.fragment(),
                                     ),
-                                    spacing="2",
-                                    align="center",
-                                    flex_wrap="wrap",
+                                    spacing="1",
+                                    align_items="flex-start",
                                 ),
-                                rx.text(
-                                    FinetuneState.effective_model_id,
-                                    font_size="0.8rem",
-                                    color=c("text_muted"),
-                                    font_family="monospace",
-                                ),
-                                rx.cond(
-                                    FinetuneState.selected_model_notes != "",
-                                    rx.text(
-                                        FinetuneState.selected_model_notes,
-                                        font_size="0.82rem",
-                                        color=c("text_secondary"),
-                                    ),
-                                    rx.fragment(),
-                                ),
-                                spacing="1",
-                                align_items="flex-start",
+                                spacing="3",
+                                align="start",
                             ),
-                            spacing="4",
-                            align="start",
+                            # 3 stat boxes — side by side
+                            rx.cond(
+                                FinetuneState.selected_model_size != "",
+                                rx.hstack(
+                                    rx.box(
+                                        rx.hstack(
+                                            rx.icon("database", size=15, color=c("accent")),
+                                            rx.text(
+                                                FinetuneState.selected_model_size,
+                                                font_size="1rem",
+                                                font_weight="700",
+                                                color=c("text_primary"),
+                                            ),
+                                            spacing="2",
+                                            align="center",
+                                        ),
+                                        rx.text(
+                                            "Parameters",
+                                            font_size="0.75rem",
+                                            color=c("text_muted"),
+                                            margin_top="4px",
+                                        ),
+                                        padding="14px 18px",
+                                        border="1px solid",
+                                        border_color=c("border"),
+                                        border_radius="10px",
+                                        flex="1",
+                                    ),
+                                    rx.cond(
+                                        FinetuneState.selected_model_license != "",
+                                        rx.box(
+                                            rx.hstack(
+                                                rx.icon("scale", size=15, color=c("accent")),
+                                                rx.text(
+                                                    FinetuneState.selected_model_license,
+                                                    font_size="1rem",
+                                                    font_weight="700",
+                                                    color=c("text_primary"),
+                                                ),
+                                                spacing="2",
+                                                align="center",
+                                            ),
+                                            rx.text(
+                                                "License",
+                                                font_size="0.75rem",
+                                                color=c("text_muted"),
+                                                margin_top="4px",
+                                            ),
+                                            padding="14px 18px",
+                                            border="1px solid",
+                                            border_color=c("border"),
+                                            border_radius="10px",
+                                            flex="1",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    rx.cond(
+                                        FinetuneState.selected_model_arch != "",
+                                        rx.box(
+                                            rx.hstack(
+                                                rx.icon("cpu", size=15, color=c("accent")),
+                                                rx.text(
+                                                    FinetuneState.selected_model_arch,
+                                                    font_size="1rem",
+                                                    font_weight="700",
+                                                    color=c("text_primary"),
+                                                ),
+                                                spacing="2",
+                                                align="center",
+                                            ),
+                                            rx.text(
+                                                "Architecture",
+                                                font_size="0.75rem",
+                                                color=c("text_muted"),
+                                                margin_top="4px",
+                                            ),
+                                            padding="14px 18px",
+                                            border="1px solid",
+                                            border_color=c("border"),
+                                            border_radius="10px",
+                                            flex="1",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    spacing="3",
+                                    width="100%",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="3",
+                            align_items="flex-start",
                             flex="1",
                             min_width="0",
                         ),
-                        # Right: bio paragraph
+                        # ── Right column: description ────────────────────
                         rx.cond(
                             FinetuneState.model_bio != "",
                             rx.box(
                                 rx.text(
                                     FinetuneState.model_bio,
-                                    font_size="0.78rem",
+                                    font_size="0.82rem",
                                     color=c("text_secondary"),
-                                    line_height="1.55",
+                                    line_height="1.7",
                                 ),
-                                padding_left="16px",
+                                padding_left="20px",
                                 border_left="1px solid",
                                 border_left_color=c("border"),
-                                max_width="340px",
-                                min_width="180px",
-                                flex_shrink="0",
+                                flex="0 0 38%",
+                                min_width="200px",
                             ),
                             rx.fragment(),
                         ),
                         spacing="4",
                         align="start",
                         width="100%",
-                    ),
-                    # Stat pills — static metadata
-                    rx.cond(
-                        FinetuneState.selected_model_size != "",
-                        rx.hstack(
-                            _stat_pill("database", FinetuneState.selected_model_size, "Parameters"),
-                            rx.cond(
-                                FinetuneState.selected_model_license != "",
-                                _stat_pill("scale", FinetuneState.selected_model_license, "License"),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.selected_model_arch != "",
-                                _stat_pill("cpu", FinetuneState.selected_model_arch, "Architecture"),
-                                rx.fragment(),
-                            ),
-                            spacing="3",
-                            width="100%",
-                        ),
-                        rx.fragment(),
                     ),
                     # Debug: show fetch error if any
                     rx.cond(
@@ -750,14 +823,9 @@ def _step1_confirm() -> rx.Component:
                                     ),
                                     rx.fragment(),
                                 ),
-                                gap="12px",
-                                flex_wrap="wrap",
-                                align="center",
-                            ),
-                            # Row 2: capability tags
-                            rx.cond(
-                                FinetuneState.model_hf_tags.length() > 0,
-                                rx.flex(
+                                # Capability tags inline with the rest
+                                rx.cond(
+                                    FinetuneState.model_hf_tags.length() > 0,
                                     rx.foreach(
                                         FinetuneState.model_hf_tags,
                                         lambda tag: rx.badge(
@@ -767,10 +835,13 @@ def _step1_confirm() -> rx.Component:
                                             size="1",
                                         ),
                                     ),
-                                    gap="5px",
-                                    flex_wrap="wrap",
+                                    rx.fragment(),
                                 ),
-                                rx.fragment(),
+                                gap="10px",
+                                flex_wrap="nowrap",
+                                overflow="hidden",
+                                align="center",
+                                width="100%",
                             ),
                             spacing="2",
                             align_items="flex-start",
@@ -912,28 +983,6 @@ def _step1_confirm() -> rx.Component:
                     rx.fragment(),
                 ),
                 spacing="4",
-                width="100%",
-            ),
-            background=c("bg_card"),
-            border="1px solid",
-            border_color=c("border"),
-            border_radius="12px",
-            padding="20px",
-            width="100%",
-        ),
-        # ── Training technique ─────────────────────────────────────
-        rx.box(
-            rx.vstack(
-                rx.text(
-                    "Training technique",
-                    font_size="0.7rem",
-                    font_weight="600",
-                    color=c("text_muted"),
-                    text_transform="uppercase",
-                    letter_spacing="0.07em",
-                ),
-                _technique_selector(),
-                spacing="3",
                 width="100%",
             ),
             background=c("bg_card"),
@@ -1121,10 +1170,6 @@ def _step1_picker() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Technique selector
-        rx.box(height="20px"),
-        _section_heading("Training technique"),
-        _technique_selector(),
         _nav_buttons(
             next_label="Next: Intent →",
             next_disabled=~FinetuneState.can_go_to_intent,
@@ -1489,6 +1534,7 @@ def _step3() -> rx.Component:
             _data_mode_btn("upload", "Upload a file", "upload"),
             _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
             _data_mode_btn("generate", "Generate with AI", "sparkles"),
+            _data_mode_btn("skip", "Skip for now", "forward"),
             spacing="2",
             margin_bottom="16px",
         ),
@@ -1497,6 +1543,37 @@ def _step3() -> rx.Component:
             ("upload", _upload_panel()),
             ("hub_dataset", _hub_dataset_panel()),
             ("generate", _generate_panel()),
+            ("skip", _card(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("info", size=16, color=c("text_muted")),
+                        rx.text(
+                            "No dataset — continue without data",
+                            font_size="0.95rem",
+                            font_weight="600",
+                            color=c("text_primary"),
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.text(
+                        "You can proceed to configure and run a training job without uploading data now. "
+                        "This is useful if you want to explore settings, or if your data will be provided "
+                        "directly to the training script at runtime.",
+                        font_size="0.84rem",
+                        color=c("text_secondary"),
+                        line_height="1.6",
+                    ),
+                    rx.callout(
+                        "Training will run with no fine-tuning data — the model weights will not change meaningfully. Add data later for real results.",
+                        icon="triangle-alert",
+                        color_scheme="orange",
+                        size="1",
+                    ),
+                    spacing="3",
+                    width="100%",
+                )
+            )),
             _upload_panel(),
         ),
         _nav_buttons(
@@ -2625,11 +2702,1155 @@ def _step7() -> rx.Component:
     )
 
 
-# ── Page root ─────────────────────────────────────────────────────
-def finetune_page() -> rx.Component:
+# ── CSS keyframes & workspace animations ─────────────────────────
+def _workspace_styles() -> rx.Component:
+    return rx.el.style(
+        """
+        @keyframes workspace-enter {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(40px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes idle-pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50%       { opacity: 0.15; transform: scale(1.35); }
+        }
+        .workspace-root { animation: workspace-enter 0.28s ease-out; }
+        .step6-reveal   { animation: slide-up 0.4s ease-out; }
+        .idle-pulse-ring { animation: idle-pulse 2.2s ease-in-out infinite; }
+        """
+    )
+
+
+# ── Workspace header ──────────────────────────────────────────────
+def _workspace_header() -> rx.Component:
+    return rx.box(
+        rx.hstack(
+            rx.hstack(
+                rx.icon("flask-conical", size=18, color=c("accent")),
+                rx.text(
+                    "TuneOS",
+                    font_weight="700",
+                    color=c("text_primary"),
+                    font_size="0.95rem",
+                ),
+                rx.text("·", color=c("text_muted"), font_size="0.9rem"),
+                rx.text(
+                    rx.cond(
+                        FinetuneState.experiment_name != "",
+                        FinetuneState.experiment_name,
+                        "New experiment",
+                    ),
+                    font_size="0.84rem",
+                    color=c("text_secondary"),
+                    max_width="280px",
+                    overflow="hidden",
+                    text_overflow="ellipsis",
+                    white_space="nowrap",
+                ),
+                spacing="2",
+                align="center",
+            ),
+            rx.spacer(),
+            rx.button(
+                rx.hstack(
+                    rx.icon("cloud-upload", size=14),
+                    rx.text("Deploy Model"),
+                    spacing="2",
+                    align="center",
+                ),
+                on_click=FinetuneState.go_to_step(7),
+                disabled=FinetuneState.training_status != "done",
+                color_scheme="blue",
+                variant=rx.cond(FinetuneState.training_status == "done", "solid", "soft"),
+                size="2",
+                opacity=rx.cond(FinetuneState.training_status == "done", "1", "0.45"),
+                cursor=rx.cond(
+                    FinetuneState.training_status == "done", "pointer", "not-allowed"
+                ),
+            ),
+            width="100%",
+            align="center",
+            padding="0 20px",
+        ),
+        background=c("bg_card"),
+        border_bottom="1px solid",
+        border_color=c("border"),
+        height="52px",
+        display="flex",
+        align_items="center",
+        width="100%",
+        flex_shrink="0",
+    )
+
+
+# ── Workspace sidebar ─────────────────────────────────────────────
+def _sidebar_icon(step_num: int, icon_name: str, tooltip: str) -> rx.Component:
+    is_active = FinetuneState.current_step == step_num
+    is_done = FinetuneState.current_step > step_num
+    return rx.box(
+        rx.cond(
+            is_done,
+            rx.icon("check", size=15, color=c("success")),
+            rx.icon(
+                icon_name,
+                size=15,
+                color=rx.cond(is_active, "white", c("text_muted")),
+            ),
+        ),
+        title=tooltip,
+        width="36px",
+        height="36px",
+        border_radius="10px",
+        background=rx.cond(
+            is_active,
+            c("accent"),
+            rx.cond(is_done, c("accent_soft"), "transparent"),
+        ),
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        cursor="pointer",
+        on_click=FinetuneState.go_to_step(step_num),
+        _hover={"background": rx.cond(is_active, c("accent"), c("bg_input"))},
+        transition="background 0.15s ease",
+    )
+
+
+def _workspace_sidebar() -> rx.Component:
+    return rx.vstack(
+        _sidebar_icon(4, "settings-2", "Configure"),
+        _sidebar_icon(5, "activity", "Training"),
+        _sidebar_icon(6, "bar-chart-2", "Results"),
+        _sidebar_icon(7, "cloud-upload", "Deploy"),
+        spacing="2",
+        align="center",
+        padding="16px 6px",
+        width="48px",
+        min_width="48px",
+        border_right="1px solid",
+        border_color=c("border"),
+        background=c("bg_card"),
+        height="100%",
+        flex_shrink="0",
+    )
+
+
+# ── Step 4 panel (Configure) ──────────────────────────────────────
+def _step4_panel() -> rx.Component:
     return rx.box(
         rx.vstack(
-            # Header
+            rx.hstack(
+                rx.hstack(
+                    rx.icon("settings-2", size=14, color=c("accent")),
+                    rx.text(
+                        "Configure",
+                        font_size="0.82rem",
+                        font_weight="600",
+                        color=c("text_primary"),
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.spacer(),
+                rx.hstack(
+                    rx.text("Simple", font_size="0.76rem", color=c("text_secondary")),
+                    rx.switch(
+                        checked=FinetuneState.ui_mode == "advanced",
+                        on_change=FinetuneState.toggle_ui_mode,
+                        size="1",
+                    ),
+                    rx.text("Advanced", font_size="0.76rem", color=c("text_secondary")),
+                    spacing="2",
+                    align="center",
+                ),
+                width="100%",
+                align="center",
+                margin_bottom="14px",
+            ),
+            # Simple config
+            _card(
+                rx.vstack(
+                    rx.grid(
+                        rx.vstack(
+                            _label("Epochs"),
+                            rx.input(
+                                value=FinetuneState.epochs.to_string(),
+                                on_change=FinetuneState.set_epochs,
+                                type="number",
+                                width="100%",
+                            ),
+                            rx.text(
+                                "One full pass through your dataset",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Learning rate"),
+                            rx.select.root(
+                                rx.select.trigger(width="100%"),
+                                rx.select.content(
+                                    *[
+                                        rx.select.item(f"{lr} — {desc}", value=lr)
+                                        for lr, desc in _LR_PRESETS
+                                    ]
+                                ),
+                                value=FinetuneState.learning_rate,
+                                on_change=FinetuneState.set_learning_rate,
+                            ),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Technique"),
+                            rx.text(
+                                FinetuneState.technique_label,
+                                font_size="0.88rem",
+                                font_weight="500",
+                                color=c("accent"),
+                            ),
+                            rx.text(
+                                "Change in Step 1",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    spacing="0",
+                )
+            ),
+            # Advanced mode
+            rx.cond(
+                FinetuneState.ui_mode == "advanced",
+                _card(
+                    rx.vstack(
+                        rx.text(
+                            "Advanced hyperparameters",
+                            font_size="0.88rem",
+                            font_weight="600",
+                            color=c("text_primary"),
+                            margin_bottom="12px",
+                        ),
+                        rx.grid(
+                            rx.vstack(
+                                _label("LoRA rank (r)"),
+                                rx.slider(
+                                    min=4,
+                                    max=128,
+                                    step=4,
+                                    default_value=[FinetuneState.lora_r],
+                                    on_value_commit=FinetuneState.set_lora_r,
+                                ),
+                                rx.text(
+                                    FinetuneState.lora_r,
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("LoRA alpha"),
+                                rx.input(
+                                    value=FinetuneState.lora_alpha.to_string(),
+                                    on_change=FinetuneState.set_lora_alpha,
+                                    type="number",
+                                    width="100%",
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("LoRA dropout"),
+                                rx.slider(
+                                    min=0.0,
+                                    max=0.3,
+                                    step=0.01,
+                                    default_value=[FinetuneState.lora_dropout],
+                                    on_value_commit=FinetuneState.set_lora_dropout,
+                                ),
+                                rx.text(
+                                    FinetuneState.lora_dropout,
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Batch size"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [1, 2, 4, 8, 16]
+                                        ]
+                                    ),
+                                    value=FinetuneState.batch_size.to_string(),
+                                    on_change=FinetuneState.set_batch_size,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Max seq length"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [128, 256, 512, 1024, 2048]
+                                        ]
+                                    ),
+                                    value=FinetuneState.max_seq_length.to_string(),
+                                    on_change=FinetuneState.set_max_seq_length,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Grad. accum."),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [1, 2, 4, 8, 16]
+                                        ]
+                                    ),
+                                    value=FinetuneState.gradient_accumulation_steps.to_string(),
+                                    on_change=FinetuneState.set_gradient_accumulation_steps,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("LR scheduler"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(v, value=v)
+                                            for v in [
+                                                "cosine",
+                                                "linear",
+                                                "constant",
+                                                "cosine_with_restarts",
+                                            ]
+                                        ]
+                                    ),
+                                    value=FinetuneState.lr_scheduler,
+                                    on_change=FinetuneState.set_lr_scheduler,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("BF16"),
+                                rx.switch(
+                                    checked=FinetuneState.bf16,
+                                    on_change=FinetuneState.set_bf16,
+                                    size="2",
+                                ),
+                                rx.text(
+                                    "A100/H100 only",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Experiment name"),
+                                rx.input(
+                                    placeholder="my-run-1",
+                                    value=FinetuneState.experiment_name,
+                                    on_change=FinetuneState.set_experiment_name,
+                                    width="100%",
+                                ),
+                                spacing="1",
+                            ),
+                            columns="3",
+                            spacing="4",
+                            width="100%",
+                        ),
+                        spacing="0",
+                    )
+                ),
+                rx.fragment(),
+            ),
+            # Run summary
+            _card(
+                rx.vstack(
+                    rx.text(
+                        "Run summary",
+                        font_size="0.82rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_bottom="8px",
+                    ),
+                    rx.grid(
+                        rx.vstack(
+                            rx.text("Model", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.effective_model_name,
+                                font_size="0.84rem",
+                                font_weight="500",
+                                color=c("text_primary"),
+                            ),
+                            spacing="0",
+                        ),
+                        rx.vstack(
+                            rx.text("Dataset", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.dataset_name,
+                                font_size="0.84rem",
+                                font_weight="500",
+                                color=c("text_primary"),
+                            ),
+                            spacing="0",
+                        ),
+                        rx.vstack(
+                            rx.text("Technique", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.technique_label,
+                                font_size="0.84rem",
+                                font_weight="500",
+                                color=c("text_primary"),
+                            ),
+                            spacing="0",
+                        ),
+                        rx.vstack(
+                            rx.text("Training", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.epochs.to_string()
+                                + " epochs · lr="
+                                + FinetuneState.learning_rate,
+                                font_size="0.82rem",
+                                font_weight="500",
+                                color=c("text_primary"),
+                            ),
+                            spacing="0",
+                        ),
+                        columns="2",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    spacing="0",
+                ),
+                background=c("bg_input"),
+            ),
+            # Start Training button (no back button in workspace)
+            rx.hstack(
+                rx.spacer(),
+                rx.button(
+                    rx.cond(
+                        FinetuneState.is_starting,
+                        rx.hstack(rx.spinner(size="2"), rx.text("Starting…"), spacing="2"),
+                        rx.hstack(
+                            rx.icon("zap", size=14),
+                            rx.text("Start Training →"),
+                            spacing="2",
+                        ),
+                    ),
+                    on_click=FinetuneState.start_training,
+                    disabled=~FinetuneState.can_start_training
+                    | FinetuneState.is_starting
+                    | (FinetuneState.training_status == "running"),
+                    size="3",
+                    color_scheme="blue",
+                ),
+                width="100%",
+                padding_top="4px",
+            ),
+            spacing="4",
+            width="100%",
+            align_items="flex-start",
+        ),
+        padding="20px",
+        width="50%",
+        border_right="1px solid",
+        border_color=c("border"),
+        overflow_y="auto",
+        height="100%",
+        flex_shrink="0",
+    )
+
+
+# ── Step 5 panel (Training) ───────────────────────────────────────
+def _step5_panel() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.hstack(
+                    rx.icon("activity", size=14, color=c("accent")),
+                    rx.text(
+                        "Training",
+                        font_size="0.82rem",
+                        font_weight="600",
+                        color=c("text_primary"),
+                    ),
+                    rx.text(
+                        FinetuneState.effective_model_name,
+                        font_size="0.76rem",
+                        color=c("text_muted"),
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.spacer(),
+                _badge_status(FinetuneState.training_status),
+                width="100%",
+                align="center",
+                margin_bottom="14px",
+            ),
+            # Idle waiting state
+            rx.cond(
+                (FinetuneState.training_status == "idle") & ~FinetuneState.is_starting,
+                rx.vstack(
+                    rx.box(
+                        rx.box(
+                            width="52px",
+                            height="52px",
+                            border_radius="50%",
+                            border="2px solid",
+                            border_color=c("border"),
+                            class_name="idle-pulse-ring",
+                        ),
+                        rx.box(
+                            rx.icon("activity", size=22, color=c("text_muted")),
+                            position="absolute",
+                            top="50%",
+                            left="50%",
+                            transform="translate(-50%,-50%)",
+                        ),
+                        position="relative",
+                        width="52px",
+                        height="52px",
+                    ),
+                    rx.text(
+                        "Waiting for training to start…",
+                        font_size="0.86rem",
+                        color=c("text_secondary"),
+                        text_align="center",
+                    ),
+                    rx.text(
+                        'Configure hyperparameters and click "Start Training →"',
+                        font_size="0.76rem",
+                        color=c("text_muted"),
+                        text_align="center",
+                        max_width="260px",
+                    ),
+                    spacing="3",
+                    align="center",
+                    width="100%",
+                    padding="48px 0",
+                ),
+                rx.fragment(),
+            ),
+            # Initializing state
+            rx.cond(
+                FinetuneState.is_starting,
+                rx.vstack(
+                    rx.spinner(size="3"),
+                    rx.text(
+                        "Initializing training job…",
+                        font_size="0.86rem",
+                        color=c("text_secondary"),
+                    ),
+                    spacing="3",
+                    align="center",
+                    padding="48px 0",
+                ),
+                rx.fragment(),
+            ),
+            # Start error
+            rx.cond(
+                FinetuneState.start_error != "",
+                rx.callout(FinetuneState.start_error, color_scheme="red"),
+                rx.fragment(),
+            ),
+            # Active / done / failed training content
+            rx.cond(
+                (FinetuneState.training_status == "running")
+                | (FinetuneState.training_status == "done")
+                | (FinetuneState.training_status == "failed"),
+                rx.vstack(
+                    rx.grid(
+                        _metric_tile("Epoch", FinetuneState.current_epoch_display),
+                        _metric_tile("Steps", FinetuneState.current_total_steps_display),
+                        _metric_tile("Elapsed", FinetuneState.elapsed_time_display),
+                        _metric_tile("GPU Mem", FinetuneState.gpu_memory_display),
+                        columns="2",
+                        spacing="3",
+                        width="100%",
+                    ),
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text(
+                                "Epoch progress",
+                                font_size="0.76rem",
+                                color=c("text_muted"),
+                            ),
+                            rx.spacer(),
+                            rx.text(
+                                FinetuneState.epoch_progress_pct.to_string() + "%",
+                                font_size="0.76rem",
+                                color=c("text_secondary"),
+                            ),
+                        ),
+                        rx.progress(
+                            value=FinetuneState.epoch_progress_pct,
+                            max=100,
+                            width="100%",
+                            color_scheme="blue",
+                        ),
+                        width="100%",
+                        spacing="1",
+                    ),
+                    _card(loss_chart()),
+                    rx.cond(
+                        FinetuneState.ai_commentary != "",
+                        _card(
+                            rx.hstack(
+                                rx.icon("sparkles", size=16, color=c("accent")),
+                                rx.text(
+                                    FinetuneState.ai_commentary,
+                                    font_size="0.86rem",
+                                    color=c("text_primary"),
+                                ),
+                                spacing="2",
+                                align="start",
+                            )
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        FinetuneState.epoch_log.length() > 0,
+                        _card(
+                            rx.vstack(
+                                rx.text(
+                                    "Epoch log",
+                                    font_size="0.78rem",
+                                    font_weight="600",
+                                    color=c("text_secondary"),
+                                    margin_bottom="8px",
+                                ),
+                                rx.foreach(FinetuneState.epoch_log, _epoch_log_row),
+                                spacing="2",
+                            )
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        FinetuneState.training_status == "done",
+                        rx.callout(
+                            rx.hstack(
+                                rx.icon("circle-check", size=16),
+                                rx.text("Training complete! Results are below ↓"),
+                                spacing="2",
+                            ),
+                            color_scheme="green",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        FinetuneState.training_status == "failed",
+                        rx.callout(
+                            rx.vstack(
+                                rx.text("Training failed", font_weight="600"),
+                                rx.text(FinetuneState.error_msg, font_size="0.82rem"),
+                            ),
+                            color_scheme="red",
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="4",
+                    width="100%",
+                    align_items="flex-start",
+                ),
+                rx.fragment(),
+            ),
+            spacing="0",
+            width="100%",
+            align_items="flex-start",
+        ),
+        padding="20px",
+        width="50%",
+        overflow_y="auto",
+        height="100%",
+    )
+
+
+# ── Step 6 panel (Results) ────────────────────────────────────────
+def _step6_panel() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.hstack(
+                    rx.icon("bar-chart-2", size=14, color=c("accent")),
+                    rx.text(
+                        "Results & Evaluation",
+                        font_size="0.82rem",
+                        font_weight="600",
+                        color=c("text_primary"),
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.spacer(),
+                width="100%",
+                align="center",
+                margin_bottom="14px",
+            ),
+            rx.hstack(
+                # Left col: eval metrics + inference tester
+                rx.vstack(
+                    _card(
+                        rx.vstack(
+                            rx.hstack(
+                                rx.text(
+                                    "Evaluation metrics",
+                                    font_size="0.9rem",
+                                    font_weight="600",
+                                    color=c("text_primary"),
+                                ),
+                                rx.spacer(),
+                                rx.cond(
+                                    FinetuneState.eval_status == "idle",
+                                    rx.button(
+                                        "Run evaluation",
+                                        on_click=FinetuneState.run_eval,
+                                        size="2",
+                                        color_scheme="blue",
+                                        variant="soft",
+                                    ),
+                                    rx.badge(
+                                        FinetuneState.eval_status,
+                                        color_scheme="blue",
+                                        size="1",
+                                    ),
+                                ),
+                                align="center",
+                            ),
+                            rx.cond(
+                                FinetuneState.eval_status == "done",
+                                rx.grid(
+                                    rx.vstack(
+                                        rx.text(
+                                            "Perplexity",
+                                            font_size="0.72rem",
+                                            color=c("text_muted"),
+                                        ),
+                                        rx.text(
+                                            FinetuneState.eval_perplexity.to_string(),
+                                            font_size="1.8rem",
+                                            font_weight="700",
+                                            color=c("accent"),
+                                        ),
+                                        rx.text(
+                                            "Lower is better",
+                                            font_size="0.7rem",
+                                            color=c("text_muted"),
+                                        ),
+                                        spacing="0",
+                                    ),
+                                    rx.vstack(
+                                        rx.text(
+                                            "What it means",
+                                            font_size="0.72rem",
+                                            color=c("text_muted"),
+                                        ),
+                                        rx.text(
+                                            rx.cond(
+                                                FinetuneState.eval_perplexity < 10,
+                                                "Excellent — model learned the domain well",
+                                                rx.cond(
+                                                    FinetuneState.eval_perplexity < 30,
+                                                    "Good — decent task alignment",
+                                                    "Try more epochs or a larger dataset",
+                                                ),
+                                            ),
+                                            font_size="0.84rem",
+                                            color=c("text_secondary"),
+                                        ),
+                                        spacing="1",
+                                    ),
+                                    columns="2",
+                                    spacing="4",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="3",
+                        )
+                    ),
+                    _card(
+                        rx.vstack(
+                            rx.text(
+                                "Test your model",
+                                font_size="0.9rem",
+                                font_weight="600",
+                                color=c("text_primary"),
+                                margin_bottom="8px",
+                            ),
+                            rx.cond(
+                                FinetuneState.user_intent != "",
+                                rx.text(
+                                    f"System context: {FinetuneState.user_intent}",
+                                    font_size="0.76rem",
+                                    color=c("text_muted"),
+                                    font_style="italic",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.test_chat_history.length() > 0,
+                                rx.box(
+                                    rx.foreach(
+                                        FinetuneState.test_chat_history,
+                                        lambda msg: rx.box(
+                                            rx.text(
+                                                msg.content,
+                                                font_size="0.84rem",
+                                                color=rx.cond(
+                                                    msg.role == "user",
+                                                    c("text_primary"),
+                                                    c("text_secondary"),
+                                                ),
+                                                padding="8px 12px",
+                                                background=rx.cond(
+                                                    msg.role == "user",
+                                                    c("accent_soft"),
+                                                    c("bg_input"),
+                                                ),
+                                                border_radius="8px",
+                                                align_self=rx.cond(
+                                                    msg.role == "user",
+                                                    "flex-end",
+                                                    "flex-start",
+                                                ),
+                                                max_width="80%",
+                                            ),
+                                            display="flex",
+                                            flex_direction=rx.cond(
+                                                msg.role == "user", "row-reverse", "row"
+                                            ),
+                                            width="100%",
+                                            margin_bottom="6px",
+                                        ),
+                                    ),
+                                    width="100%",
+                                    max_height="200px",
+                                    overflow_y="auto",
+                                    padding="8px",
+                                    border="1px solid",
+                                    border_color=c("border"),
+                                    border_radius="8px",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.hstack(
+                                rx.input(
+                                    placeholder="Type a test message...",
+                                    value=FinetuneState.chat_input,
+                                    on_change=FinetuneState.set_chat_input,
+                                    on_key_down=FinetuneState.handle_chat_key,
+                                    flex="1",
+                                ),
+                                rx.button(
+                                    rx.cond(
+                                        FinetuneState.chat_loading,
+                                        rx.spinner(size="2"),
+                                        rx.icon("send", size=16),
+                                    ),
+                                    on_click=FinetuneState.send_test_chat,
+                                    disabled=FinetuneState.chat_loading,
+                                    color_scheme="blue",
+                                    size="2",
+                                ),
+                                spacing="2",
+                            ),
+                            rx.cond(
+                                FinetuneState.chat_error != "",
+                                rx.callout(
+                                    FinetuneState.chat_error, color_scheme="red", size="1"
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="3",
+                        )
+                    ),
+                    spacing="4",
+                    flex="1",
+                    min_width="0",
+                ),
+                # Right col: register + past runs
+                rx.vstack(
+                    rx.cond(
+                        (FinetuneState.training_status == "done")
+                        & (FinetuneState.experiment_id != ""),
+                        _card(
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.icon("bookmark", size=16, color=c("accent")),
+                                    rx.text(
+                                        "Register to registry",
+                                        font_size="0.9rem",
+                                        font_weight="600",
+                                        color=c("text_primary"),
+                                    ),
+                                    spacing="2",
+                                    align="center",
+                                ),
+                                rx.text(
+                                    "Save this run under a name for tracking and comparison.",
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                rx.cond(
+                                    FinetuneState.eval_status != "done",
+                                    rx.callout(
+                                        "Run evaluation first for accurate metrics.",
+                                        color_scheme="amber",
+                                        size="1",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.hstack(
+                                    rx.input(
+                                        placeholder="my-chatbot-v1",
+                                        value=ModelRegistryState.register_name,
+                                        on_change=ModelRegistryState.set_register_name,
+                                        flex="1",
+                                        disabled=FinetuneState.eval_status != "done",
+                                    ),
+                                    rx.button(
+                                        rx.cond(
+                                            ModelRegistryState.is_registering,
+                                            rx.hstack(
+                                                rx.spinner(size="2"),
+                                                rx.text("Saving…"),
+                                                spacing="2",
+                                            ),
+                                            rx.text("Register"),
+                                        ),
+                                        on_click=ModelRegistryState.do_register(
+                                            FinetuneState.experiment_id,
+                                            FinetuneState.eval_perplexity,
+                                            FinetuneState.last_train_loss,
+                                        ),
+                                        disabled=ModelRegistryState.is_registering
+                                        | (FinetuneState.eval_status != "done"),
+                                        color_scheme="blue",
+                                        size="2",
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                ),
+                                rx.cond(
+                                    ModelRegistryState.register_error != "",
+                                    rx.callout(
+                                        ModelRegistryState.register_error,
+                                        color_scheme="red",
+                                        size="1",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    ModelRegistryState.registered_run_id
+                                    == FinetuneState.experiment_id,
+                                    rx.callout(
+                                        rx.hstack(
+                                            rx.icon("circle-check", size=14),
+                                            rx.text(
+                                                "Registered as "
+                                                + ModelRegistryState.register_name
+                                            ),
+                                            spacing="2",
+                                        ),
+                                        color_scheme="green",
+                                        size="1",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                spacing="3",
+                            )
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        ExperimentState.completed_runs.length() > 1,
+                        _card(
+                            rx.vstack(
+                                rx.text(
+                                    "Past runs",
+                                    font_size="0.9rem",
+                                    font_weight="600",
+                                    color=c("text_primary"),
+                                    margin_bottom="8px",
+                                ),
+                                rx.table.root(
+                                    rx.table.header(
+                                        rx.table.row(
+                                            rx.table.column_header_cell("Name"),
+                                            rx.table.column_header_cell("Technique"),
+                                            rx.table.column_header_cell("LR"),
+                                            rx.table.column_header_cell("Epochs"),
+                                            rx.table.column_header_cell("Loss"),
+                                            rx.table.column_header_cell("PPL"),
+                                        )
+                                    ),
+                                    rx.table.body(
+                                        rx.foreach(
+                                            ExperimentState.completed_runs,
+                                            lambda r: rx.table.row(
+                                                rx.table.cell(
+                                                    rx.text(r.name, font_size="0.78rem")
+                                                ),
+                                                rx.table.cell(
+                                                    rx.text(r.technique, font_size="0.78rem")
+                                                ),
+                                                rx.table.cell(
+                                                    rx.text(
+                                                        r.learning_rate, font_size="0.78rem"
+                                                    )
+                                                ),
+                                                rx.table.cell(
+                                                    rx.text(
+                                                        r.epochs.to_string(),
+                                                        font_size="0.78rem",
+                                                    )
+                                                ),
+                                                rx.table.cell(
+                                                    rx.text(
+                                                        r.final_loss.to_string(),
+                                                        font_size="0.78rem",
+                                                    )
+                                                ),
+                                                rx.table.cell(
+                                                    rx.text(
+                                                        r.perplexity.to_string(),
+                                                        font_size="0.78rem",
+                                                    )
+                                                ),
+                                            ),
+                                        )
+                                    ),
+                                    variant="surface",
+                                    size="1",
+                                    width="100%",
+                                ),
+                                spacing="2",
+                            )
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="4",
+                    width="340px",
+                    flex_shrink="0",
+                    min_width="0",
+                ),
+                spacing="4",
+                width="100%",
+                align_items="flex-start",
+            ),
+            spacing="0",
+            width="100%",
+            align_items="flex-start",
+        ),
+        padding="20px",
+        width="100%",
+        border_top="2px solid",
+        border_color=c("accent"),
+        background=c("bg_card"),
+        overflow_y="auto",
+        max_height="50vh",
+        class_name="step6-reveal",
+    )
+
+
+# ── Step 7 workspace panel (Deploy) ───────────────────────────────
+def _step7_workspace_panel() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.button(
+                rx.hstack(
+                    rx.icon("arrow-left", size=13),
+                    rx.text("Back to workspace"),
+                    spacing="1",
+                ),
+                on_click=FinetuneState.go_to_step(6),
+                variant="ghost",
+                color_scheme="gray",
+                size="1",
+                align_self="flex-start",
+                margin_bottom="4px",
+            ),
+            _step7(),
+            spacing="0",
+            width="100%",
+            align_items="flex-start",
+        ),
+        padding="20px",
+        width="100%",
+        overflow_y="auto",
+        height="100%",
+    )
+
+
+# ── Workspace layout (steps 4-7) ──────────────────────────────────
+def _workspace_layout() -> rx.Component:
+    return rx.vstack(
+        _workspace_styles(),
+        _workspace_header(),
+        rx.hstack(
+            _workspace_sidebar(),
+            rx.cond(
+                FinetuneState.current_step == 7,
+                _step7_workspace_panel(),
+                rx.vstack(
+                    rx.hstack(
+                        _step4_panel(),
+                        _step5_panel(),
+                        width="100%",
+                        align_items="stretch",
+                        spacing="0",
+                        flex="1",
+                        min_height="0",
+                        overflow="hidden",
+                    ),
+                    rx.cond(
+                        FinetuneState.training_status == "done",
+                        _step6_panel(),
+                        rx.fragment(),
+                    ),
+                    width="100%",
+                    height="100%",
+                    spacing="0",
+                    align_items="flex-start",
+                    overflow="auto",
+                ),
+            ),
+            width="100%",
+            align_items="stretch",
+            flex="1",
+            spacing="0",
+            min_height="0",
+            overflow="hidden",
+        ),
+        width="100%",
+        height="100vh",
+        spacing="0",
+        class_name="workspace-root",
+        overflow="hidden",
+    )
+
+
+# ── Wizard layout (steps 1-3) ─────────────────────────────────────
+def _wizard_layout() -> rx.Component:
+    return rx.box(
+        rx.vstack(
             rx.hstack(
                 rx.icon("flask-conical", size=20, color=c("accent")),
                 rx.text(
@@ -2642,18 +3863,12 @@ def finetune_page() -> rx.Component:
                 align="center",
                 margin_bottom="24px",
             ),
-            # Progress bar
             _progress_bar(),
-            # Step content
             rx.match(
                 FinetuneState.current_step,
                 (1, _step1()),
                 (2, _step2()),
                 (3, _step3()),
-                (4, _step4()),
-                (5, _step5()),
-                (6, _step6()),
-                (7, _step7()),
                 rx.text("Invalid step", color=c("text_muted")),
             ),
             spacing="0",
@@ -2662,5 +3877,23 @@ def finetune_page() -> rx.Component:
             padding="32px 24px",
         ),
         width="100%",
-        on_mount=[ExperimentState.load_runs, ModelRegistryState.load_models],
+        max_width="900px",
+        margin="0 auto",
+    )
+
+
+# ── Page root ─────────────────────────────────────────────────────
+def finetune_page() -> rx.Component:
+    return rx.box(
+        rx.cond(
+            FinetuneState.current_step <= 3,
+            _wizard_layout(),
+            _workspace_layout(),
+        ),
+        width="100%",
+        on_mount=[
+            ExperimentState.load_runs,
+            ModelRegistryState.load_models,
+            FinetuneState.fetch_model_info,
+        ],
     )

@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Register button wired (Phase 4).** Step 6 (Results) now shows a "Register to
+  model registry" card when training completes. Users type a name and click
+  **Register** — the run is stored via `ModelRegistryState.do_register`, wiring
+  up the API and state that was built in Phase 3.
+- **Hyperparameter comparison table (Phase 4).** The past-runs table in Step 6
+  now includes Technique, LR, LoRA r, and Batch columns alongside the existing
+  Final Loss and Perplexity, making cross-run hyperparameter diffing visible at
+  a glance.
+- **PostgreSQL experiment backend (Phase 4).** Set `EXPERIMENTS_DB_URL` to a
+  `postgresql://` DSN to have all experiment data go to Postgres instead of the
+  local SQLite file — enables multi-machine worker deployments that share a
+  single experiment store. Requires `psycopg2-binary` (`pip install
+  psycopg2-binary` or `poetry install --with postgres`).  All upsert statements
+  migrated from `INSERT OR REPLACE` to portable `ON CONFLICT … DO UPDATE`,
+  compatible with both SQLite 3.24+ and PostgreSQL.
+- **`ModelRegistryState.do_register` event.** Reads `register_name` from local
+  state and accepts `run_id`, `perplexity`, and `final_loss` as arguments so the
+  UI can bind to cross-state Vars cleanly.
+- **`FinetuneState.last_train_loss` computed var.** Exposes the final training
+  step loss from `loss_history` for use in the register metric snapshot.
+- **`tests/test_experiments_db.py`** — 13 unit tests covering all DB helpers,
+  upsert idempotency, and the `_adapt_sql` placeholder conversion.
 - **Run comparison & model registry (Phase 3).**
   `GET /experiments/compare?ids=run1,run2` returns step-level metrics for up to 10
   runs. `app/components/loss_chart.py` gains `comparison_loss_chart()` for overlaid

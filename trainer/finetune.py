@@ -1,6 +1,6 @@
 import os
 
-from transformers import TrainingArguments
+from transformers import EarlyStoppingCallback, TrainingArguments
 from trl import SFTTrainer
 
 from trainer.callbacks import RedisLossCallback
@@ -8,6 +8,24 @@ from trainer.config import LoraConfig, ModelConfig, TrainingConfig
 from trainer.dataset import load_and_tokenize
 from trainer.lora import save_adapter
 from trainer.qlora import prepare_qlora_model
+
+
+class OutOfMemoryError(RuntimeError):
+    """Raised when training fails due to GPU OOM, carrying a remediation hint."""
+
+    def __init__(self, original: BaseException):
+        self.suggestion = (
+            "CUDA out of memory — reduce batch_size, max_seq_length, or "
+            "gradient_accumulation_steps, or pick a smaller model."
+        )
+        super().__init__(f"{self.suggestion} (original error: {original})")
+
+
+def _is_oom(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return (
+        "out of memory" in msg or "cuda oom" in msg or exc.__class__.__name__ == "OutOfMemoryError"
+    )
 
 
 def finetune(
@@ -20,19 +38,21 @@ def finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
-) -> str:
+):
     """
     Full fine-tuning pipeline:
       1. Load model (any source: HF Hub, local, custom string)
-      2. Load + tokenize dataset (local file or HF Hub dataset)
-      3. Train with SFTTrainer
+      2. Load + tokenize dataset, optionally splitting off a validation set
+      3. Train with SFTTrainer (with optional early stopping + checkpoint resume)
       4. Save adapter weights
     Returns (output_path, model, tokenizer).
+
+    Raises OutOfMemoryError with a remediation hint if training hits GPU OOM.
     """
     # 1. Prepare model
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
-    # 2. Load dataset
+    # 2. Load dataset, optionally splitting off a held-out validation set
     dataset = load_and_tokenize(
         dataset_path,
         tokenizer,
@@ -42,6 +62,18 @@ def finetune(
         instruction_col=instruction_col,
         output_col=output_col,
     )
+
+    eval_dataset = None
+    ratio = train_cfg.eval_split_ratio
+    # Only split if a meaningful validation set (>=1 example) can be carved out.
+    if ratio and 0.0 < ratio < 1.0 and len(dataset) >= 2 and int(len(dataset) * ratio) >= 1:
+        split = dataset.train_test_split(test_size=ratio, seed=42)
+        dataset, eval_dataset = split["train"], split["test"]
+
+    use_early_stopping = bool(train_cfg.early_stopping_patience) and eval_dataset is not None
+    eval_strategy = "epoch" if eval_dataset is not None else "no"
+    # load_best_model_at_end requires matching eval/save strategies.
+    save_strategy = "epoch" if use_early_stopping else "steps"
 
     # 3. Training arguments
     output_path = os.path.join(train_cfg.output_dir, job_id)
@@ -61,20 +93,37 @@ def finetune(
         max_grad_norm=train_cfg.max_grad_norm,
         report_to="none",  # disable external experiment trackers by default
         gradient_checkpointing=True,
+        eval_strategy=eval_strategy,
+        save_strategy=save_strategy,
+        load_best_model_at_end=use_early_stopping,
+        metric_for_best_model="eval_loss" if use_early_stopping else None,
+        greater_is_better=False if use_early_stopping else None,
     )
+
+    callbacks = [RedisLossCallback(job_id=job_id)]
+    if use_early_stopping:
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=train_cfg.early_stopping_patience)
+        )
 
     # 4. Trainer
     trainer = SFTTrainer(
         model=model,
         train_dataset=dataset,
+        eval_dataset=eval_dataset,
         args=training_args,
         tokenizer=tokenizer,
         dataset_text_field="text",
         max_seq_length=model_cfg.max_seq_length,
-        callbacks=[RedisLossCallback(job_id=job_id)],
+        callbacks=callbacks,
     )
 
-    trainer.train()
-    save_adapter(model, output_path)
+    try:
+        trainer.train(resume_from_checkpoint=train_cfg.resume_from_checkpoint or None)
+    except Exception as exc:  # noqa: BLE001 — re-raised below
+        if _is_oom(exc):
+            raise OutOfMemoryError(exc) from exc
+        raise
 
+    save_adapter(model, output_path)
     return output_path, model, tokenizer

@@ -34,6 +34,7 @@ pyinstaller = "^6.20.0"
 [tool.poetry.group.dev.dependencies]
 ruff = ">=0.6.0"
 pytest = ">=8.0.0"
+mypy = ">=1.10.0"
 
 [tool.poetry.scripts]
 tuneos = "main:main"
@@ -51,6 +52,17 @@ ignore = ["E501", "B008"]
 # Test modules deliberately stub heavy dependencies in sys.modules before
 # importing the modules under test, so imports are not at the top of the file.
 "tests/**" = ["E402"]
+
+[tool.mypy]
+# Scoped to pure-logic, framework-light modules where static typing is
+# meaningful. Excluded: the Reflex UI layer (dynamic Var typing) and the thin
+# wrappers around torch/trl/peft, whose third-party stubs are incomplete and
+# produce false positives that aren't real bugs.
+files = ["trainer/config.py", "trainer/metrics.py", "trainer/evaluate.py", "app/state/experiments_db.py"]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -80,6 +80,27 @@ def test_training_config_defaults():
     assert cfg.optim == "paged_adamw_32bit"
 
 
+def test_training_config_phase2_defaults():
+    cfg = TrainingConfig()
+    assert cfg.eval_split_ratio == pytest.approx(0.1)
+    assert cfg.early_stopping_patience == 0  # disabled by default
+    assert cfg.resume_from_checkpoint is None
+    assert cfg.eval_metrics is None
+
+
+def test_training_config_phase2_custom():
+    cfg = TrainingConfig(
+        eval_split_ratio=0.2,
+        early_stopping_patience=3,
+        resume_from_checkpoint="/tmp/ckpt-100",
+        eval_metrics=["perplexity", "rouge1"],
+    )
+    assert cfg.eval_split_ratio == pytest.approx(0.2)
+    assert cfg.early_stopping_patience == 3
+    assert cfg.resume_from_checkpoint == "/tmp/ckpt-100"
+    assert cfg.eval_metrics == ["perplexity", "rouge1"]
+
+
 def test_training_config_custom():
     cfg = TrainingConfig(num_train_epochs=5, learning_rate=1e-4, fp16=False, bf16=True)
     assert cfg.num_train_epochs == 5

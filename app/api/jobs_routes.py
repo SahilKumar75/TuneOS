@@ -84,6 +84,9 @@ async def create_job(config: JobConfig):
         "lr_scheduler_type": config.lr_scheduler_type,
         "optim": "paged_adamw_32bit",
         "max_grad_norm": 0.3,
+        "eval_split_ratio": config.eval_split_ratio,
+        "early_stopping_patience": config.early_stopping_patience,
+        "resume_from_checkpoint": config.resume_from_checkpoint or None,
     }
 
     try:

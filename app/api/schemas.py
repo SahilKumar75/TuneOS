@@ -48,6 +48,10 @@ class JobConfig(BaseModel):
     warmup_ratio: float = Field(default=0.03, ge=0.0, le=0.5)
     lr_scheduler_type: str = "cosine"
     bf16: bool = False
+    # ── Phase 2: validation + resumption ──────────────────────────
+    eval_split_ratio: float = Field(default=0.1, ge=0.0, lt=1.0)
+    early_stopping_patience: int = Field(default=0, ge=0, le=20)
+    resume_from_checkpoint: str = ""
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

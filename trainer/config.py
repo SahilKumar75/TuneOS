@@ -78,3 +78,13 @@ class TrainingConfig:
     lr_scheduler_type: str = "cosine"
     optim: str = "paged_adamw_32bit"
     max_grad_norm: float = 0.3
+    # ── Phase 2: validation + resumption ──────────────────────────
+    # Fraction of the dataset held out for in-training validation. 0 disables.
+    eval_split_ratio: float = 0.1
+    # Stop after this many evals with no improvement. 0 disables early stopping.
+    early_stopping_patience: int = 0
+    # Path to a checkpoint dir to resume from, or True to auto-detect the latest
+    # checkpoint under output_dir. None/"" starts fresh.
+    resume_from_checkpoint: str | bool | None = None
+    # Metrics computed post-training; names must exist in trainer.metrics.REGISTRY.
+    eval_metrics: list[str] | None = None

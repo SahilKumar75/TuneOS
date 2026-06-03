@@ -98,7 +98,7 @@ class FinetuneState(rx.State):
     is_validating_model: bool = False
     hf_token: str = ""  # for gated models
     selected_technique: str = "qlora"  # "qlora" | "lora"
-    step1_show_picker: bool = True  # False = show confirmation card
+    step1_show_picker: bool = False  # True = full grid picker (advanced)
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""
@@ -362,8 +362,13 @@ class FinetuneState(rx.State):
 
     @rx.event
     def show_model_picker(self):
-        """Switch Step 1 back to the full model picker."""
+        """Open the full grid picker."""
         self.step1_show_picker = True
+
+    @rx.event
+    def hide_model_picker(self):
+        """Return to the confirmation / selection card."""
+        self.step1_show_picker = False
 
     @rx.event
     def select_technique(self, technique: str):

@@ -330,11 +330,14 @@ def _technique_selector() -> rx.Component:
 
 
 def _step1_confirm() -> rx.Component:
-    """Confirmation view — shown when a model has been pre-filled or selected."""
+    """Primary Step 1 view — model preview (or empty state) + selection controls."""
     return rx.vstack(
-        # ── Model preview card ─────────────────────────────────────
-        _card(
-            rx.vstack(
+        _section_heading("Choose your model"),
+        # ── Model preview / empty state ────────────────────────────
+        rx.cond(
+            FinetuneState.selected_model_id != "",
+            # Preview card — model is selected
+            _card(
                 rx.hstack(
                     rx.box(
                         rx.icon("bot", size=26, color=c("accent")),
@@ -396,23 +399,50 @@ def _step1_confirm() -> rx.Component:
                     align="start",
                     width="100%",
                 ),
-                spacing="0",
-            )
+            ),
+            # Empty state — nothing selected yet
+            _card(
+                rx.vstack(
+                    rx.icon("bot", size=36, color=c("text_muted")),
+                    rx.text(
+                        "No model selected",
+                        font_size="0.92rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                    ),
+                    rx.text(
+                        "Pick a preset from the dropdown, enter any Hugging Face model ID, "
+                        "or browse the full list below.",
+                        font_size="0.82rem",
+                        color=c("text_muted"),
+                        text_align="center",
+                        max_width="440px",
+                    ),
+                    spacing="2",
+                    align="center",
+                    width="100%",
+                    padding="12px 0",
+                ),
+                background=c("bg_input"),
+            ),
         ),
-        # ── Change model card ──────────────────────────────────────
+        # ── Model selection controls ───────────────────────────────
         _card(
             rx.vstack(
-                _label("Change model"),
+                _label(
+                    rx.cond(
+                        FinetuneState.selected_model_id != "",
+                        "Change model",
+                        "Select a model",
+                    )
+                ),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Select a different preset…",
+                        placeholder="Select a preset model…",
                         width="100%",
                     ),
                     rx.select.content(
-                        *[
-                            rx.select.item(m["name"], value=m["id"])
-                            for m in _MODELS
-                        ],
+                        *[rx.select.item(m["name"], value=m["id"]) for m in _MODELS],
                     ),
                     value=rx.cond(
                         FinetuneState.model_source == "hub",
@@ -423,11 +453,10 @@ def _step1_confirm() -> rx.Component:
                     width="100%",
                 ),
                 rx.text(
-                    "Or enter any model ID",
+                    "Or enter any Hugging Face / local model ID",
                     font_size="0.78rem",
-                    font_weight="500",
                     color=c("text_secondary"),
-                    margin_top="8px",
+                    margin_top="4px",
                 ),
                 rx.hstack(
                     rx.input(
@@ -462,17 +491,60 @@ def _step1_confirm() -> rx.Component:
                     rx.callout(FinetuneState.model_url_error, color_scheme="red", size="1"),
                     rx.fragment(),
                 ),
+                # HF token for gated models
+                rx.cond(
+                    FinetuneState.selected_model_id != "",
+                    rx.vstack(
+                        _label("HF Token (required for gated models like Llama 3)"),
+                        rx.input(
+                            placeholder="hf_xxxxxxxxxxxxx",
+                            type="password",
+                            value=FinetuneState.hf_token,
+                            on_change=FinetuneState.set_hf_token,
+                            width="100%",
+                        ),
+                        spacing="1",
+                    ),
+                    rx.fragment(),
+                ),
+                # Browse all models link
+                rx.hstack(
+                    rx.button(
+                        rx.hstack(
+                            rx.icon("layout-grid", size=13),
+                            rx.text("Browse all models"),
+                            spacing="2",
+                            align="center",
+                        ),
+                        on_click=FinetuneState.show_model_picker,
+                        variant="ghost",
+                        color_scheme="gray",
+                        size="1",
+                    ),
+                    justify="end",
+                    width="100%",
+                ),
                 spacing="3",
             )
         ),
         # ── Technique selector ─────────────────────────────────────
-        rx.box(height="4px"),
         _section_heading("Training technique"),
         _technique_selector(),
-        _nav_buttons(
-            next_label="Confirm & continue →",
-            next_disabled=~FinetuneState.can_go_to_intent,
-            show_back=False,
+        rx.hstack(
+            rx.spacer(),
+            rx.button(
+                rx.cond(
+                    FinetuneState.selected_model_id != "",
+                    "Confirm & continue →",
+                    "Next: Intent →",
+                ),
+                on_click=FinetuneState.next_step,
+                disabled=~FinetuneState.can_go_to_intent,
+                size="3",
+                color_scheme="blue",
+            ),
+            width="100%",
+            padding_top="16px",
         ),
         spacing="4",
         width="100%",
@@ -481,8 +553,21 @@ def _step1_confirm() -> rx.Component:
 
 
 def _step1_picker() -> rx.Component:
-    """Full model picker — shown when no model has been selected yet."""
+    """Full grid picker — accessed via 'Browse all models'."""
     return rx.vstack(
+        rx.hstack(
+            rx.button(
+                rx.hstack(rx.icon("arrow-left", size=13), rx.text("Back"), spacing="1"),
+                on_click=FinetuneState.hide_model_picker,
+                variant="ghost",
+                color_scheme="gray",
+                size="1",
+            ),
+            rx.spacer(),
+            align="center",
+            width="100%",
+            margin_bottom="4px",
+        ),
         _section_heading("Choose your model"),
         rx.text(
             "Pick from common models, paste any Hugging Face ID, load a local file, "

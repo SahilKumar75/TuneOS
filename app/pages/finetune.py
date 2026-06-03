@@ -329,52 +329,84 @@ def _technique_selector() -> rx.Component:
     )
 
 
+def _org_badge() -> rx.Component:
+    """Coloured org badge — shows HF CDN avatar image on top of a fallback initial."""
+    return rx.box(
+        # Fallback initial — always rendered underneath
+        rx.text(
+            FinetuneState.selected_model_org_initial,
+            color="white",
+            font_size="1rem",
+            font_weight="700",
+            position="absolute",
+            top="50%",
+            left="50%",
+            transform="translate(-50%, -50%)",
+            pointer_events="none",
+            user_select="none",
+        ),
+        # HF CDN org thumbnail — covers the initial if the image loads
+        rx.image(
+            src=FinetuneState.selected_model_org_avatar,
+            position="absolute",
+            top="0",
+            left="0",
+            width="100%",
+            height="100%",
+            object_fit="cover",
+        ),
+        position="relative",
+        background=FinetuneState.selected_model_org_color,
+        border_radius="12px",
+        width="52px",
+        height="52px",
+        min_width="52px",
+        overflow="hidden",
+        flex_shrink="0",
+    )
+
+
 def _step1_confirm() -> rx.Component:
-    """Primary Step 1 view — model preview (or empty state) + selection controls."""
+    """Primary Step 1 view — model preview (or empty state) + free-form model input."""
     return rx.vstack(
         _section_heading("Choose your model"),
-        # ── Model preview / empty state ────────────────────────────
+        # ── Preview card (selected) or empty state ─────────────────
         rx.cond(
             FinetuneState.selected_model_id != "",
-            # Preview card — model is selected
             _card(
                 rx.hstack(
-                    rx.box(
-                        rx.icon("bot", size=26, color=c("accent")),
-                        background=c("accent_soft"),
-                        border_radius="10px",
-                        padding="10px",
-                        display="flex",
-                        align_items="center",
-                        justify_content="center",
-                        flex_shrink="0",
-                    ),
+                    _org_badge(),
                     rx.vstack(
+                        # Name + source badge
                         rx.hstack(
                             rx.text(
                                 FinetuneState.effective_model_name,
-                                font_size="1.05rem",
+                                font_size="1.1rem",
                                 font_weight="700",
                                 color=c("text_primary"),
                             ),
                             rx.badge(
                                 FinetuneState.selected_model_source_label,
                                 color_scheme="blue",
+                                variant="soft",
                                 size="1",
                             ),
                             spacing="2",
                             align="center",
                             flex_wrap="wrap",
                         ),
+                        # Model ID in monospace
                         rx.text(
                             FinetuneState.effective_model_id,
-                            font_size="0.78rem",
+                            font_size="0.8rem",
                             color=c("text_muted"),
                             font_family="monospace",
                         ),
+                        # Size · Notes row
                         rx.cond(
                             FinetuneState.selected_model_size != "",
                             rx.hstack(
+                                rx.icon("layers", size=12, color=c("text_muted")),
                                 rx.text(
                                     FinetuneState.selected_model_size,
                                     font_size="0.78rem",
@@ -387,87 +419,115 @@ def _step1_confirm() -> rx.Component:
                                     color=c("text_secondary"),
                                 ),
                                 spacing="1",
+                                align="center",
                                 flex_wrap="wrap",
                             ),
                             rx.fragment(),
                         ),
-                        spacing="1",
+                        # License + Architecture row
+                        rx.hstack(
+                            rx.cond(
+                                FinetuneState.selected_model_license != "",
+                                rx.hstack(
+                                    rx.icon("scale", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.selected_model_license,
+                                        font_size="0.75rem",
+                                        color=c("text_muted"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.selected_model_arch != "",
+                                rx.hstack(
+                                    rx.text("·", color=c("text_muted"), font_size="0.75rem"),
+                                    rx.icon("cpu", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.selected_model_arch,
+                                        font_size="0.75rem",
+                                        color=c("text_muted"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.selected_model_org != "",
+                                rx.hstack(
+                                    rx.text("·", color=c("text_muted"), font_size="0.75rem"),
+                                    rx.icon("building-2", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.selected_model_org,
+                                        font_size="0.75rem",
+                                        color=c("text_muted"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="2",
+                            flex_wrap="wrap",
+                        ),
+                        spacing="2",
                         align_items="flex-start",
                         flex="1",
                     ),
-                    spacing="3",
+                    spacing="4",
                     align="start",
                     width="100%",
                 ),
             ),
-            # Empty state — nothing selected yet
+            # Empty state
             _card(
                 rx.vstack(
-                    rx.icon("bot", size=36, color=c("text_muted")),
+                    rx.image(
+                        src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg",
+                        width="48px",
+                        height="48px",
+                        opacity="0.25",
+                    ),
                     rx.text(
                         "No model selected",
-                        font_size="0.92rem",
+                        font_size="0.96rem",
                         font_weight="600",
                         color=c("text_secondary"),
                     ),
                     rx.text(
-                        "Pick a preset from the dropdown, enter any Hugging Face model ID, "
-                        "or browse the full list below.",
+                        "Enter any Hugging Face model ID below or pick a quick preset.",
                         font_size="0.82rem",
                         color=c("text_muted"),
                         text_align="center",
-                        max_width="440px",
                     ),
                     spacing="2",
                     align="center",
                     width="100%",
-                    padding="12px 0",
+                    padding="16px 0",
                 ),
                 background=c("bg_input"),
             ),
         ),
-        # ── Model selection controls ───────────────────────────────
+        # ── Model input ────────────────────────────────────────────
         _card(
             rx.vstack(
                 _label(
                     rx.cond(
                         FinetuneState.selected_model_id != "",
                         "Change model",
-                        "Select a model",
+                        "Model ID",
                     )
-                ),
-                rx.select.root(
-                    rx.select.trigger(
-                        placeholder="Select a preset model…",
-                        width="100%",
-                    ),
-                    rx.select.content(
-                        *[rx.select.item(m["name"], value=m["id"]) for m in _MODELS],
-                    ),
-                    value=rx.cond(
-                        FinetuneState.model_source == "hub",
-                        FinetuneState.selected_model_id,
-                        "",
-                    ),
-                    on_change=FinetuneState.select_preset,
-                    width="100%",
-                ),
-                rx.text(
-                    "Or enter any Hugging Face / local model ID",
-                    font_size="0.78rem",
-                    color=c("text_secondary"),
-                    margin_top="4px",
                 ),
                 rx.hstack(
                     rx.input(
-                        placeholder='e.g. "EleutherAI/gpt-j-6b"',
-                        value=rx.cond(
-                            FinetuneState.model_source == "custom_string",
-                            FinetuneState.custom_model_str,
-                            "",
-                        ),
+                        placeholder="org/model-name — e.g. mistralai/Mistral-7B-v0.1",
+                        value=FinetuneState.effective_model_id,
                         on_change=FinetuneState.set_custom_confirm_input,
                         flex="1",
+                        size="3",
                     ),
                     rx.button(
                         rx.cond(
@@ -479,19 +539,47 @@ def _step1_confirm() -> rx.Component:
                         ),
                         on_click=FinetuneState.validate_and_select_custom_model,
                         disabled=FinetuneState.is_validating_model
-                        | (FinetuneState.custom_model_str == ""),
+                        | (FinetuneState.effective_model_id == ""),
                         variant="soft",
                         color_scheme="gray",
-                        size="2",
+                        size="3",
                     ),
                     spacing="2",
+                    width="100%",
                 ),
                 rx.cond(
                     FinetuneState.model_url_error != "",
                     rx.callout(FinetuneState.model_url_error, color_scheme="red", size="1"),
                     rx.fragment(),
                 ),
-                # HF token for gated models
+                # Quick preset chips
+                rx.text(
+                    "Quick presets",
+                    font_size="0.75rem",
+                    font_weight="500",
+                    color=c("text_muted"),
+                    margin_top="2px",
+                ),
+                rx.flex(
+                    *[
+                        rx.button(
+                            m["name"],
+                            on_click=FinetuneState.select_preset(m["id"]),
+                            variant=rx.cond(
+                                FinetuneState.selected_model_id == m["id"],
+                                "solid",
+                                "outline",
+                            ),
+                            color_scheme="blue",
+                            size="1",
+                            radius="full",
+                        )
+                        for m in _MODELS
+                    ],
+                    wrap="wrap",
+                    gap="6px",
+                ),
+                # HF Token — shown only after a model is selected
                 rx.cond(
                     FinetuneState.selected_model_id != "",
                     rx.vstack(
@@ -507,7 +595,6 @@ def _step1_confirm() -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
-                # Browse all models link
                 rx.hstack(
                     rx.button(
                         rx.hstack(

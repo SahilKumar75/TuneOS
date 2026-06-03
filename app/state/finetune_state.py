@@ -17,34 +17,68 @@ from app.state.experiment_state import ExperimentState, save_experiment_run
 _PRESET_META: dict[str, dict[str, str]] = {
     "mistralai/Mistral-7B-v0.1": {
         "name": "Mistral 7B",
+        "org": "mistralai",
         "size": "7B params",
         "notes": "Well-tested with QLoRA, great all-rounder",
+        "license": "Apache 2.0",
+        "arch": "Decoder-only",
     },
     "meta-llama/Meta-Llama-3-8B": {
         "name": "Llama 3 8B",
+        "org": "meta-llama",
         "size": "8B params",
         "notes": "Strong general-purpose model",
+        "license": "Llama 3 Community",
+        "arch": "Decoder-only",
     },
     "microsoft/Phi-3-mini-4k-instruct": {
         "name": "Phi-3 Mini",
+        "org": "microsoft",
         "size": "3.8B params",
         "notes": "Fast, runs on smaller GPUs",
+        "license": "MIT",
+        "arch": "Decoder-only",
     },
     "google/gemma-2b": {
         "name": "Gemma 2B",
+        "org": "google",
         "size": "2B params",
         "notes": "Good for low-VRAM environments",
+        "license": "Gemma License",
+        "arch": "Decoder-only",
     },
     "EleutherAI/pythia-410m": {
         "name": "Pythia 410M",
+        "org": "EleutherAI",
         "size": "410M params",
         "notes": "Tiny model — great for testing pipelines fast",
+        "license": "Apache 2.0",
+        "arch": "Decoder-only",
     },
     "bigcode/starcoder2-3b": {
         "name": "StarCoder2 3B",
+        "org": "bigcode",
         "size": "3B params",
         "notes": "Excellent for code generation tasks",
+        "license": "BigCode OpenRAIL-M",
+        "arch": "Decoder-only",
     },
+}
+
+# Organisation badge colours and initials (keyed lowercase).
+_ORG_META: dict[str, dict[str, str]] = {
+    "mistralai": {"initial": "Mi", "color": "#FF7000"},
+    "meta-llama": {"initial": "M", "color": "#0668E1"},
+    "microsoft": {"initial": "Ms", "color": "#00A4EF"},
+    "google": {"initial": "G", "color": "#4285F4"},
+    "eleutherai": {"initial": "EA", "color": "#6E40C9"},
+    "bigcode": {"initial": "BC", "color": "#0EA5E9"},
+    "huggingface": {"initial": "HF", "color": "#FF9D00"},
+    "stabilityai": {"initial": "SA", "color": "#6366F1"},
+    "tiiuae": {"initial": "FA", "color": "#059669"},
+    "qwen": {"initial": "Q", "color": "#7C3AED"},
+    "cohere": {"initial": "Co", "color": "#39594D"},
+    "openai": {"initial": "Oa", "color": "#10A37F"},
 }
 
 
@@ -300,10 +334,43 @@ class FinetuneState(rx.State):
         return _PRESET_META.get(self.selected_model_id, {}).get("notes", "")
 
     @rx.var
+    def selected_model_license(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("license", "")
+
+    @rx.var
+    def selected_model_arch(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("arch", "")
+
+    @rx.var
     def selected_model_source_label(self) -> str:
         return {"hub": "Hub model", "local": "Local file", "custom_string": "Custom ID"}.get(
             self.model_source, ""
         )
+
+    @rx.var
+    def selected_model_org(self) -> str:
+        if "/" in self.selected_model_id:
+            return self.selected_model_id.split("/")[0]
+        return ""
+
+    @rx.var
+    def selected_model_org_initial(self) -> str:
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        meta = _ORG_META.get(org.lower(), {})
+        return meta.get("initial", org[:2].upper() if org else "?")
+
+    @rx.var
+    def selected_model_org_color(self) -> str:
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        return _ORG_META.get(org.lower(), {}).get("color", "#6366F1")
+
+    @rx.var
+    def selected_model_org_avatar(self) -> str:
+        """HuggingFace org thumbnail CDN URL — loads if available, silent on error."""
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        if not org:
+            return ""
+        return f"https://cdn-thumbnails.huggingface.co/social-thumbnails/orgs/{org}.png"
 
     @rx.var
     def last_train_loss(self) -> float:

@@ -262,7 +262,6 @@ class FinetuneState(rx.State):
             )
             or (self.data_source == "hub_dataset" and bool(self.hub_dataset_id))
             or (self.data_source == "generate" and bool(self.dataset_path))
-            or self.data_source == "skip"
         )
         return has_data
 
@@ -448,8 +447,6 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
-        self._clear_model_preview()
-        return FinetuneState.fetch_model_info
 
     @rx.event
     def select_model(self, model_id: str, model_name: str):
@@ -459,8 +456,6 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
-        self._clear_model_preview()
-        return FinetuneState.fetch_model_info
 
     def _clear_model_preview(self):
         self.model_downloads = ""
@@ -615,24 +610,9 @@ class FinetuneState(rx.State):
                             if end != -1:
                                 readme = readme[end + 3:].strip()
                         lines = readme.split("\n")
-
-                        def _collect_paragraph(start_idx: int) -> str:
-                            """Join consecutive non-empty prose lines into one paragraph."""
-                            parts = []
-                            for ln in lines[start_idx:]:
-                                s = ln.strip()
-                                if not s:
-                                    if parts:
-                                        break  # blank line ends the paragraph
-                                    continue
-                                if s.startswith("#"):
-                                    break
-                                parts.append(s)
-                            return " ".join(parts)
-
-                        # Pass 1: paragraph after a description/about/overview heading
+                        # Pass 1: first prose line after a description/about/overview heading
                         in_desc = False
-                        for idx, line in enumerate(lines):
+                        for line in lines:
                             stripped = line.strip()
                             if stripped.startswith("#") and any(
                                 kw in stripped.lower()
@@ -644,15 +624,13 @@ class FinetuneState(rx.State):
                                 if stripped.startswith("#"):
                                     break
                                 if _is_prose(stripped):
-                                    para = _collect_paragraph(idx)
-                                    bio = para[:900] + ("…" if len(para) > 900 else "")
+                                    bio = stripped[:300] + ("…" if len(stripped) > 300 else "")
                                     break
-                        # Pass 2: fall back to first substantial prose paragraph anywhere
+                        # Pass 2: fall back to first substantial prose line anywhere
                         if not bio:
-                            for idx, line in enumerate(lines):
+                            for line in lines:
                                 if _is_prose(line.strip()):
-                                    para = _collect_paragraph(idx)
-                                    bio = para[:900] + ("…" if len(para) > 900 else "")
+                                    bio = line.strip()[:300] + ("…" if len(line.strip()) > 300 else "")
                                     break
                 except Exception:
                     pass

@@ -181,6 +181,12 @@ class ModelRegistryState(rx.State):
         return ModelRegistryState.load_models
 
     @rx.event
+    def set_register_name(self, value: str):
+        self.register_name = value
+        self.register_success = False
+        self.register_error = ""
+
+    @rx.event
     def do_register(self, run_id: str, perplexity: float, final_loss: float):
         """Register the current run using ``self.register_name``.
 

@@ -257,6 +257,12 @@ class FinetuneState(rx.State):
         lr_map = {"1e-4": "Slow & careful", "2e-4": "Balanced", "5e-4": "Fast learning"}
         return lr_map.get(self.learning_rate, self.learning_rate)
 
+    @rx.var
+    def last_train_loss(self) -> float:
+        if self.loss_history:
+            return self.loss_history[-1].loss
+        return 0.0
+
     # ── Step 1 events ─────────────────────────────────────────────
     @rx.event
     def select_model(self, model_id: str, model_name: str):

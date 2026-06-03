@@ -1,4 +1,4 @@
-"""Pure SQLite persistence for experiment tracking.
+"""Pure SQLite/PostgreSQL persistence for experiment tracking.
 
 This module is intentionally free of any Reflex (UI) dependency so that the
 Celery worker and trainer — which run in a headless backend process — can
@@ -6,6 +6,17 @@ persist run metrics and job status without importing the UI framework.
 
 The Reflex-facing layer (``experiment_state.py``) re-exports these helpers
 and adds the ``rx.State`` class on top.
+
+Backend selection
+-----------------
+By default the module uses a local SQLite file at ``storage/experiments.db``.
+Set ``EXPERIMENTS_DB_URL`` to a PostgreSQL DSN
+(``postgresql://user:pass@host/db``) to switch to Postgres — useful when
+multiple worker machines need to share the same experiment store.
+
+``psycopg2-binary`` must be installed for the Postgres backend::
+
+    pip install psycopg2-binary
 """
 
 from __future__ import annotations
@@ -15,6 +26,8 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 _logger = logging.getLogger(__name__)
@@ -22,12 +35,65 @@ _logger = logging.getLogger(__name__)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.getenv("EXPERIMENT_DB", os.path.join(_PROJECT_ROOT, "storage", "experiments.db"))
 
+# When set to a postgres:// / postgresql:// DSN the module uses psycopg2.
+_POSTGRES_URL: str = os.getenv("EXPERIMENTS_DB_URL", "")
+_USE_POSTGRES: bool = _POSTGRES_URL.startswith(("postgres://", "postgresql://"))
 
-def _get_conn() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+
+def _adapt_sql(sql: str) -> str:
+    """Convert ``?`` parameter markers to ``%s`` for the PostgreSQL driver."""
+    if _USE_POSTGRES:
+        return sql.replace("?", "%s")
+    return sql
+
+
+class _PgConnAdapter:
+    """Wraps a psycopg2 connection + RealDictCursor to look like sqlite3."""
+
+    def __init__(self, conn, cur) -> None:  # type: ignore[type-arg]
+        self._conn = conn
+        self._cur = cur
+
+    def execute(self, sql: str, params: tuple = ()):
+        self._cur.execute(_adapt_sql(sql), params)
+        return self._cur
+
+    def executemany(self, sql: str, params_seq):
+        self._cur.executemany(_adapt_sql(sql), params_seq)
+        return self._cur
+
+
+@contextmanager
+def _get_conn() -> Generator[Any, None, None]:
+    """Context manager that yields a DB connection normalised to the sqlite3 API."""
+    if _USE_POSTGRES:
+        try:
+            import psycopg2  # type: ignore[import]
+            import psycopg2.extras  # type: ignore[import]
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg2-binary is required for the PostgreSQL backend. "
+                "Run: pip install psycopg2-binary"
+            ) from exc
+        conn = psycopg2.connect(_POSTGRES_URL)
+        try:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            yield _PgConnAdapter(conn, cur)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+    else:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
 
 def _init_db():
@@ -111,8 +177,10 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
         _init_db()
         with _get_conn() as conn:
             conn.executemany(
-                "INSERT OR REPLACE INTO run_metrics (run_id, key, value, step, timestamp) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT (run_id, key, step) DO UPDATE SET "
+                "value=EXCLUDED.value, timestamp=EXCLUDED.timestamp",
                 rows,
             )
     except Exception:
@@ -128,7 +196,8 @@ def save_run_params(run_id: str, params: dict[str, Any]) -> None:
         _init_db()
         with _get_conn() as conn:
             conn.executemany(
-                "INSERT OR REPLACE INTO run_params (run_id, key, value) VALUES (?, ?, ?)",
+                "INSERT INTO run_params (run_id, key, value) VALUES (?, ?, ?) "
+                "ON CONFLICT (run_id, key) DO UPDATE SET value=EXCLUDED.value",
                 rows,
             )
     except Exception:
@@ -291,11 +360,29 @@ def save_experiment_run(run_data: dict[str, Any]):
         with _get_conn() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO runs
+                INSERT INTO runs
                 (id, name, model_id, model_source, technique, epochs, learning_rate,
                  lora_r, batch_size, dataset_name, user_intent, final_loss, perplexity,
                  started_at, finished_at, status, output_path, loss_history)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=EXCLUDED.name,
+                    model_id=EXCLUDED.model_id,
+                    model_source=EXCLUDED.model_source,
+                    technique=EXCLUDED.technique,
+                    epochs=EXCLUDED.epochs,
+                    learning_rate=EXCLUDED.learning_rate,
+                    lora_r=EXCLUDED.lora_r,
+                    batch_size=EXCLUDED.batch_size,
+                    dataset_name=EXCLUDED.dataset_name,
+                    user_intent=EXCLUDED.user_intent,
+                    final_loss=EXCLUDED.final_loss,
+                    perplexity=EXCLUDED.perplexity,
+                    started_at=EXCLUDED.started_at,
+                    finished_at=EXCLUDED.finished_at,
+                    status=EXCLUDED.status,
+                    output_path=EXCLUDED.output_path,
+                    loss_history=EXCLUDED.loss_history
                 """,
                 (
                     run_data.get("id", ""),

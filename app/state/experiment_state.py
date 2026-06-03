@@ -146,6 +146,8 @@ class ModelRegistryState(rx.State):
     models: list[RegisteredModel] = []
     is_registering: bool = False
     register_error: str = ""
+    register_name: str = ""
+    register_success: bool = False
 
     @rx.event
     def load_models(self):
@@ -172,6 +174,33 @@ class ModelRegistryState(rx.State):
         self.register_error = ""
         try:
             register_model(name.strip(), run_id, alias="latest", metric_snapshot=metrics)
+        except Exception as exc:
+            self.register_error = str(exc)
+        finally:
+            self.is_registering = False
+        return ModelRegistryState.load_models
+
+    @rx.event
+    def do_register(self, run_id: str, perplexity: float, final_loss: float):
+        """Register the current run using ``self.register_name``.
+
+        Called from the Step 6 UI where the run_id and metrics come from
+        FinetuneState vars passed as event arguments.
+        """
+        if not self.register_name.strip():
+            self.register_error = "Model name cannot be empty"
+            return
+        self.is_registering = True
+        self.register_error = ""
+        self.register_success = False
+        try:
+            register_model(
+                self.register_name.strip(),
+                run_id,
+                alias="latest",
+                metric_snapshot={"perplexity": perplexity, "final_loss": final_loss},
+            )
+            self.register_success = True
         except Exception as exc:
             self.register_error = str(exc)
         finally:

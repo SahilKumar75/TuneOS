@@ -5,7 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from app.components.loss_chart import loss_chart
-from app.state.experiment_state import ExperimentState
+from app.state.experiment_state import ExperimentState, ModelRegistryState
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
@@ -1483,6 +1483,80 @@ def _step6() -> rx.Component:
                 spacing="3",
             )
         ),
+        # Register to model registry
+        rx.cond(
+            (FinetuneState.training_status == "done") & (FinetuneState.experiment_id != ""),
+            _card(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("bookmark", size=16, color=c("accent")),
+                        rx.text(
+                            "Register to model registry",
+                            font_size="0.9rem",
+                            font_weight="600",
+                            color=c("text_primary"),
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.text(
+                        "Save this run under a name so you can promote it to production "
+                        "or compare it against future runs.",
+                        font_size="0.82rem",
+                        color=c("text_secondary"),
+                    ),
+                    rx.hstack(
+                        rx.input(
+                            placeholder="my-chatbot-v1",
+                            value=ModelRegistryState.register_name,
+                            on_change=ModelRegistryState.set_register_name,
+                            flex="1",
+                        ),
+                        rx.button(
+                            rx.cond(
+                                ModelRegistryState.is_registering,
+                                rx.hstack(
+                                    rx.spinner(size="2"), rx.text("Saving…"), spacing="2"
+                                ),
+                                rx.text("Register"),
+                            ),
+                            on_click=ModelRegistryState.do_register(
+                                FinetuneState.experiment_id,
+                                FinetuneState.eval_perplexity,
+                                FinetuneState.last_train_loss,
+                            ),
+                            disabled=ModelRegistryState.is_registering,
+                            color_scheme="blue",
+                            size="2",
+                        ),
+                        spacing="2",
+                        width="100%",
+                    ),
+                    rx.cond(
+                        ModelRegistryState.register_error != "",
+                        rx.callout(ModelRegistryState.register_error, color_scheme="red", size="1"),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        ModelRegistryState.register_success,
+                        rx.callout(
+                            rx.hstack(
+                                rx.icon("circle-check", size=14),
+                                rx.text(
+                                    "Registered as "" + ModelRegistryState.register_name + """
+                                ),
+                                spacing="2",
+                            ),
+                            color_scheme="green",
+                            size="1",
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="3",
+                )
+            ),
+            rx.fragment(),
+        ),
         # Experiment comparison
         rx.cond(
             ExperimentState.completed_runs.length() > 1,
@@ -1500,6 +1574,10 @@ def _step6() -> rx.Component:
                             rx.table.row(
                                 rx.table.column_header_cell("Name"),
                                 rx.table.column_header_cell("Model"),
+                                rx.table.column_header_cell("Technique"),
+                                rx.table.column_header_cell("LR"),
+                                rx.table.column_header_cell("LoRA r"),
+                                rx.table.column_header_cell("Batch"),
                                 rx.table.column_header_cell("Epochs"),
                                 rx.table.column_header_cell("Final Loss"),
                                 rx.table.column_header_cell("Perplexity"),
@@ -1511,6 +1589,16 @@ def _step6() -> rx.Component:
                                 lambda r: rx.table.row(
                                     rx.table.cell(rx.text(r.name, font_size="0.8rem")),
                                     rx.table.cell(rx.text(r.model_id, font_size="0.8rem")),
+                                    rx.table.cell(rx.text(r.technique, font_size="0.8rem")),
+                                    rx.table.cell(
+                                        rx.text(r.learning_rate, font_size="0.8rem")
+                                    ),
+                                    rx.table.cell(
+                                        rx.text(r.lora_r.to_string(), font_size="0.8rem")
+                                    ),
+                                    rx.table.cell(
+                                        rx.text(r.batch_size.to_string(), font_size="0.8rem")
+                                    ),
                                     rx.table.cell(
                                         rx.text(r.epochs.to_string(), font_size="0.8rem")
                                     ),
@@ -1916,5 +2004,5 @@ def finetune_page() -> rx.Component:
             padding="32px 24px",
         ),
         width="100%",
-        on_mount=ExperimentState.load_runs,
+        on_mount=[ExperimentState.load_runs, ModelRegistryState.load_models],
     )

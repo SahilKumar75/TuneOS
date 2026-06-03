@@ -144,9 +144,19 @@ Body: `{ "name": "my-chatbot", "run_id": "...", "alias": "latest", "metric_snaps
 ### `DELETE /api/experiments/models/{name}`
 Removes a named model from the registry.
 
+### `POST /api/experiments/models` — Register button
+
+The **Register** button in Step 6 of the wizard calls `ModelRegistryState.do_register`
+on the frontend, which in turn hits `POST /api/experiments/models`. The run is stored
+under the provided name and its perplexity/final-loss are captured in
+`metric_snapshot`.
+
 ## Storage Model
 
-Run history is persisted in `storage/experiments.db` (SQLite):
+By default run history is persisted in `storage/experiments.db` (SQLite). Set
+`EXPERIMENTS_DB_URL` to a `postgresql://` DSN to switch to PostgreSQL — useful
+when multiple worker machines share one experiment store (`psycopg2-binary`
+required).
 
 | Table | Purpose |
 | --- | --- |
@@ -155,8 +165,9 @@ Run history is persisted in `storage/experiments.db` (SQLite):
 | `run_params` | Immutable hyperparameter snapshot `(run_id, key, value)` |
 | `registered_models` | Named model registry `(name, run_id, alias, metric_snapshot, registered_at)` |
 
-The pure-SQLite persistence layer lives in `app/state/experiments_db.py` and has
-no Reflex dependency, so the headless Celery worker can write to it directly.
+The persistence layer in `app/state/experiments_db.py` has no Reflex dependency so
+the headless Celery worker can write to it directly. All upserts use portable
+`ON CONFLICT … DO UPDATE` syntax (SQLite 3.24+ and PostgreSQL).
 
 ## Internal Architecture
 

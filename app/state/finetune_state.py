@@ -14,6 +14,79 @@ from pydantic import BaseModel
 
 from app.state.experiment_state import ExperimentState, save_experiment_run
 
+_PRESET_META: dict[str, dict[str, str]] = {
+    "mistralai/Mistral-7B-v0.1": {
+        "name": "Mistral 7B",
+        "org": "mistralai",
+        "size": "7B params",
+        "notes": "Well-tested with QLoRA, great all-rounder",
+        "license": "Apache 2.0",
+        "arch": "Decoder-only",
+    },
+    "meta-llama/Meta-Llama-3-8B": {
+        "name": "Llama 3 8B",
+        "org": "meta-llama",
+        "size": "8B params",
+        "notes": "Strong general-purpose model",
+        "license": "Llama 3 Community",
+        "arch": "Decoder-only",
+    },
+    "microsoft/Phi-3-mini-4k-instruct": {
+        "name": "Phi-3 Mini",
+        "org": "microsoft",
+        "size": "3.8B params",
+        "notes": "Fast, runs on smaller GPUs",
+        "license": "MIT",
+        "arch": "Decoder-only",
+    },
+    "google/gemma-2b": {
+        "name": "Gemma 2B",
+        "org": "google",
+        "size": "2B params",
+        "notes": "Good for low-VRAM environments",
+        "license": "Gemma License",
+        "arch": "Decoder-only",
+    },
+    "EleutherAI/pythia-410m": {
+        "name": "Pythia 410M",
+        "org": "EleutherAI",
+        "size": "410M params",
+        "notes": "Tiny model — great for testing pipelines fast",
+        "license": "Apache 2.0",
+        "arch": "Decoder-only",
+    },
+    "bigcode/starcoder2-3b": {
+        "name": "StarCoder2 3B",
+        "org": "bigcode",
+        "size": "3B params",
+        "notes": "Excellent for code generation tasks",
+        "license": "BigCode OpenRAIL-M",
+        "arch": "Decoder-only",
+    },
+}
+
+# Organisation meta — keyed lowercase HF org name.
+# `logo` is the Clearbit CDN URL for a clean official logo.
+# Clearbit provides 128px PNGs of official company marks — consistent, well-cropped.
+_ORG_META: dict[str, dict[str, str]] = {
+    "mistralai":    {"initial": "Mi", "color": "#FF7000", "logo": "https://github.com/mistralai.png?size=128"},
+    "meta-llama":   {"initial": "M",  "color": "#0668E1", "logo": "https://github.com/meta-llama.png?size=128"},
+    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "logo": "https://github.com/microsoft.png?size=128"},
+    "google":       {"initial": "G",  "color": "#4285F4", "logo": "https://github.com/google.png?size=128"},
+    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "logo": "https://github.com/EleutherAI.png?size=128"},
+    "bigcode":      {"initial": "BC", "color": "#0EA5E9", "logo": "https://github.com/bigcode-project.png?size=128"},
+    "huggingface":  {"initial": "HF", "color": "#FF9D00", "logo": "https://github.com/huggingface.png?size=128"},
+    "stabilityai":  {"initial": "SA", "color": "#6366F1", "logo": "https://github.com/Stability-AI.png?size=128"},
+    "tiiuae":       {"initial": "FA", "color": "#059669", "logo": "https://github.com/tiiuae.png?size=128"},
+    "qwen":         {"initial": "Q",  "color": "#7C3AED", "logo": "https://github.com/QwenLM.png?size=128"},
+    "cohere":       {"initial": "Co", "color": "#39594D", "logo": "https://github.com/cohere-ai.png?size=128"},
+    "openai":       {"initial": "Oa", "color": "#10A37F", "logo": "https://github.com/openai.png?size=128"},
+    "nvidia":       {"initial": "Nv", "color": "#76B900", "logo": "https://github.com/NVIDIA.png?size=128"},
+    "apple":        {"initial": "Ap", "color": "#555555", "logo": "https://github.com/apple.png?size=128"},
+    "deepmind":     {"initial": "DM", "color": "#4285F4", "logo": "https://github.com/google-deepmind.png?size=128"},
+    "anthropic":    {"initial": "An", "color": "#C97E45", "logo": "https://github.com/anthropics.png?size=128"},
+}
+
 
 class DatasetRow(BaseModel):
     instruction: str = ""
@@ -65,6 +138,19 @@ class FinetuneState(rx.State):
     is_validating_model: bool = False
     hf_token: str = ""  # for gated models
     selected_technique: str = "qlora"  # "qlora" | "lora"
+    step1_show_picker: bool = False  # True = full grid picker (advanced)
+    # Extended preview info fetched live from HF Hub API
+    model_downloads: str = ""
+    model_likes: str = ""
+    model_pipeline: str = ""
+    model_hf_tags: list[str] = []
+    model_context_window: str = ""   # max_position_embeddings from config
+    model_type_hf: str = ""          # model_type from config (gemma, llama, etc.)
+    model_languages: str = ""        # comma-joined language codes
+    model_last_updated: str = ""     # ISO date string from lastModified
+    model_bio: str = ""              # first paragraph from model README
+    model_fetch_error: str = ""      # debug: last error from fetch_model_info
+    is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""
@@ -257,7 +343,111 @@ class FinetuneState(rx.State):
         lr_map = {"1e-4": "Slow & careful", "2e-4": "Balanced", "5e-4": "Fast learning"}
         return lr_map.get(self.learning_rate, self.learning_rate)
 
+    @rx.var
+    def selected_model_size(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("size", "")
+
+    @rx.var
+    def selected_model_notes(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("notes", "")
+
+    @rx.var
+    def selected_model_license(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("license", "")
+
+    @rx.var
+    def selected_model_arch(self) -> str:
+        return _PRESET_META.get(self.selected_model_id, {}).get("arch", "")
+
+    @rx.var
+    def selected_model_source_label(self) -> str:
+        return {"hub": "Hub model", "local": "Local file", "custom_string": "Custom ID"}.get(
+            self.model_source, ""
+        )
+
+    @rx.var
+    def selected_model_org(self) -> str:
+        if "/" in self.selected_model_id:
+            return self.selected_model_id.split("/")[0]
+        return ""
+
+    @rx.var
+    def selected_model_org_initial(self) -> str:
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        meta = _ORG_META.get(org.lower(), {})
+        return meta.get("initial", org[:2].upper() if org else "?")
+
+    @rx.var
+    def selected_model_org_color(self) -> str:
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        return _ORG_META.get(org.lower(), {}).get("color", "#6366F1")
+
+    @rx.var
+    def selected_model_org_avatar(self) -> str:
+        """Clearbit logo URL for known orgs; GitHub fallback for unknown ones."""
+        org = self.selected_model_id.split("/")[0] if "/" in self.selected_model_id else ""
+        if not org:
+            return ""
+        meta = _ORG_META.get(org.lower(), {})
+        return meta.get("logo", f"https://github.com/{org}.png?size=128")
+
+    @rx.var
+    def suggested_technique(self) -> str:
+        """Recommend a technique based on model size + user intent (Step 2)."""
+        intent = self.user_intent.lower()
+        size = self.selected_model_size.lower()
+
+        # Intent-based signal: preference / alignment → DPO
+        if any(k in intent for k in ["preference", "alignment", "reward", "rlhf", "helpful"]):
+            return "dpo"
+
+        # Parse size to float billions
+        size_b = 0.0
+        try:
+            if "b params" in size:
+                size_b = float(size.replace("b params", "").strip())
+            elif "m params" in size:
+                size_b = float(size.replace("m params", "").strip()) / 1000.0
+        except ValueError:
+            pass
+
+        # Small models (< 1.5B) can handle standard LoRA efficiently
+        if 0 < size_b < 1.5:
+            return "lora"
+        # Everything ≥ 1.5B benefits from QLoRA's memory efficiency
+        return "qlora"
+
+    @rx.var
+    def last_train_loss(self) -> float:
+        if self.loss_history:
+            return self.loss_history[-1].loss
+        return 0.0
+
     # ── Step 1 events ─────────────────────────────────────────────
+    @rx.event
+    def prefill_model(self, model_id: str, model_name: str):
+        """Pre-populate model from an external context (e.g. landing page preview).
+
+        Lands the wizard on the confirmation card so the user sees what model
+        was chosen and can confirm or swap it — without being dumped back into
+        the full picker.  No-op if the wizard is already in progress.
+        """
+        # Only skip pre-fill when a flow is genuinely in progress (past Step 1).
+        # A stale selected_model_id from a previous closed tab should not block the
+        # new pre-fill — the tab close should reset state, but if it didn't we
+        # still want the new model to take over at Step 1.
+        if self.current_step > 1:
+            return
+        if not model_id:
+            return
+        meta = _PRESET_META.get(model_id, {})
+        self.selected_model_id = model_id
+        self.selected_model_name = meta.get("name", model_name or model_id)
+        self.model_source = "hub"
+        self.custom_model_str = ""
+        self.model_url_error = ""
+        self.step1_show_picker = False
+
     @rx.event
     def select_model(self, model_id: str, model_name: str):
         self.selected_model_id = model_id
@@ -265,6 +455,64 @@ class FinetuneState(rx.State):
         self.model_source = "hub"
         self.custom_model_str = ""
         self.model_url_error = ""
+        self.step1_show_picker = False
+
+    def _clear_model_preview(self):
+        self.model_downloads = ""
+        self.model_likes = ""
+        self.model_pipeline = ""
+        self.model_hf_tags = []
+        self.model_context_window = ""
+        self.model_type_hf = ""
+        self.model_languages = ""
+        self.model_last_updated = ""
+        self.model_bio = ""
+        self.model_fetch_error = ""
+
+    @rx.event
+    def select_preset(self, model_id: str):
+        """Select a model by ID from the confirmation-card dropdown."""
+        meta = _PRESET_META.get(model_id, {})
+        self.selected_model_id = model_id
+        self.selected_model_name = meta.get("name", model_id)
+        self.model_source = "hub"
+        self.custom_model_str = ""
+        self.model_url_error = ""
+        self._clear_model_preview()
+        return FinetuneState.fetch_model_info
+
+    @rx.event
+    def set_custom_confirm_input(self, value: str):
+        """Update model from the text input; auto-strips HF/GitHub URLs to model IDs."""
+        cleaned = value.strip()
+        # Parse HuggingFace URLs → extract org/model slug
+        for prefix in (
+            "https://huggingface.co/",
+            "https://hf.co/",
+            "http://huggingface.co/",
+            "huggingface.co/",
+        ):
+            if cleaned.startswith(prefix):
+                slug = cleaned[len(prefix):].rstrip("/")
+                parts = slug.split("/")
+                cleaned = "/".join(parts[:2]) if len(parts) >= 2 else slug
+                break
+        self.custom_model_str = cleaned
+        self.selected_model_id = cleaned
+        self.selected_model_name = cleaned
+        self.model_source = "custom_string"
+        self.model_url_error = ""
+        self._clear_model_preview()
+
+    @rx.event
+    def show_model_picker(self):
+        """Open the full grid picker."""
+        self.step1_show_picker = True
+
+    @rx.event
+    def hide_model_picker(self):
+        """Return to the confirmation / selection card."""
+        self.step1_show_picker = False
 
     @rx.event
     def select_technique(self, technique: str):
@@ -305,6 +553,9 @@ class FinetuneState(rx.State):
                     self.selected_model_id = model_str
                     self.selected_model_name = data.get("model_type", model_str)
                     self.is_validating_model = False
+                    self.step1_show_picker = False
+                    self._clear_model_preview()
+                return FinetuneState.fetch_model_info
             else:
                 async with self:
                     self.model_url_error = data.get("error", "Model not found or inaccessible.")
@@ -313,6 +564,127 @@ class FinetuneState(rx.State):
             async with self:
                 self.model_url_error = f"Validation failed: {exc}"
                 self.is_validating_model = False
+
+    @rx.event(background=True)
+    async def fetch_model_info(self):
+        """Fetch live metadata from HF Hub API and populate extended preview fields."""
+        async with self:
+            model_id = self.selected_model_id
+            token = self.hf_token
+        if not model_id or "/" not in model_id:
+            return
+        async with self:
+            self.is_fetching_model_info = True
+        try:
+            headers = {"Authorization": f"Bearer {token}"} if token else {}
+            _SKIP_STARTS = ("#", "!", "[", "<", "|", "*", "-", ">", "_", ":")
+            def _is_prose(line: str) -> bool:
+                s = line.strip()
+                return (
+                    bool(s)
+                    and len(s) > 60
+                    and not any(s.startswith(c) for c in _SKIP_STARTS)
+                    and not s[0].isdigit()
+                )
+
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                resp = await client.get(
+                    f"https://huggingface.co/api/models/{model_id}",
+                    headers=headers,
+                )
+                if resp.status_code != 200:
+                    return
+                data = resp.json()
+
+                # Bio: fetch README inside the same client session
+                bio = ""
+                try:
+                    readme_resp = await client.get(
+                        f"https://huggingface.co/{model_id}/resolve/main/README.md",
+                        headers=headers,
+                    )
+                    if readme_resp.status_code == 200:
+                        readme = readme_resp.text
+                        if readme.startswith("---"):
+                            end = readme.find("---", 3)
+                            if end != -1:
+                                readme = readme[end + 3:].strip()
+                        lines = readme.split("\n")
+                        # Pass 1: first prose line after a description/about/overview heading
+                        in_desc = False
+                        for line in lines:
+                            stripped = line.strip()
+                            if stripped.startswith("#") and any(
+                                kw in stripped.lower()
+                                for kw in ("description", "about", "overview", "introduction", "summary")
+                            ):
+                                in_desc = True
+                                continue
+                            if in_desc:
+                                if stripped.startswith("#"):
+                                    break
+                                if _is_prose(stripped):
+                                    bio = stripped[:300] + ("…" if len(stripped) > 300 else "")
+                                    break
+                        # Pass 2: fall back to first substantial prose line anywhere
+                        if not bio:
+                            for line in lines:
+                                if _is_prose(line.strip()):
+                                    bio = line.strip()[:300] + ("…" if len(line.strip()) > 300 else "")
+                                    break
+                except Exception:
+                    pass
+
+            dl    = data.get("downloads", 0) or 0
+            likes = data.get("likes", 0) or 0
+            pipeline = (data.get("pipeline_tag") or "").replace("-", " ").title()
+
+            # Useful capability tags only
+            keep = {
+                "text-generation", "conversational", "code", "summarization",
+                "translation", "question-answering", "fill-mask", "rlhf",
+                "instruction-tuned", "chat", "fine-tuned", "causal-lm",
+            }
+            raw_tags = data.get("tags") or []
+            tags = [t for t in raw_tags if t.lower() in keep][:4]
+
+            # Architecture / config details
+            cfg = data.get("config") or {}
+            model_type_raw = cfg.get("model_type") or ""
+            ctx = cfg.get("max_position_embeddings") or cfg.get("max_seq_len") or 0
+
+            # Languages from card metadata
+            card = data.get("cardData") or {}
+            langs = card.get("language") or []
+            lang_str = ", ".join(str(lg) for lg in langs[:4]) if langs else ""
+
+            # Last-modified date (trim to YYYY-MM-DD)
+            last_mod = (data.get("lastModified") or "")[:10]
+
+            async with self:
+                self.model_downloads = (
+                    f"{dl / 1_000_000:.1f}M" if dl >= 1_000_000
+                    else f"{dl // 1_000}k" if dl >= 1_000
+                    else str(dl)
+                ) if dl else ""
+                self.model_likes = str(likes) if likes else ""
+                self.model_pipeline = pipeline
+                self.model_hf_tags = tags
+                self.model_type_hf = model_type_raw.title() if model_type_raw else ""
+                self.model_context_window = f"{ctx:,} tokens" if ctx else ""
+                self.model_languages = lang_str
+                self.model_last_updated = last_mod
+                self.model_bio = bio
+                self.model_fetch_error = ""
+        except Exception as _exc:
+            import traceback
+            _tb = traceback.format_exc()
+            print("fetch_model_info ERROR:", _tb)
+            async with self:
+                self.model_fetch_error = str(_exc)
+        finally:
+            async with self:
+                self.is_fetching_model_info = False
 
     async def handle_local_model_upload(self, files: list[rx.UploadFile]):
         self.is_validating_model = True

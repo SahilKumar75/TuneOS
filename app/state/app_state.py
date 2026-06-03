@@ -11,6 +11,8 @@ import reflex as rx
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from app.state.finetune_state import FinetuneState
+
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"), override=True)
 
 
@@ -381,19 +383,28 @@ class AppState(rx.State):
 
     @rx.event
     def open_finetune_tab(self):
-        """Open the Fine-tune wizard as a tab. Only one instance at a time."""
+        """Open the Fine-tune wizard as a tab. Only one instance at a time.
+
+        If the user is currently previewing a model, pre-populate Step 1 and
+        advance the wizard to Step 2 so they don't have to pick the model again.
+        """
         existing = next((t for t in self.workspace_tabs if t.tab_type == "finetune"), None)
         if existing:
             self.active_workspace_tab_id = existing.id
-            return
-        ft_tab = WorkspaceTab(
-            id="finetune-main",
-            title="Fine-tune",
-            tab_type="finetune",
-            closeable=True,
-        )
-        self.workspace_tabs = [*self.workspace_tabs, ft_tab]
-        self.active_workspace_tab_id = "finetune-main"
+        else:
+            ft_tab = WorkspaceTab(
+                id="finetune-main",
+                title="Fine-tune",
+                tab_type="finetune",
+                closeable=True,
+            )
+            self.workspace_tabs = [*self.workspace_tabs, ft_tab]
+            self.active_workspace_tab_id = "finetune-main"
+        if self.preview_model_id:
+            return FinetuneState.prefill_model(
+                self.preview_model_id,
+                self.preview_title or self.preview_model_id,
+            )
 
     @rx.event
     def start_editing_tab(self, tab_id: str, current_title: str):

@@ -146,6 +146,10 @@ class ModelRegistryState(rx.State):
     models: list[RegisteredModel] = []
     is_registering: bool = False
     register_error: str = ""
+    register_name: str = ""
+    # Tracks the run_id that was most recently registered successfully.
+    # Empty string means no registration has occurred in this session.
+    registered_run_id: str = ""
 
     @rx.event
     def load_models(self):
@@ -172,6 +176,46 @@ class ModelRegistryState(rx.State):
         self.register_error = ""
         try:
             register_model(name.strip(), run_id, alias="latest", metric_snapshot=metrics)
+        except Exception as exc:
+            self.register_error = str(exc)
+        finally:
+            self.is_registering = False
+        return ModelRegistryState.load_models
+
+    @rx.event
+    def set_register_name(self, value: str):
+        self.register_name = value
+        self.registered_run_id = ""
+        self.register_error = ""
+
+    @rx.event
+    def clear_registration(self):
+        """Reset registration state when a new experiment is started."""
+        self.register_name = ""
+        self.registered_run_id = ""
+        self.register_error = ""
+
+    @rx.event
+    def do_register(self, run_id: str, perplexity: float, final_loss: float):
+        """Register the current run using ``self.register_name``.
+
+        Only snapshots metrics when they are passed in at click-time (not during
+        render), so perplexity will reflect the actual evaluated value.
+        """
+        if not self.register_name.strip():
+            self.register_error = "Model name cannot be empty"
+            return
+        self.is_registering = True
+        self.register_error = ""
+        self.registered_run_id = ""
+        try:
+            register_model(
+                self.register_name.strip(),
+                run_id,
+                alias="latest",
+                metric_snapshot={"perplexity": perplexity, "final_loss": final_loss},
+            )
+            self.registered_run_id = run_id
         except Exception as exc:
             self.register_error = str(exc)
         finally:

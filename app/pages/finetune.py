@@ -393,25 +393,34 @@ def _technique_card(
 def _technique_selector() -> rx.Component:
     return rx.grid(
         _technique_card(
-            "qlora", "QLoRA", "gauge",
+            "qlora",
+            "QLoRA",
+            "gauge",
             "4-bit quantized LoRA adapter — runs on consumer GPUs",
             "~12 GB VRAM · Recommended starting point",
-            False, recommended=True,
+            False,
+            recommended=True,
         ),
         _technique_card(
-            "lora", "LoRA", "layers",
+            "lora",
+            "LoRA",
+            "layers",
             "Full float-16 precision LoRA adapter",
             "~16 GB VRAM for 7B models",
             False,
         ),
         _technique_card(
-            "full", "Full Fine-tune", "server",
+            "full",
+            "Full Fine-tune",
+            "server",
             "All model weights updated end-to-end",
             "~80 GB+ VRAM for 7B models",
             True,
         ),
         _technique_card(
-            "dpo", "DPO", "scale",
+            "dpo",
+            "DPO",
+            "scale",
             "Direct Preference Optimisation (alignment)",
             "Requires ranked preference pairs",
             True,
@@ -1089,9 +1098,7 @@ def _step1_picker() -> rx.Component:
                         rx.button(
                             rx.cond(
                                 FinetuneState.is_validating_model,
-                                rx.hstack(
-                                    rx.spinner(size="1"), rx.text("Checking…"), spacing="2"
-                                ),
+                                rx.hstack(rx.spinner(size="1"), rx.text("Checking…"), spacing="2"),
                                 rx.text("Verify"),
                             ),
                             on_click=FinetuneState.validate_and_select_custom_model,
@@ -1543,37 +1550,40 @@ def _step3() -> rx.Component:
             ("upload", _upload_panel()),
             ("hub_dataset", _hub_dataset_panel()),
             ("generate", _generate_panel()),
-            ("skip", _card(
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("info", size=16, color=c("text_muted")),
-                        rx.text(
-                            "No dataset — continue without data",
-                            font_size="0.95rem",
-                            font_weight="600",
-                            color=c("text_primary"),
+            (
+                "skip",
+                _card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("info", size=16, color=c("text_muted")),
+                            rx.text(
+                                "No dataset — continue without data",
+                                font_size="0.95rem",
+                                font_weight="600",
+                                color=c("text_primary"),
+                            ),
+                            spacing="2",
+                            align="center",
                         ),
-                        spacing="2",
-                        align="center",
-                    ),
-                    rx.text(
-                        "You can proceed to configure and run a training job without uploading data now. "
-                        "This is useful if you want to explore settings, or if your data will be provided "
-                        "directly to the training script at runtime.",
-                        font_size="0.84rem",
-                        color=c("text_secondary"),
-                        line_height="1.6",
-                    ),
-                    rx.callout(
-                        "Training will run with no fine-tuning data — the model weights will not change meaningfully. Add data later for real results.",
-                        icon="triangle-alert",
-                        color_scheme="orange",
-                        size="1",
-                    ),
-                    spacing="3",
-                    width="100%",
-                )
-            )),
+                        rx.text(
+                            "You can proceed to configure and run a training job without uploading data now. "
+                            "This is useful if you want to explore settings, or if your data will be provided "
+                            "directly to the training script at runtime.",
+                            font_size="0.84rem",
+                            color=c("text_secondary"),
+                            line_height="1.6",
+                        ),
+                        rx.callout(
+                            "Training will run with no fine-tuning data — the model weights will not change meaningfully. Add data later for real results.",
+                            icon="triangle-alert",
+                            color_scheme="orange",
+                            size="1",
+                        ),
+                        spacing="3",
+                        width="100%",
+                    )
+                ),
+            ),
             _upload_panel(),
         ),
         _nav_buttons(
@@ -2252,9 +2262,7 @@ def _step6() -> rx.Component:
                         rx.button(
                             rx.cond(
                                 ModelRegistryState.is_registering,
-                                rx.hstack(
-                                    rx.spinner(size="2"), rx.text("Saving…"), spacing="2"
-                                ),
+                                rx.hstack(rx.spinner(size="2"), rx.text("Saving…"), spacing="2"),
                                 rx.text("Register"),
                             ),
                             on_click=ModelRegistryState.do_register(
@@ -2326,9 +2334,7 @@ def _step6() -> rx.Component:
                                     rx.table.cell(rx.text(r.name, font_size="0.8rem")),
                                     rx.table.cell(rx.text(r.model_id, font_size="0.8rem")),
                                     rx.table.cell(rx.text(r.technique, font_size="0.8rem")),
-                                    rx.table.cell(
-                                        rx.text(r.learning_rate, font_size="0.8rem")
-                                    ),
+                                    rx.table.cell(rx.text(r.learning_rate, font_size="0.8rem")),
                                     rx.table.cell(
                                         rx.text(r.lora_r.to_string(), font_size="0.8rem")
                                     ),
@@ -2768,9 +2774,7 @@ def _workspace_header() -> rx.Component:
                 variant=rx.cond(FinetuneState.training_status == "done", "solid", "soft"),
                 size="2",
                 opacity=rx.cond(FinetuneState.training_status == "done", "1", "0.45"),
-                cursor=rx.cond(
-                    FinetuneState.training_status == "done", "pointer", "not-allowed"
-                ),
+                cursor=rx.cond(FinetuneState.training_status == "done", "pointer", "not-allowed"),
             ),
             width="100%",
             align="center",
@@ -3573,9 +3577,7 @@ def _step6_panel() -> rx.Component:
                             ),
                             rx.cond(
                                 FinetuneState.chat_error != "",
-                                rx.callout(
-                                    FinetuneState.chat_error, color_scheme="red", size="1"
-                                ),
+                                rx.callout(FinetuneState.chat_error, color_scheme="red", size="1"),
                                 rx.fragment(),
                             ),
                             spacing="3",
@@ -3664,8 +3666,7 @@ def _step6_panel() -> rx.Component:
                                         rx.hstack(
                                             rx.icon("circle-check", size=14),
                                             rx.text(
-                                                "Registered as "
-                                                + ModelRegistryState.register_name
+                                                "Registered as " + ModelRegistryState.register_name
                                             ),
                                             spacing="2",
                                         ),
@@ -3705,16 +3706,12 @@ def _step6_panel() -> rx.Component:
                                         rx.foreach(
                                             ExperimentState.completed_runs,
                                             lambda r: rx.table.row(
-                                                rx.table.cell(
-                                                    rx.text(r.name, font_size="0.78rem")
-                                                ),
+                                                rx.table.cell(rx.text(r.name, font_size="0.78rem")),
                                                 rx.table.cell(
                                                     rx.text(r.technique, font_size="0.78rem")
                                                 ),
                                                 rx.table.cell(
-                                                    rx.text(
-                                                        r.learning_rate, font_size="0.78rem"
-                                                    )
+                                                    rx.text(r.learning_rate, font_size="0.78rem")
                                                 ),
                                                 rx.table.cell(
                                                     rx.text(

@@ -2795,14 +2795,19 @@ def _workspace_header() -> rx.Component:
 def _sidebar_icon(step_num: int, icon_name: str, tooltip: str, gated: bool = False) -> rx.Component:
     is_active = FinetuneState.current_step == step_num
     is_done = FinetuneState.current_step > step_num
+    # Use rx.cond(gated, False, <var>) instead of <var> & ~gated to avoid
+    # ~False == -1 (Python bitwise NOT on a plain bool default) corrupting
+    # Reflex Var boolean expressions.
+    show_check = rx.cond(gated, False, is_done)
+    show_active_color = rx.cond(gated, False, is_active)
     return rx.box(
         rx.cond(
-            is_done & ~gated,
+            show_check,
             rx.icon("check", size=15, color=c("success")),
             rx.icon(
                 icon_name,
                 size=15,
-                color=rx.cond(is_active & ~gated, "white", c("text_muted")),
+                color=rx.cond(show_active_color, "white", c("text_muted")),
             ),
         ),
         title=tooltip,

@@ -389,6 +389,8 @@ class FinetuneState(rx.State):
 
     @rx.var
     def dataset_name(self) -> str:
+        if self.data_source == "skip":
+            return "None (skipped)"
         if self.data_source == "hub_dataset":
             return self.hub_dataset_id
         if self.dataset_filename:
@@ -630,7 +632,7 @@ class FinetuneState(rx.State):
     async def fetch_model_info(self):
         """Fetch live metadata from HF Hub API and populate extended preview fields."""
         async with self:
-            model_id = self.selected_model_id
+            model_id = self.selected_model_id  # snapshot; used to discard stale responses
             token = self.hf_token
         if not model_id or "/" not in model_id:
             return
@@ -756,6 +758,9 @@ class FinetuneState(rx.State):
             last_mod = (data.get("lastModified") or "")[:10]
 
             async with self:
+                # Discard if the user selected a different model while we were fetching
+                if self.selected_model_id != model_id:
+                    return
                 self.model_downloads = (
                     (
                         f"{dl / 1_000_000:.1f}M"
@@ -776,16 +781,16 @@ class FinetuneState(rx.State):
                 self.model_last_updated = last_mod
                 self.model_bio = bio
                 self.model_fetch_error = ""
+                self.is_fetching_model_info = False
         except Exception as _exc:
             import traceback
 
             _tb = traceback.format_exc()
             print("fetch_model_info ERROR:", _tb)
             async with self:
-                self.model_fetch_error = str(_exc)
-        finally:
-            async with self:
-                self.is_fetching_model_info = False
+                if self.selected_model_id == model_id:
+                    self.model_fetch_error = str(_exc)
+                    self.is_fetching_model_info = False
 
     async def handle_local_model_upload(self, files: list[rx.UploadFile]):
         self.is_validating_model = True
@@ -825,6 +830,10 @@ class FinetuneState(rx.State):
     @rx.event
     def set_data_source(self, source: str):
         self.data_source = source
+        if source == "skip":
+            self.dataset_path = ""
+            self.dataset_filename = ""
+            self.dataset_error = ""
 
     @rx.event
     def set_hub_dataset_id(self, dataset_id: str):
@@ -1142,7 +1151,9 @@ class FinetuneState(rx.State):
             "model_source": self.model_source,
             "local_model_path": self.local_model_path,
             "hf_token": self.hf_token,
-            "dataset_path": self.dataset_path if self.data_source != "hub_dataset" else "",
+            "dataset_path": self.dataset_path
+            if self.data_source not in ("hub_dataset", "skip")
+            else "",
             "hub_dataset_id": self.hub_dataset_id if self.data_source == "hub_dataset" else "",
             "hub_dataset_split": self.hub_dataset_split,
             "instruction_col": self.hub_dataset_instruction_col,

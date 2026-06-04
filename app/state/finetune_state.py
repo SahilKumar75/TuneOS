@@ -69,22 +69,78 @@ _PRESET_META: dict[str, dict[str, str]] = {
 # `logo` is the Clearbit CDN URL for a clean official logo.
 # Clearbit provides 128px PNGs of official company marks — consistent, well-cropped.
 _ORG_META: dict[str, dict[str, str]] = {
-    "mistralai":    {"initial": "Mi", "color": "#FF7000", "logo": "https://github.com/mistralai.png?size=128"},
-    "meta-llama":   {"initial": "M",  "color": "#0668E1", "logo": "https://github.com/meta-llama.png?size=128"},
-    "microsoft":    {"initial": "Ms", "color": "#00A4EF", "logo": "https://github.com/microsoft.png?size=128"},
-    "google":       {"initial": "G",  "color": "#4285F4", "logo": "https://github.com/google.png?size=128"},
-    "eleutherai":   {"initial": "EA", "color": "#6E40C9", "logo": "https://github.com/EleutherAI.png?size=128"},
-    "bigcode":      {"initial": "BC", "color": "#0EA5E9", "logo": "https://github.com/bigcode-project.png?size=128"},
-    "huggingface":  {"initial": "HF", "color": "#FF9D00", "logo": "https://github.com/huggingface.png?size=128"},
-    "stabilityai":  {"initial": "SA", "color": "#6366F1", "logo": "https://github.com/Stability-AI.png?size=128"},
-    "tiiuae":       {"initial": "FA", "color": "#059669", "logo": "https://github.com/tiiuae.png?size=128"},
-    "qwen":         {"initial": "Q",  "color": "#7C3AED", "logo": "https://github.com/QwenLM.png?size=128"},
-    "cohere":       {"initial": "Co", "color": "#39594D", "logo": "https://github.com/cohere-ai.png?size=128"},
-    "openai":       {"initial": "Oa", "color": "#10A37F", "logo": "https://github.com/openai.png?size=128"},
-    "nvidia":       {"initial": "Nv", "color": "#76B900", "logo": "https://github.com/NVIDIA.png?size=128"},
-    "apple":        {"initial": "Ap", "color": "#555555", "logo": "https://github.com/apple.png?size=128"},
-    "deepmind":     {"initial": "DM", "color": "#4285F4", "logo": "https://github.com/google-deepmind.png?size=128"},
-    "anthropic":    {"initial": "An", "color": "#C97E45", "logo": "https://github.com/anthropics.png?size=128"},
+    "mistralai": {
+        "initial": "Mi",
+        "color": "#FF7000",
+        "logo": "https://github.com/mistralai.png?size=128",
+    },
+    "meta-llama": {
+        "initial": "M",
+        "color": "#0668E1",
+        "logo": "https://github.com/meta-llama.png?size=128",
+    },
+    "microsoft": {
+        "initial": "Ms",
+        "color": "#00A4EF",
+        "logo": "https://github.com/microsoft.png?size=128",
+    },
+    "google": {
+        "initial": "G",
+        "color": "#4285F4",
+        "logo": "https://github.com/google.png?size=128",
+    },
+    "eleutherai": {
+        "initial": "EA",
+        "color": "#6E40C9",
+        "logo": "https://github.com/EleutherAI.png?size=128",
+    },
+    "bigcode": {
+        "initial": "BC",
+        "color": "#0EA5E9",
+        "logo": "https://github.com/bigcode-project.png?size=128",
+    },
+    "huggingface": {
+        "initial": "HF",
+        "color": "#FF9D00",
+        "logo": "https://github.com/huggingface.png?size=128",
+    },
+    "stabilityai": {
+        "initial": "SA",
+        "color": "#6366F1",
+        "logo": "https://github.com/Stability-AI.png?size=128",
+    },
+    "tiiuae": {
+        "initial": "FA",
+        "color": "#059669",
+        "logo": "https://github.com/tiiuae.png?size=128",
+    },
+    "qwen": {"initial": "Q", "color": "#7C3AED", "logo": "https://github.com/QwenLM.png?size=128"},
+    "cohere": {
+        "initial": "Co",
+        "color": "#39594D",
+        "logo": "https://github.com/cohere-ai.png?size=128",
+    },
+    "openai": {
+        "initial": "Oa",
+        "color": "#10A37F",
+        "logo": "https://github.com/openai.png?size=128",
+    },
+    "nvidia": {
+        "initial": "Nv",
+        "color": "#76B900",
+        "logo": "https://github.com/NVIDIA.png?size=128",
+    },
+    "apple": {"initial": "Ap", "color": "#555555", "logo": "https://github.com/apple.png?size=128"},
+    "deepmind": {
+        "initial": "DM",
+        "color": "#4285F4",
+        "logo": "https://github.com/google-deepmind.png?size=128",
+    },
+    "anthropic": {
+        "initial": "An",
+        "color": "#C97E45",
+        "logo": "https://github.com/anthropics.png?size=128",
+    },
 }
 
 
@@ -144,12 +200,12 @@ class FinetuneState(rx.State):
     model_likes: str = ""
     model_pipeline: str = ""
     model_hf_tags: list[str] = []
-    model_context_window: str = ""   # max_position_embeddings from config
-    model_type_hf: str = ""          # model_type from config (gemma, llama, etc.)
-    model_languages: str = ""        # comma-joined language codes
-    model_last_updated: str = ""     # ISO date string from lastModified
-    model_bio: str = ""              # first paragraph from model README
-    model_fetch_error: str = ""      # debug: last error from fetch_model_info
+    model_context_window: str = ""  # max_position_embeddings from config
+    model_type_hf: str = ""  # model_type from config (gemma, llama, etc.)
+    model_languages: str = ""  # comma-joined language codes
+    model_last_updated: str = ""  # ISO date string from lastModified
+    model_bio: str = ""  # first paragraph from model README
+    model_fetch_error: str = ""  # debug: last error from fetch_model_info
     is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
@@ -262,6 +318,7 @@ class FinetuneState(rx.State):
             )
             or (self.data_source == "hub_dataset" and bool(self.hub_dataset_id))
             or (self.data_source == "generate" and bool(self.dataset_path))
+            or self.data_source == "skip"
         )
         return has_data
 
@@ -332,6 +389,8 @@ class FinetuneState(rx.State):
 
     @rx.var
     def dataset_name(self) -> str:
+        if self.data_source == "skip":
+            return "None (skipped)"
         if self.data_source == "hub_dataset":
             return self.hub_dataset_id
         if self.dataset_filename:
@@ -447,6 +506,8 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
+        self._clear_model_preview()
+        return FinetuneState.fetch_model_info
 
     @rx.event
     def select_model(self, model_id: str, model_name: str):
@@ -456,6 +517,8 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
+        self._clear_model_preview()
+        return FinetuneState.fetch_model_info
 
     def _clear_model_preview(self):
         self.model_downloads = ""
@@ -493,7 +556,7 @@ class FinetuneState(rx.State):
             "huggingface.co/",
         ):
             if cleaned.startswith(prefix):
-                slug = cleaned[len(prefix):].rstrip("/")
+                slug = cleaned[len(prefix) :].rstrip("/")
                 parts = slug.split("/")
                 cleaned = "/".join(parts[:2]) if len(parts) >= 2 else slug
                 break
@@ -569,7 +632,7 @@ class FinetuneState(rx.State):
     async def fetch_model_info(self):
         """Fetch live metadata from HF Hub API and populate extended preview fields."""
         async with self:
-            model_id = self.selected_model_id
+            model_id = self.selected_model_id  # snapshot; used to discard stale responses
             token = self.hf_token
         if not model_id or "/" not in model_id:
             return
@@ -578,6 +641,7 @@ class FinetuneState(rx.State):
         try:
             headers = {"Authorization": f"Bearer {token}"} if token else {}
             _SKIP_STARTS = ("#", "!", "[", "<", "|", "*", "-", ">", "_", ":")
+
             def _is_prose(line: str) -> bool:
                 s = line.strip()
                 return (
@@ -608,15 +672,36 @@ class FinetuneState(rx.State):
                         if readme.startswith("---"):
                             end = readme.find("---", 3)
                             if end != -1:
-                                readme = readme[end + 3:].strip()
+                                readme = readme[end + 3 :].strip()
                         lines = readme.split("\n")
-                        # Pass 1: first prose line after a description/about/overview heading
+
+                        def _collect_paragraph(start_idx: int) -> str:
+                            """Join consecutive non-empty prose lines into one paragraph."""
+                            parts = []
+                            for ln in lines[start_idx:]:
+                                s = ln.strip()
+                                if not s:
+                                    if parts:
+                                        break  # blank line ends the paragraph
+                                    continue
+                                if s.startswith("#"):
+                                    break
+                                parts.append(s)
+                            return " ".join(parts)
+
+                        # Pass 1: paragraph after a description/about/overview heading
                         in_desc = False
-                        for line in lines:
+                        for idx, line in enumerate(lines):
                             stripped = line.strip()
                             if stripped.startswith("#") and any(
                                 kw in stripped.lower()
-                                for kw in ("description", "about", "overview", "introduction", "summary")
+                                for kw in (
+                                    "description",
+                                    "about",
+                                    "overview",
+                                    "introduction",
+                                    "summary",
+                                )
                             ):
                                 in_desc = True
                                 continue
@@ -624,26 +709,37 @@ class FinetuneState(rx.State):
                                 if stripped.startswith("#"):
                                     break
                                 if _is_prose(stripped):
-                                    bio = stripped[:300] + ("…" if len(stripped) > 300 else "")
+                                    para = _collect_paragraph(idx)
+                                    bio = para[:900] + ("…" if len(para) > 900 else "")
                                     break
-                        # Pass 2: fall back to first substantial prose line anywhere
+                        # Pass 2: fall back to first substantial prose paragraph anywhere
                         if not bio:
-                            for line in lines:
+                            for idx, line in enumerate(lines):
                                 if _is_prose(line.strip()):
-                                    bio = line.strip()[:300] + ("…" if len(line.strip()) > 300 else "")
+                                    para = _collect_paragraph(idx)
+                                    bio = para[:900] + ("…" if len(para) > 900 else "")
                                     break
                 except Exception:
                     pass
 
-            dl    = data.get("downloads", 0) or 0
+            dl = data.get("downloads", 0) or 0
             likes = data.get("likes", 0) or 0
             pipeline = (data.get("pipeline_tag") or "").replace("-", " ").title()
 
             # Useful capability tags only
             keep = {
-                "text-generation", "conversational", "code", "summarization",
-                "translation", "question-answering", "fill-mask", "rlhf",
-                "instruction-tuned", "chat", "fine-tuned", "causal-lm",
+                "text-generation",
+                "conversational",
+                "code",
+                "summarization",
+                "translation",
+                "question-answering",
+                "fill-mask",
+                "rlhf",
+                "instruction-tuned",
+                "chat",
+                "fine-tuned",
+                "causal-lm",
             }
             raw_tags = data.get("tags") or []
             tags = [t for t in raw_tags if t.lower() in keep][:4]
@@ -662,11 +758,20 @@ class FinetuneState(rx.State):
             last_mod = (data.get("lastModified") or "")[:10]
 
             async with self:
+                # Discard if the user selected a different model while we were fetching
+                if self.selected_model_id != model_id:
+                    return
                 self.model_downloads = (
-                    f"{dl / 1_000_000:.1f}M" if dl >= 1_000_000
-                    else f"{dl // 1_000}k" if dl >= 1_000
-                    else str(dl)
-                ) if dl else ""
+                    (
+                        f"{dl / 1_000_000:.1f}M"
+                        if dl >= 1_000_000
+                        else f"{dl // 1_000}k"
+                        if dl >= 1_000
+                        else str(dl)
+                    )
+                    if dl
+                    else ""
+                )
                 self.model_likes = str(likes) if likes else ""
                 self.model_pipeline = pipeline
                 self.model_hf_tags = tags
@@ -676,15 +781,16 @@ class FinetuneState(rx.State):
                 self.model_last_updated = last_mod
                 self.model_bio = bio
                 self.model_fetch_error = ""
+                self.is_fetching_model_info = False
         except Exception as _exc:
             import traceback
+
             _tb = traceback.format_exc()
             print("fetch_model_info ERROR:", _tb)
             async with self:
-                self.model_fetch_error = str(_exc)
-        finally:
-            async with self:
-                self.is_fetching_model_info = False
+                if self.selected_model_id == model_id:
+                    self.model_fetch_error = str(_exc)
+                    self.is_fetching_model_info = False
 
     async def handle_local_model_upload(self, files: list[rx.UploadFile]):
         self.is_validating_model = True
@@ -724,6 +830,10 @@ class FinetuneState(rx.State):
     @rx.event
     def set_data_source(self, source: str):
         self.data_source = source
+        if source == "skip":
+            self.dataset_path = ""
+            self.dataset_filename = ""
+            self.dataset_error = ""
 
     @rx.event
     def set_hub_dataset_id(self, dataset_id: str):
@@ -1041,7 +1151,9 @@ class FinetuneState(rx.State):
             "model_source": self.model_source,
             "local_model_path": self.local_model_path,
             "hf_token": self.hf_token,
-            "dataset_path": self.dataset_path if self.data_source != "hub_dataset" else "",
+            "dataset_path": self.dataset_path
+            if self.data_source not in ("hub_dataset", "skip")
+            else "",
             "hub_dataset_id": self.hub_dataset_id if self.data_source == "hub_dataset" else "",
             "hub_dataset_split": self.hub_dataset_split,
             "instruction_col": self.hub_dataset_instruction_col,

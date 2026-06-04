@@ -77,9 +77,7 @@ def test_init_db_creates_tables(tmp_path, monkeypatch):
     with db._get_conn() as conn:
         tables = {
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
     assert {"runs", "run_metrics", "run_params", "registered_models"}.issubset(tables)
 

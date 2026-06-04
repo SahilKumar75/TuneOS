@@ -513,7 +513,7 @@ def _step1_confirm() -> rx.Component:
     return rx.vstack(
         # ── Current model preview ──────────────────────────────────
         rx.cond(
-            FinetuneState.selected_model_id != "",
+            FinetuneState.effective_model_id != "",
             rx.box(
                 rx.vstack(
                     # Section label row
@@ -2792,17 +2792,17 @@ def _workspace_header() -> rx.Component:
 
 
 # ── Workspace sidebar ─────────────────────────────────────────────
-def _sidebar_icon(step_num: int, icon_name: str, tooltip: str) -> rx.Component:
+def _sidebar_icon(step_num: int, icon_name: str, tooltip: str, gated: bool = False) -> rx.Component:
     is_active = FinetuneState.current_step == step_num
     is_done = FinetuneState.current_step > step_num
     return rx.box(
         rx.cond(
-            is_done,
+            is_done & ~gated,
             rx.icon("check", size=15, color=c("success")),
             rx.icon(
                 icon_name,
                 size=15,
-                color=rx.cond(is_active, "white", c("text_muted")),
+                color=rx.cond(is_active & ~gated, "white", c("text_muted")),
             ),
         ),
         title=tooltip,
@@ -2810,26 +2810,36 @@ def _sidebar_icon(step_num: int, icon_name: str, tooltip: str) -> rx.Component:
         height="36px",
         border_radius="10px",
         background=rx.cond(
-            is_active,
-            c("accent"),
-            rx.cond(is_done, c("accent_soft"), "transparent"),
+            gated,
+            "transparent",
+            rx.cond(
+                is_active,
+                c("accent"),
+                rx.cond(is_done, c("accent_soft"), "transparent"),
+            ),
         ),
         display="flex",
         align_items="center",
         justify_content="center",
-        cursor="pointer",
-        on_click=FinetuneState.go_to_step(step_num),
-        _hover={"background": rx.cond(is_active, c("accent"), c("bg_input"))},
-        transition="background 0.15s ease",
+        cursor=rx.cond(gated, "not-allowed", "pointer"),
+        opacity=rx.cond(gated, "0.35", "1"),
+        on_click=rx.cond(gated, rx.prevent_default, FinetuneState.go_to_step(step_num)),
+        _hover={
+            "background": rx.cond(
+                gated, "transparent", rx.cond(is_active, c("accent"), c("bg_input"))
+            )
+        },
+        transition="background 0.15s ease, opacity 0.15s ease",
     )
 
 
 def _workspace_sidebar() -> rx.Component:
+    training_done = FinetuneState.training_status == "done"
     return rx.vstack(
         _sidebar_icon(4, "settings-2", "Configure"),
         _sidebar_icon(5, "activity", "Training"),
-        _sidebar_icon(6, "bar-chart-2", "Results"),
-        _sidebar_icon(7, "cloud-upload", "Deploy"),
+        _sidebar_icon(6, "bar-chart-2", "Results", gated=~training_done),
+        _sidebar_icon(7, "cloud-upload", "Deploy", gated=~training_done),
         spacing="2",
         align="center",
         padding="16px 6px",
@@ -3784,7 +3794,19 @@ def _step7_workspace_panel() -> rx.Component:
                 align_self="flex-start",
                 margin_bottom="4px",
             ),
-            _step7(),
+            # Guard: no completed training run yet
+            rx.cond(
+                FinetuneState.training_status != "done",
+                rx.callout(
+                    "Training must complete before you can deploy. "
+                    "Start training from the Configure panel.",
+                    icon="info",
+                    color_scheme="amber",
+                    size="2",
+                    width="100%",
+                ),
+                _step7(),
+            ),
             spacing="0",
             width="100%",
             align_items="flex-start",

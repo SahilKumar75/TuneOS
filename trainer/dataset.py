@@ -28,18 +28,15 @@ def _validate_columns(available: list[str], instruction_col: str, output_col: st
         raise ValueError(f"Output column '{output_col}' not found. Available columns: {available}")
 
 
-def load_and_tokenize(
+def _load_raw(
     file_path: str,
-    tokenizer: PreTrainedTokenizer,
-    max_seq_length: int = 512,
     hub_dataset_id: str = "",
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
 ) -> Dataset:
-    """
-    Load from a local file or HF Hub dataset, apply column mapping,
-    format as instruction prompts, and tokenize.
+    """Load and validate the raw dataset, normalising columns to
+    ``instruction`` / ``output``. Shared by tokenization and reference eval.
 
     Column presence is validated as early as possible — on the raw pandas/dict
     for local files — so an invalid request fails fast before a (potentially
@@ -70,6 +67,47 @@ def load_and_tokenize(
         raw = raw.rename_column(instruction_col, "instruction")
     if output_col != "output" and output_col in raw.column_names:
         raw = raw.rename_column(output_col, "output")
+    return raw
+
+
+def load_instruction_pairs(
+    file_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+) -> Dataset:
+    """Return the raw dataset with ``instruction``/``output`` text columns, for
+    generating predictions and computing reference metrics (ROUGE/BLEU)."""
+    return _load_raw(
+        file_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
+    )
+
+
+def load_and_tokenize(
+    file_path: str,
+    tokenizer: PreTrainedTokenizer,
+    max_seq_length: int = 512,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+) -> Dataset:
+    """
+    Load from a local file or HF Hub dataset, apply column mapping,
+    format as instruction prompts, and tokenize.
+    """
+    raw = _load_raw(
+        file_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
+    )
 
     raw = raw.map(lambda x: {"text": format_prompt(x)})
     tokenized = raw.map(

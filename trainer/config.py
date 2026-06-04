@@ -88,3 +88,9 @@ class TrainingConfig:
     resume_from_checkpoint: str | bool | None = None
     # Metrics computed post-training; names must exist in trainer.metrics.REGISTRY.
     eval_metrics: list[str] | None = None
+    # Seed for every source of randomness (split, data shuffle, init) so runs are
+    # reproducible — the precondition for experiment tracking to be meaningful.
+    seed: int = 42
+    # Opt-in PyTorch 2.0 compilation of the model for faster training. Off by
+    # default so CPU/CI and GPUs without a working dynamo backend are unaffected.
+    use_torch_compile: bool = False

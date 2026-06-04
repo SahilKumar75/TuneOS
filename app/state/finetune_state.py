@@ -12,7 +12,11 @@ import httpx
 import reflex as rx
 from pydantic import BaseModel
 
-from app.state.experiment_state import ExperimentState, save_experiment_run
+from app.state.experiment_state import (
+    ExperimentState,
+    save_experiment_run,
+    save_final_metrics,
+)
 
 _PRESET_META: dict[str, dict[str, str]] = {
     "mistralai/Mistral-7B-v0.1": {
@@ -274,6 +278,7 @@ class FinetuneState(rx.State):
     # ── Step 6: Results ───────────────────────────────────────────
     eval_perplexity: float = 0.0
     eval_bleu: float = 0.0
+    eval_rouge1: float = 0.0
     eval_status: str = "idle"  # idle | running | done | error | not_ready
     test_chat_history: list[ChatMessage] = []
     chat_input: str = ""
@@ -1316,6 +1321,10 @@ class FinetuneState(rx.State):
                         self.eval_status = "done"
                         ppl = data.get("perplexity")
                         self.eval_perplexity = float(ppl) if ppl is not None else 0.0
+                        rouge1 = data.get("rouge1")
+                        self.eval_rouge1 = float(rouge1) if rouge1 is not None else 0.0
+                        bleu = data.get("bleu")
+                        self.eval_bleu = float(bleu) if bleu is not None else 0.0
                     return
             except Exception:
                 pass
@@ -1347,6 +1356,11 @@ class FinetuneState(rx.State):
                 "output_path": self.output_path,
                 "loss_history": [pt.model_dump() for pt in self.loss_history],
             }
+        )
+        # Persist reference metrics (ROUGE-1/BLEU) for run comparison.
+        save_final_metrics(
+            self.experiment_id,
+            {"rouge1": self.eval_rouge1, "bleu": self.eval_bleu},
         )
         async with self:
             pass

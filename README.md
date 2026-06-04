@@ -38,10 +38,11 @@ The application ships in two forms from one codebase:
 
 | Domain | Description |
 | --- | --- |
-| Parameter-efficient fine-tuning | LoRA and QLoRA training via PyTorch, PEFT, and TRL, executed locally or on a dedicated worker. |
+| Parameter-efficient fine-tuning | LoRA and QLoRA training via PyTorch, PEFT, and TRL, executed locally or on a dedicated worker. Optional `torch.compile()` acceleration. |
+| Reproducible runs | A single configurable seed drives the train/validation split, data shuffling, and initialization, so a run can be reproduced exactly. |
 | Dataset preparation | Generate, format, and validate instruction and chat datasets prior to training. |
 | Model conversion | Convert weights between Hugging Face, SafeTensors, and GGUF formats for downstream inference engines. |
-| Training analysis | Track loss curves, evaluation metrics, and run history in real time. |
+| Training analysis | Track training and validation loss curves plus held-out metrics (perplexity, ROUGE-1, BLEU) and run history in real time. |
 | Experiment tracking | Persist every fine-tuning run (hyperparameters, loss history, metrics) in a local SQLite database, with comparison and filtering across runs. |
 | Model deployment | Download adapter weights, push to Hugging Face Hub or GitHub, export to GGUF, and test the fine-tuned model via a built-in inference chat. |
 | Model inspection | Explore architecture, tokenization behavior, and configuration of any supported checkpoint. |

@@ -59,9 +59,14 @@ def _run_finetune_impl(
 
         # Evaluate on a 20% random sample of the training data
         try:
-            from trainer.dataset import load_and_tokenize
-            from trainer.evaluate import evaluate_model
+            from trainer.dataset import load_and_tokenize, load_instruction_pairs
+            from trainer.evaluate import (
+                evaluate_model,
+                evaluate_references,
+                generate_predictions,
+            )
 
+            seed = TrainingConfig(**train_cfg).seed
             full_dataset = load_and_tokenize(
                 dataset_path,
                 tokenizer,
@@ -72,12 +77,37 @@ def _run_finetune_impl(
                 output_col=output_col,
             )
             n_eval = max(1, int(0.2 * len(full_dataset)))
-            eval_sample = full_dataset.shuffle(seed=42).select(range(n_eval))
+            eval_sample = full_dataset.shuffle(seed=seed).select(range(n_eval))
             eval_results = evaluate_model(model, tokenizer, eval_sample)
+
+            # Reference metrics (ROUGE-1/BLEU) need generated predictions vs. the
+            # raw reference text. Sample the same indices from the raw pairs.
+            try:
+                raw_pairs = load_instruction_pairs(
+                    dataset_path,
+                    hub_dataset_id=hub_dataset_id,
+                    hub_split=hub_split,
+                    instruction_col=instruction_col,
+                    output_col=output_col,
+                )
+                n_ref = min(len(raw_pairs), 32)
+                ref_sample = raw_pairs.shuffle(seed=seed).select(range(n_ref))
+                instructions = [row["instruction"] for row in ref_sample]
+                references = [row["output"] for row in ref_sample]
+                predictions = generate_predictions(model, tokenizer, instructions)
+                eval_results.update(evaluate_references(predictions, references))
+            except Exception:
+                # Reference metrics are best-effort; never let them break eval.
+                eval_results.setdefault("rouge1", None)
+                eval_results.setdefault("bleu", None)
+
             r.set(f"job:{job_id}:eval", json.dumps(eval_results))
         except Exception:
             # Eval failure must not fail the whole job
-            r.set(f"job:{job_id}:eval", json.dumps({"perplexity": None, "bleu": None}))
+            r.set(
+                f"job:{job_id}:eval",
+                json.dumps({"perplexity": None, "rouge1": None, "bleu": None}),
+            )
 
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart

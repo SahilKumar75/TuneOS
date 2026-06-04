@@ -87,6 +87,8 @@ async def create_job(config: JobConfig):
         "eval_split_ratio": config.eval_split_ratio,
         "early_stopping_patience": config.early_stopping_patience,
         "resume_from_checkpoint": config.resume_from_checkpoint or None,
+        "seed": config.seed,
+        "use_torch_compile": config.use_torch_compile,
     }
 
     try:

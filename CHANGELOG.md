@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reproducible runs via a configurable seed.** `TrainingConfig.seed` (default
+  `42`) now drives every source of randomness — the train/validation split,
+  data shuffling, and weight initialization — through `transformers.set_seed`
+  and `TrainingArguments(seed=, data_seed=)`. The seed is persisted with each
+  run's hyperparameters, so any run can be reproduced exactly. Previously the
+  seed was hardcoded in two places with no user control.
+- **Optional `torch.compile()` acceleration.** `TrainingConfig.use_torch_compile`
+  (default `False`) enables PyTorch 2.0 compilation via
+  `TrainingArguments(torch_compile=...)` for faster training on supported GPUs.
+  Off by default so CPU/CI and unsupported backends are unaffected.
+- **Reference metrics (ROUGE-1 / BLEU) in results.** After training, the worker
+  generates predictions on the held-out evaluation sample and computes ROUGE-1
+  and BLEU against the reference outputs (via the new
+  `trainer.evaluate.generate_predictions` and
+  `trainer.dataset.load_instruction_pairs`). Step 6 (Results) now shows ROUGE-1
+  and BLEU tiles alongside perplexity, and the metrics are persisted per run
+  (`save_final_metrics`) for cross-run comparison.
 - **Register button wired (Phase 4).** Step 6 (Results) now shows a "Register to
   model registry" card when training completes. Users type a name and click
   **Register** — the run is stored via `ModelRegistryState.do_register`, wiring

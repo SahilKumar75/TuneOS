@@ -55,7 +55,9 @@ Creates and enqueues a fine-tuning job.
   "max_seq_length": 512,
   "eval_split_ratio": 0.1,
   "early_stopping_patience": 0,
-  "resume_from_checkpoint": ""
+  "resume_from_checkpoint": "",
+  "seed": 42,
+  "use_torch_compile": false
 }
 ```
 LoRA `target_modules` are auto-detected from the model architecture, so they
@@ -68,6 +70,12 @@ Phase 2 training controls:
 | `eval_split_ratio` | `0.1` | Fraction of the dataset held out for in-training validation. `0` disables the eval loop. |
 | `early_stopping_patience` | `0` | Stop after this many evals with no `eval_loss` improvement. `0` disables early stopping. Requires a non-zero `eval_split_ratio`. |
 | `resume_from_checkpoint` | `""` | Path to a checkpoint dir to resume from; empty starts fresh. |
+| `seed` | `42` | Seeds the train/validation split, data shuffling, and initialization so a run is reproducible. Persisted with the run's hyperparameters. |
+| `use_torch_compile` | `false` | Enables PyTorch 2.0 `torch.compile()` for faster training on supported GPUs. |
+
+After training, the held-out evaluation sample is scored for **perplexity**,
+**ROUGE-1**, and **BLEU**; these surface in Step 6 (Results) and are persisted
+per run for cross-run comparison.
 
 If training hits a CUDA out-of-memory error, the job status reports
 `status: "failed"` with a `suggestion` field describing how to reduce memory.

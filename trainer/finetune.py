@@ -1,6 +1,6 @@
 import os
 
-from transformers import EarlyStoppingCallback, TrainingArguments
+from transformers import EarlyStoppingCallback, TrainingArguments, set_seed
 from trl import SFTTrainer
 
 from trainer.callbacks import RedisLossCallback
@@ -49,6 +49,9 @@ def finetune(
 
     Raises OutOfMemoryError with a remediation hint if training hits GPU OOM.
     """
+    # Seed every source of randomness up front so the run is reproducible.
+    set_seed(train_cfg.seed)
+
     # 1. Prepare model
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
@@ -67,7 +70,7 @@ def finetune(
     ratio = train_cfg.eval_split_ratio
     # Only split if a meaningful validation set (>=1 example) can be carved out.
     if ratio and 0.0 < ratio < 1.0 and len(dataset) >= 2 and int(len(dataset) * ratio) >= 1:
-        split = dataset.train_test_split(test_size=ratio, seed=42)
+        split = dataset.train_test_split(test_size=ratio, seed=train_cfg.seed)
         dataset, eval_dataset = split["train"], split["test"]
 
     use_early_stopping = bool(train_cfg.early_stopping_patience) and eval_dataset is not None
@@ -93,6 +96,9 @@ def finetune(
         max_grad_norm=train_cfg.max_grad_norm,
         report_to="none",  # disable external experiment trackers by default
         gradient_checkpointing=True,
+        seed=train_cfg.seed,
+        data_seed=train_cfg.seed,
+        torch_compile=train_cfg.use_torch_compile,
         eval_strategy=eval_strategy,
         save_strategy=save_strategy,
         load_best_model_at_end=use_early_stopping,

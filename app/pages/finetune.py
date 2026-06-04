@@ -2104,6 +2104,32 @@ def _step6() -> rx.Component:
                             spacing="0",
                         ),
                         rx.vstack(
+                            rx.text("ROUGE-1", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.eval_rouge1.to_string(),
+                                font_size="1.8rem",
+                                font_weight="700",
+                                color=c("accent"),
+                            ),
+                            rx.text(
+                                "Higher is better", font_size="0.7rem", color=c("text_muted")
+                            ),
+                            spacing="0",
+                        ),
+                        rx.vstack(
+                            rx.text("BLEU", font_size="0.72rem", color=c("text_muted")),
+                            rx.text(
+                                FinetuneState.eval_bleu.to_string(),
+                                font_size="1.8rem",
+                                font_weight="700",
+                                color=c("accent"),
+                            ),
+                            rx.text(
+                                "Higher is better", font_size="0.7rem", color=c("text_muted")
+                            ),
+                            spacing="0",
+                        ),
+                        rx.vstack(
                             rx.text("What it means", font_size="0.72rem", color=c("text_muted")),
                             rx.text(
                                 rx.cond(
@@ -2120,7 +2146,7 @@ def _step6() -> rx.Component:
                             ),
                             spacing="1",
                         ),
-                        columns="2",
+                        columns="4",
                         spacing="4",
                     ),
                     rx.fragment(),

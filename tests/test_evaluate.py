@@ -51,3 +51,20 @@ class TestEvaluateModel:
             _evaluate_mod.evaluate_model(mock_model, mock_tokenizer, mock_dataset)
         except Exception as exc:
             pytest.fail(f"evaluate_model raised unexpectedly: {exc}")
+
+
+class TestEvaluateReferences:
+    """Reference metrics (ROUGE-1/BLEU) are pure-Python and need no mocking."""
+
+    def test_returns_rouge1_and_bleu_floats(self):
+        predictions = ["the cat sat on the mat", "hello world"]
+        references = ["the cat sat on the mat", "hello there world"]
+        result = _evaluate_mod.evaluate_references(predictions, references)
+        assert "rouge1" in result and "bleu" in result
+        assert isinstance(result["rouge1"], float)
+        assert isinstance(result["bleu"], float)
+
+    def test_perfect_match_scores_high(self):
+        pairs = ["the quick brown fox"]
+        result = _evaluate_mod.evaluate_references(pairs, pairs)
+        assert result["rouge1"] == 1.0

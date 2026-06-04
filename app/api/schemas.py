@@ -52,6 +52,10 @@ class JobConfig(BaseModel):
     eval_split_ratio: float = Field(default=0.1, ge=0.0, lt=1.0)
     early_stopping_patience: int = Field(default=0, ge=0, le=20)
     resume_from_checkpoint: str = ""
+    # Seeds every source of randomness so a run is reproducible.
+    seed: int = Field(default=42, ge=0)
+    # Opt-in PyTorch 2.0 compilation for faster training on supported GPUs.
+    use_torch_compile: bool = False
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

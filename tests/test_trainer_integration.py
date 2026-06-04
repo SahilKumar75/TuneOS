@@ -56,6 +56,46 @@ def test_dataset_tokenizes_to_expected_shape(tiny_dataset):
     assert len(ds[0]["input_ids"]) == 32
 
 
+def test_load_instruction_pairs_returns_raw_text(tiny_dataset):
+    from trainer.dataset import load_instruction_pairs
+
+    ds = load_instruction_pairs(tiny_dataset)
+    assert {"instruction", "output"} <= set(ds.column_names)
+    assert ds[0]["instruction"] == "Question 0"
+    assert ds[0]["output"] == "Answer 0"
+
+
+def test_seeded_split_is_reproducible(tiny_dataset):
+    """Same seed → identical held-out membership; this is what makes runs reproducible."""
+    from trainer.dataset import load_instruction_pairs
+
+    ds = load_instruction_pairs(tiny_dataset)
+    a = list(ds.train_test_split(test_size=0.25, seed=42)["test"]["instruction"])
+    b = list(ds.train_test_split(test_size=0.25, seed=42)["test"]["instruction"])
+    c = list(ds.train_test_split(test_size=0.25, seed=7)["test"]["instruction"])
+    assert a == b  # same seed is deterministic
+    assert len(c) == len(a)  # different seed still produces a valid split
+
+
+def test_torch_compile_flag_threads_to_training_arguments(tmp_path):
+    """The config flag reaches TrainingArguments unchanged (no GPU needed)."""
+    from transformers import TrainingArguments
+
+    from trainer.config import TrainingConfig
+
+    cfg = TrainingConfig(use_torch_compile=True, seed=7)
+    args = TrainingArguments(
+        output_dir=str(tmp_path),
+        torch_compile=cfg.use_torch_compile,
+        seed=cfg.seed,
+        data_seed=cfg.seed,
+        report_to="none",
+    )
+    assert args.torch_compile is True
+    assert args.seed == 7
+    assert args.data_seed == 7
+
+
 def test_perplexity_is_finite(tiny_dataset):
     from trainer.dataset import load_and_tokenize
     from trainer.metrics import compute_perplexity

@@ -188,6 +188,34 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
         raise
 
 
+def save_final_metrics(run_id: str, metrics: dict[str, Any]) -> None:
+    """Persist run-level final metrics (e.g. rouge1, bleu) into run_metrics.
+
+    Stored at step=-1 to distinguish them from per-step curves while remaining
+    queryable alongside other metric keys. None values are skipped.
+    """
+    rows = [
+        (run_id, key, float(val), -1, time.time())
+        for key, val in metrics.items()
+        if val is not None
+    ]
+    if not rows:
+        return
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            conn.executemany(
+                "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT (run_id, key, step) DO UPDATE SET "
+                "value=EXCLUDED.value, timestamp=EXCLUDED.timestamp",
+                rows,
+            )
+    except Exception:
+        _logger.exception("Failed to save final metrics for run_id=%s", run_id)
+        raise
+
+
 def save_run_params(run_id: str, params: dict[str, Any]) -> None:
     """Persist hyperparameter key/value pairs for a run (immutable snapshot)."""
     if not params:

@@ -57,15 +57,61 @@ _MODELS = [
 
 _STEP_LABELS = ["Model", "Intent", "Data", "Configure", "Train", "Results", "Deploy"]
 
-_INTENT_IDEAS = [
-    "Health chatbot for diabetes patients",
-    "Python code review assistant",
-    "Customer support for SaaS products",
-    "Legal document summarizer",
-    "Recipe recommendation assistant",
-    "Scientific paper Q&A bot",
-    "SQL query generator",
-    "Children's education tutor",
+_FILTER_USE_FOR = [("personal", "Personal"), ("company", "Company product")]
+_FILTER_DOMAIN = [
+    ("healthcare", "Healthcare"),
+    ("finance", "Finance"),
+    ("education", "Education"),
+    ("legal", "Legal"),
+    ("creative", "Creative"),
+]
+_FILTER_TASK = [
+    ("text", "Text generation"),
+    ("vision", "Image / Vision"),
+    ("audio", "Audio / Speech"),
+    ("code", "Code"),
+]
+_QUESTIONS = [
+    {
+        "heading": "What is the primary goal of this model?",
+        "options": [
+            "Answer questions / provide information",
+            "Generate or transform content",
+            "Classify, analyze, or extract data",
+        ],
+    },
+    {
+        "heading": "Who is the target audience?",
+        "options": [
+            "General public / consumers",
+            "Domain professionals",
+            "Internal team / developers",
+        ],
+    },
+    {
+        "heading": "What is the primary input format?",
+        "options": [
+            "Free-form text / conversations",
+            "Structured data or documents",
+            "Mixed / varies",
+        ],
+    },
+    {
+        "heading": "What tone and style should the model use?",
+        "options": [
+            "Formal and precise",
+            "Friendly and conversational",
+            "Concise and direct",
+        ],
+    },
+    {
+        "heading": "How will you measure success?",
+        "options": [
+            "Accuracy / factual correctness",
+            "User satisfaction / engagement",
+            "Task completion / automation rate",
+        ],
+    },
 ]
 
 _LR_PRESETS = [
@@ -1197,53 +1243,331 @@ def _step1() -> rx.Component:
 
 
 # ── Step 2: Intent ────────────────────────────────────────────────
-def _step2() -> rx.Component:
+
+def _intent_filter_chip(value: str, label: str, current_var, event_handler) -> rx.Component:
+    return rx.badge(
+        label,
+        cursor="pointer",
+        on_click=event_handler(value),
+        color_scheme="blue",
+        variant=rx.cond(current_var == value, "solid", "soft"),
+        size="2",
+        padding="6px 12px",
+    )
+
+
+def _intent_filter_row(row_label: str, chips: list) -> rx.Component:
     return rx.vstack(
-        _section_heading("What are you building?"),
-        rx.text(
-            "Describe your use-case in plain English. TuneOS uses this to generate starter data, "
-            "guide the training dashboard, and pre-fill the system prompt for testing.",
-            font_size="0.86rem",
-            color=c("text_secondary"),
-            margin_bottom="16px",
-        ),
+        _label(row_label),
+        rx.flex(*chips, wrap="wrap", gap="8px"),
+        spacing="2",
+        width="100%",
+    )
+
+
+def _intent_phase_a() -> rx.Component:
+    return rx.vstack(
         _card(
             rx.vstack(
-                _label("Your goal (1–3 sentences)"),
-                rx.text_area(
-                    placeholder="e.g. A health chatbot that answers questions for people with Type 2 diabetes in simple language.",
-                    value=FinetuneState.user_intent,
-                    on_change=FinetuneState.set_user_intent,
-                    rows="4",
-                    width="100%",
-                    resize="vertical",
+                rx.text(
+                    "All fields are optional — skip any you're not sure about.",
+                    font_size="0.82rem",
+                    color=c("text_muted"),
+                    margin_bottom="4px",
                 ),
-                rx.text("Quick ideas:", font_size="0.76rem", color=c("text_muted")),
-                rx.flex(
-                    *[
-                        rx.badge(
-                            idea,
-                            cursor="pointer",
-                            on_click=FinetuneState.set_user_intent(idea),
-                            color_scheme="blue",
-                            variant="soft",
-                            size="1",
-                        )
-                        for idea in _INTENT_IDEAS
+                _intent_filter_row(
+                    "Use for?",
+                    [
+                        _intent_filter_chip(v, l, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for)
+                        for v, l in _FILTER_USE_FOR
                     ],
-                    wrap="wrap",
-                    gap="6px",
                 ),
-                spacing="3",
+                rx.divider(),
+                _intent_filter_row(
+                    "Domain?",
+                    [
+                        _intent_filter_chip(v, l, FinetuneState.intent_domain, FinetuneState.set_intent_domain)
+                        for v, l in _FILTER_DOMAIN
+                    ],
+                ),
+                rx.divider(),
+                _intent_filter_row(
+                    "Task type?",
+                    [
+                        _intent_filter_chip(v, l, FinetuneState.intent_task_type, FinetuneState.set_intent_task_type)
+                        for v, l in _FILTER_TASK
+                    ],
+                ),
+                spacing="4",
+                width="100%",
             )
         ),
-        _nav_buttons(
-            next_label="Next: Add Data →",
-            next_disabled=FinetuneState.user_intent == "",
+        rx.button(
+            "Continue →",
+            on_click=FinetuneState.intent_next_phase,
+            color_scheme="blue",
+            size="3",
+            width="100%",
+        ),
+        spacing="3",
+        width="100%",
+    )
+
+
+def _intent_option_btn(q_idx: int, option_text: str) -> rx.Component:
+    is_selected = FinetuneState.intent_answers[q_idx] == option_text
+    return rx.button(
+        option_text,
+        on_click=FinetuneState.set_intent_answer(q_idx, option_text),
+        variant=rx.cond(is_selected, "solid", "outline"),
+        color_scheme="blue",
+        size="2",
+        width="100%",
+        text_align="left",
+        justify_content="flex-start",
+    )
+
+
+def _intent_other_input(q_idx: int) -> rx.Component:
+    is_open = FinetuneState.intent_is_custom[q_idx]
+    return rx.vstack(
+        rx.button(
+            rx.hstack(
+                rx.icon(rx.cond(is_open, "chevron-down", "chevron-right"), size=14),
+                rx.text("Other..."),
+                spacing="2",
+                align="center",
+            ),
+            on_click=FinetuneState.toggle_intent_custom(q_idx),
+            variant=rx.cond(is_open, "solid", "ghost"),
+            color_scheme="blue",
+            size="2",
+        ),
+        rx.cond(
+            is_open,
+            rx.input(
+                placeholder="Describe in your own words...",
+                value=FinetuneState.intent_custom_answers[q_idx],
+                on_change=lambda v: FinetuneState.set_intent_custom_answer(q_idx, v),
+                width="100%",
+                auto_focus=True,
+            ),
+            rx.fragment(),
+        ),
+        spacing="2",
+        width="100%",
+    )
+
+
+def _intent_timeline_row(q_idx: int) -> rx.Component:
+    q = _QUESTIONS[q_idx]
+    is_active = FinetuneState.intent_question_idx == q_idx
+    is_answered = (FinetuneState.intent_answers[q_idx] != "") & ~is_active
+    is_future = ~is_answered & ~is_active
+
+    dot = rx.box(
+        rx.cond(
+            is_answered,
+            rx.icon("check", size=12, color="white"),
+            rx.text(
+                str(q_idx + 1),
+                font_size="0.72rem",
+                font_weight="700",
+                color=rx.cond(is_active, "white", c("text_muted")),
+            ),
+        ),
+        width="26px",
+        height="26px",
+        min_width="26px",
+        border_radius="50%",
+        background=rx.cond(
+            is_answered | is_active,
+            c("accent"),
+            c("border"),
+        ),
+        display="flex",
+        align_items="center",
+        justify_content="center",
+    )
+
+    connector = (
+        rx.box(
+            width="2px",
+            background=rx.cond(is_answered, c("accent"), c("border")),
+            flex_grow="1",
+            min_height="20px",
+            margin_x="auto",
+        )
+        if q_idx < 4
+        else rx.fragment()
+    )
+
+    left_col = rx.vstack(
+        dot,
+        connector,
+        align_items="center",
+        spacing="0",
+        width="26px",
+        min_width="26px",
+        align_self="stretch",
+    )
+
+    answered_view = rx.hstack(
+        rx.text(q["heading"], font_size="0.84rem", color=c("text_secondary")),
+        rx.text("·", color=c("text_muted"), flex_shrink="0"),
+        rx.text(
+            FinetuneState.intent_answers[q_idx],
+            font_size="0.84rem",
+            color=c("text_primary"),
+            font_weight="500",
+        ),
+        rx.spacer(),
+        rx.text(
+            "Edit",
+            font_size="0.75rem",
+            color=c("accent"),
+            cursor="pointer",
+            on_click=FinetuneState.intent_edit_question(q_idx),
+            flex_shrink="0",
+        ),
+        spacing="2",
+        align="center",
+        width="100%",
+        flex_wrap="wrap",
+    )
+
+    active_view = rx.vstack(
+        rx.text(q["heading"], font_size="0.97rem", font_weight="600", color=c("text_primary")),
+        rx.box(height="6px"),
+        *[_intent_option_btn(q_idx, opt) for opt in q["options"]],
+        _intent_other_input(q_idx),
+        spacing="2",
+        width="100%",
+    )
+
+    future_view = rx.text(q["heading"], font_size="0.84rem", color=c("text_muted"))
+
+    content = rx.cond(
+        is_answered,
+        answered_view,
+        rx.cond(is_active, active_view, future_view),
+    )
+
+    return rx.hstack(
+        left_col,
+        rx.box(
+            content,
+            flex="1",
+            padding_left="14px",
+            padding_bottom="22px" if q_idx < 4 else "4px",
+            opacity=rx.cond(is_future, "0.45", "1"),
+        ),
+        id=f"intent-q-{q_idx}",
+        align_items="stretch",
+        width="100%",
+        spacing="0",
+    )
+
+
+def _intent_phase_b() -> rx.Component:
+    return rx.vstack(
+        _card(
+            rx.vstack(
+                *[_intent_timeline_row(i) for i in range(5)],
+                spacing="0",
+                width="100%",
+            ),
+        ),
+        rx.cond(
+            FinetuneState.intent_all_answered,
+            rx.button(
+                "Generate Profile →",
+                on_click=FinetuneState.intent_next_phase,
+                color_scheme="blue",
+                size="3",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        spacing="3",
+        width="100%",
+    )
+
+
+def _intent_phase_c() -> rx.Component:
+    return rx.vstack(
+        _section_heading("Review your intent profile"),
+        rx.text(
+            "This profile will guide data generation, training configuration, and system prompt scaffolding.",
+            font_size="0.85rem",
+            color=c("text_secondary"),
+            margin_bottom="8px",
+        ),
+        _card(
+            rx.box(
+                rx.markdown(FinetuneState.intent_md),
+                padding="4px",
+                width="100%",
+            ),
+            padding="16px",
+        ),
+        rx.box(height="8px"),
+        rx.hstack(
+            rx.button(
+                "← Edit",
+                on_click=FinetuneState.intent_prev_phase,
+                variant="soft",
+                color_scheme="gray",
+                size="2",
+            ),
+            rx.spacer(),
+            rx.button(
+                "Approve & Continue →",
+                on_click=FinetuneState.approve_intent,
+                color_scheme="blue",
+                size="3",
+            ),
+            width="100%",
+            align="center",
         ),
         spacing="0",
         width="100%",
         align_items="flex-start",
+    )
+
+
+def _step2() -> rx.Component:
+    return rx.cond(
+        FinetuneState.intent_phase == 1,
+        # Phase A
+        rx.vstack(
+            _section_heading("Tell us about your use case"),
+            rx.button(
+                "← Back to Model",
+                on_click=FinetuneState.prev_step,
+                variant="soft",
+                color_scheme="gray",
+                size="2",
+                margin_bottom="12px",
+            ),
+            _intent_phase_a(),
+            spacing="0",
+            width="100%",
+            align_items="flex-start",
+        ),
+        rx.cond(
+            FinetuneState.intent_phase == 2,
+            # Phase B – timeline
+            rx.vstack(
+                _section_heading("Tell us about your use case"),
+                _intent_phase_b(),
+                spacing="3",
+                width="100%",
+                align_items="flex-start",
+            ),
+            # Phase C – review
+            _intent_phase_c(),
+        ),
     )
 
 
@@ -3927,7 +4251,7 @@ def _wizard_layout() -> rx.Component:
             padding="32px 24px",
         ),
         width="100%",
-        max_width="900px",
+        max_width="1125px",
         margin="0 auto",
     )
 

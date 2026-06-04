@@ -55,3 +55,6 @@ hf_deploy/
 
 # Assets
 assets/external/
+
+# Graphify knowledge graph output
+graphify-out/

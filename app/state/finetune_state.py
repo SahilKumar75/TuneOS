@@ -213,7 +213,25 @@ class FinetuneState(rx.State):
     is_fetching_model_info: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
-    user_intent: str = ""
+    user_intent: str = ""  # written by approve_intent() for API compat
+
+    # Phase A – filter chips (all optional)
+    intent_use_for: str = ""        # "personal" | "company" | ""
+    intent_domain: str = ""         # "healthcare" | "finance" | "education" | "legal" | "creative" | ""
+    intent_task_type: str = ""      # "text" | "vision" | "audio" | "code" | ""
+
+    # Phase progression
+    intent_phase: int = 1           # 1 = filter chips, 2 = questions, 3 = preview
+
+    # Phase B – questionnaire
+    intent_question_idx: int = 0    # 0-4
+    intent_answers: list[str] = ["", "", "", "", ""]
+    intent_custom_answers: list[str] = ["", "", "", "", ""]
+    intent_is_custom: list[bool] = [False, False, False, False, False]
+
+    # Phase C – markdown preview
+    intent_md: str = ""
+    intent_approved: bool = False
 
     # ── Step 3: Data ──────────────────────────────────────────────
     data_source: str = "upload"  # "upload" | "hub_dataset" | "generate"
@@ -311,7 +329,11 @@ class FinetuneState(rx.State):
 
     @rx.var
     def can_go_to_data(self) -> bool:
-        return bool(self.user_intent)
+        return bool(self.intent_approved)
+
+    @rx.var
+    def intent_all_answered(self) -> bool:
+        return all(a != "" for a in self.intent_answers)
 
     @rx.var
     def can_go_to_configure(self) -> bool:
@@ -458,7 +480,7 @@ class FinetuneState(rx.State):
     @rx.var
     def suggested_technique(self) -> str:
         """Recommend a technique based on model size + user intent (Step 2)."""
-        intent = self.user_intent.lower()
+        intent = (self.intent_domain + " " + " ".join(self.intent_answers)).lower()
         size = self.selected_model_size.lower()
 
         # Intent-based signal: preference / alignment → DPO
@@ -827,9 +849,160 @@ class FinetuneState(rx.State):
         self.is_validating_model = False
 
     # ── Step 2 events ─────────────────────────────────────────────
+
     @rx.event
     def set_user_intent(self, value: str):
+        """Legacy setter kept for test compat."""
         self.user_intent = value
+
+    @rx.event
+    def set_intent_use_for(self, v: str):
+        self.intent_use_for = "" if self.intent_use_for == v else v
+
+    @rx.event
+    def set_intent_domain(self, v: str):
+        self.intent_domain = "" if self.intent_domain == v else v
+
+    @rx.event
+    def set_intent_task_type(self, v: str):
+        self.intent_task_type = "" if self.intent_task_type == v else v
+
+    @rx.event
+    def intent_next_phase(self):
+        if self.intent_phase == 2:
+            self._generate_intent_md()
+        if self.intent_phase < 3:
+            self.intent_phase += 1
+
+    @rx.event
+    def intent_prev_phase(self):
+        if self.intent_phase > 1:
+            self.intent_phase -= 1
+            if self.intent_phase == 2:
+                self.intent_question_idx = 4
+
+    @rx.event
+    def intent_next_question(self):
+        if self.intent_question_idx < 4:
+            self.intent_question_idx += 1
+        else:
+            self._generate_intent_md()
+            self.intent_phase = 3
+
+    @rx.event
+    def intent_prev_question(self):
+        if self.intent_question_idx > 0:
+            self.intent_question_idx -= 1
+        else:
+            self.intent_phase = 1
+
+    @rx.event
+    def intent_edit_question(self, idx: int):
+        self.intent_question_idx = idx
+        yield rx.call_script(
+            f"setTimeout(()=>{{const e=document.getElementById('intent-q-{idx}');if(e)e.scrollIntoView({{behavior:'smooth',block:'start'}});}},50)"
+        )
+
+    @rx.event
+    def set_intent_answer(self, idx: int, value: str):
+        answers = list(self.intent_answers)
+        answers[idx] = value
+        self.intent_answers = answers
+        is_custom = list(self.intent_is_custom)
+        is_custom[idx] = False
+        self.intent_is_custom = is_custom
+        # Auto-advance focus and scroll to next question
+        if self.intent_question_idx == idx and idx < 4:
+            self.intent_question_idx = idx + 1
+            next_id = f"intent-q-{idx + 1}"
+            yield rx.call_script(
+                f"setTimeout(()=>{{const e=document.getElementById('{next_id}');if(e)e.scrollIntoView({{behavior:'smooth',block:'start'}});}},120)"
+            )
+
+    @rx.event
+    def set_intent_custom_answer(self, idx: int, value: str):
+        custom = list(self.intent_custom_answers)
+        custom[idx] = value
+        self.intent_custom_answers = custom
+        answers = list(self.intent_answers)
+        answers[idx] = value
+        self.intent_answers = answers
+
+    @rx.event
+    def toggle_intent_custom(self, idx: int):
+        is_custom = list(self.intent_is_custom)
+        is_custom[idx] = not is_custom[idx]
+        self.intent_is_custom = is_custom
+        if is_custom[idx]:
+            answers = list(self.intent_answers)
+            answers[idx] = self.intent_custom_answers[idx]
+            self.intent_answers = answers
+        else:
+            answers = list(self.intent_answers)
+            answers[idx] = ""
+            self.intent_answers = answers
+
+    def _generate_intent_md(self):
+        use_for_label = {"personal": "Personal", "company": "Company product"}.get(
+            self.intent_use_for, "Not specified"
+        )
+        domain_label = {
+            "healthcare": "Healthcare", "finance": "Finance",
+            "education": "Education", "legal": "Legal", "creative": "Creative",
+        }.get(self.intent_domain, "Not specified")
+        task_label = {
+            "text": "Text generation", "vision": "Image / Vision",
+            "audio": "Audio / Speech", "code": "Code",
+        }.get(self.intent_task_type, "Not specified")
+
+        q_labels = [
+            "Primary goal", "Target audience", "Input format",
+            "Tone & style", "Success metric",
+        ]
+        filled = [a for a in self.intent_answers if a]
+        if filled:
+            audience = self.intent_answers[1] or "general users"
+            metric = self.intent_answers[4] or "task completion"
+            summary = (
+                f"A {task_label.lower()} model for {domain_label.lower()} "
+                f"targeting {audience.lower()}. "
+                f"Optimized for {metric.lower()}."
+            )
+        else:
+            summary = "Intent not fully specified — all fields can be updated before training."
+
+        q_lines = "\n".join(
+            f"{i + 1}. **{q_labels[i]}:** {self.intent_answers[i] or 'Not specified'}"
+            for i in range(5)
+        )
+
+        self.intent_md = f"""# Fine-Tuning Intent Profile
+
+## Summary
+{summary}
+
+## Use Case Context
+- **Use for:** {use_for_label}
+- **Domain:** {domain_label}
+- **Task type:** {task_label}
+
+## Questionnaire
+{q_lines}
+
+## Machine Context
+```
+intent_use_for: {self.intent_use_for or 'not_set'}
+intent_domain: {self.intent_domain or 'not_set'}
+intent_task_type: {self.intent_task_type or 'not_set'}
+intent_answers: {self.intent_answers}
+```
+"""
+
+    @rx.event
+    def approve_intent(self):
+        self.intent_approved = True
+        self.user_intent = self.intent_md
+        return FinetuneState.next_step()
 
     # ── Step 3 events ─────────────────────────────────────────────
     @rx.event

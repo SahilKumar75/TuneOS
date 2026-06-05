@@ -97,7 +97,7 @@ class AppState(rx.State):
     is_chat_loading: bool = False
     chat_model: str = "auto"
     last_used_model: str = ""
-    chat_open: bool = True
+    chat_open: bool = False
 
     # ── Project history (real, built from user actions) ───────────
     projects: list[ProjectItem] = []

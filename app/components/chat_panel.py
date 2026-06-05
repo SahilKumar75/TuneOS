@@ -175,11 +175,18 @@ def _input_row() -> rx.Component:
     )
 
 
+def _has_started() -> rx.Var:
+    """True once the user has selected a model or moved past step 1."""
+    return (FinetuneState.selected_model_id != "") | (FinetuneState.current_step > 1)
+
+
 def chat_panel() -> rx.Component:
-    """Collapsible context-aware chat panel (right side of wizard layout)."""
+    """Collapsible context-aware chat panel — icon appears only after user starts working."""
     return rx.cond(
-        AppState.chat_open,
-        rx.box(
+        _has_started(),
+        rx.cond(
+            AppState.chat_open,
+            rx.box(
             rx.vstack(
                 # Header
                 rx.hstack(
@@ -250,4 +257,6 @@ def chat_panel() -> rx.Component:
             transform="translateY(-50%)",
             z_index="100",
         ),
+        ),
+        rx.fragment(),  # nothing shown before user starts working
     )

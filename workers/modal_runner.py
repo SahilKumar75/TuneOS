@@ -27,12 +27,16 @@ except ImportError as exc:  # pragma: no cover - exercised only without modal in
 
 
 def modal_available() -> bool:
-    """True when the SDK is installed and Modal credentials are configured."""
-    return (
-        modal is not None
-        and bool(os.getenv("MODAL_TOKEN_ID"))
-        and bool(os.getenv("MODAL_TOKEN_SECRET"))
-    )
+    """True when the SDK is installed and Modal credentials are configured.
+
+    Accepts either env-var tokens (MODAL_TOKEN_ID/SECRET — best for deploys) or
+    a local profile written by `modal token set` (~/.modal.toml — best for dev).
+    """
+    if modal is None:
+        return False
+    if os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET"):
+        return True
+    return (Path.home() / ".modal.toml").exists()
 
 
 # The remote app + function are only defined when `modal` is importable, so that

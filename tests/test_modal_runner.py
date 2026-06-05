@@ -29,15 +29,18 @@ def test_zip_roundtrip(tmp_path):
     assert (dest / "nested" / "extra.txt").read_text() == "hello"
 
 
-def test_modal_unavailable_without_credentials(monkeypatch):
+def test_modal_unavailable_without_credentials(monkeypatch, tmp_path):
     monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
     monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
+    # Redirect home so a real ~/.modal.toml on the dev box doesn't flip this.
+    monkeypatch.setattr(modal_runner.Path, "home", staticmethod(lambda: tmp_path))
     assert modal_runner.modal_available() is False
 
 
 def test_run_on_modal_raises_when_unavailable(monkeypatch, tmp_path):
     monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
     monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
+    monkeypatch.setattr(modal_runner.Path, "home", staticmethod(lambda: tmp_path))
     with pytest.raises(RuntimeError, match="Modal backend"):
         modal_runner.run_on_modal(
             job_id="j1",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 _VERSION = "0.2.0"
@@ -56,8 +58,8 @@ class JobConfig(BaseModel):
     seed: int = Field(default=42, ge=0)
     # Opt-in PyTorch 2.0 compilation for faster training on supported GPUs.
     use_torch_compile: bool = False
-    # Compute backend: "local" | "modal" | "hf_spaces".
-    compute_backend: str = "local"
+    # Compute backend for training execution.
+    compute_backend: Literal["local", "modal", "hf_spaces"] = "local"
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

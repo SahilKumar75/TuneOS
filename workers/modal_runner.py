@@ -42,6 +42,9 @@ def modal_available() -> bool:
 # The remote app + function are only defined when `modal` is importable, so that
 # importing this module never fails on a machine without the SDK.
 if modal is not None:
+    # Mirrors the trainer stack the remote run imports (trainer.finetune +
+    # trainer.evaluate → trainer.dataset/metrics). No celery/redis needed: the
+    # remote side only touches the framework-light trainer layer.
     modal_image = modal.Image.debian_slim(python_version="3.10").pip_install(
         "torch",
         "transformers>=4.44.0",
@@ -50,6 +53,7 @@ if modal is not None:
         "bitsandbytes>=0.43.0",
         "datasets>=2.19.0",
         "accelerate>=0.30.0",
+        "pandas>=2.0.0",
     )
     modal_app = modal.App("tuneos-trainer")
 
@@ -100,10 +104,11 @@ if modal is not None:
         )
 
         # Evaluate remotely while the model is still in GPU memory — the local
-        # worker has no model object to score against.
-        from workers.train_task import _compute_eval
+        # worker has no model object to score against. Imported from the
+        # framework-light trainer layer so the Modal image needs no celery/redis.
+        from trainer.evaluate import evaluate_run
 
-        eval_results = _compute_eval(
+        eval_results = evaluate_run(
             model,
             tokenizer,
             model_cfg,

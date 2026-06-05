@@ -16,7 +16,11 @@ _LR_PRESETS = [
 
 _COMPUTE_BACKENDS = [
     ("local", "Local GPU", "Train on this machine — uses your detected device"),
-    ("modal", "Modal", "Free T4 cloud GPU (~$30/mo credits) — needs MODAL_TOKEN_ID"),
+    (
+        "modal",
+        "Modal",
+        "Free T4 cloud GPU (~$30/mo credits) — needs MODAL_TOKEN_ID + MODAL_TOKEN_SECRET",
+    ),
     ("hf_spaces", "HF Spaces", "ZeroGPU A100 — 30 min/job limit when deployed there"),
 ]
 

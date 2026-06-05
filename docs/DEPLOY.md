@@ -65,7 +65,7 @@ it on the worker's local device.
    **Settings → Tokens**.
 2. Install the optional dependency: `poetry install --with modal`.
 3. Add the credentials to `.env`:
-   ```
+   ```bash
    MODAL_TOKEN_ID=ak-...
    MODAL_TOKEN_SECRET=as-...
    ```

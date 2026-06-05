@@ -1,17 +1,20 @@
 frontend:
   - changed-files:
       - any-glob-to-any-file:
-          - "tuneos/components/**"
-          - "tuneos/pages/**"
+          - "app/components/**"
+          - "app/pages/**"
+          - "app/styles.py"
           - "**/*.css"
           - "assets/**"
 
 backend:
   - changed-files:
       - any-glob-to-any-file:
-          - "api/**"
-          - "packages/**"
-          - "**/*.py"
+          - "app/api/**"
+          - "app/state/**"
+          - "trainer/**"
+          - "workers/**"
+          - "main.py"
 
 infra:
   - changed-files:
@@ -19,6 +22,7 @@ infra:
           - "Dockerfile"
           - "docker-compose*"
           - ".github/**"
+          - "hf_spaces/**"
           - "*.sh"
 
 docs:

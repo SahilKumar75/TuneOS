@@ -89,6 +89,7 @@ async def create_job(config: JobConfig):
         "resume_from_checkpoint": config.resume_from_checkpoint or None,
         "seed": config.seed,
         "use_torch_compile": config.use_torch_compile,
+        "compute_backend": config.compute_backend,
     }
 
     # Guard: refuse to queue if no worker is listening — job would silently sit forever.

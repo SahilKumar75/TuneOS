@@ -56,6 +56,8 @@ class JobConfig(BaseModel):
     seed: int = Field(default=42, ge=0)
     # Opt-in PyTorch 2.0 compilation for faster training on supported GPUs.
     use_torch_compile: bool = False
+    # Compute backend: "local" | "modal" | "hf_spaces".
+    compute_backend: str = "local"
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

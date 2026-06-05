@@ -216,15 +216,15 @@ class FinetuneState(rx.State):
     user_intent: str = ""  # written by approve_intent() for API compat
 
     # Phase A – filter chips (all optional)
-    intent_use_for: str = ""        # "personal" | "company" | ""
-    intent_domain: str = ""         # "healthcare" | "finance" | "education" | "legal" | "creative" | ""
-    intent_task_type: str = ""      # "text" | "vision" | "audio" | "code" | ""
+    intent_use_for: str = ""  # "personal" | "company" | ""
+    intent_domain: str = ""  # "healthcare" | "finance" | "education" | "legal" | "creative" | ""
+    intent_task_type: str = ""  # "text" | "vision" | "audio" | "code" | ""
 
     # Phase progression
-    intent_phase: int = 1           # 1 = filter chips, 2 = questions, 3 = preview
+    intent_phase: int = 1  # 1 = filter chips, 2 = questions, 3 = preview
 
     # Phase B – questionnaire
-    intent_question_idx: int = 0    # 0-4
+    intent_question_idx: int = 0  # 0-4
     intent_answers: list[str] = ["", "", "", "", ""]
     intent_custom_answers: list[str] = ["", "", "", "", ""]
     intent_is_custom: list[bool] = [False, False, False, False, False]
@@ -279,6 +279,7 @@ class FinetuneState(rx.State):
     experiment_name: str = ""
     eval_split_ratio: float = 0.1
     early_stopping_patience: int = 0
+    compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
 
     # ── Step 5: Training dashboard ────────────────────────────────
     job_id: str = ""
@@ -953,17 +954,25 @@ class FinetuneState(rx.State):
             self.intent_use_for, "Not specified"
         )
         domain_label = {
-            "healthcare": "Healthcare", "finance": "Finance",
-            "education": "Education", "legal": "Legal", "creative": "Creative",
+            "healthcare": "Healthcare",
+            "finance": "Finance",
+            "education": "Education",
+            "legal": "Legal",
+            "creative": "Creative",
         }.get(self.intent_domain, "Not specified")
         task_label = {
-            "text": "Text generation", "vision": "Image / Vision",
-            "audio": "Audio / Speech", "code": "Code",
+            "text": "Text generation",
+            "vision": "Image / Vision",
+            "audio": "Audio / Speech",
+            "code": "Code",
         }.get(self.intent_task_type, "Not specified")
 
         q_labels = [
-            "Primary goal", "Target audience", "Input format",
-            "Tone & style", "Success metric",
+            "Primary goal",
+            "Target audience",
+            "Input format",
+            "Tone & style",
+            "Success metric",
         ]
         filled = [a for a in self.intent_answers if a]
         if filled:
@@ -997,9 +1006,9 @@ class FinetuneState(rx.State):
 
 ## Machine Context
 ```
-intent_use_for: {self.intent_use_for or 'not_set'}
-intent_domain: {self.intent_domain or 'not_set'}
-intent_task_type: {self.intent_task_type or 'not_set'}
+intent_use_for: {self.intent_use_for or "not_set"}
+intent_domain: {self.intent_domain or "not_set"}
+intent_task_type: {self.intent_task_type or "not_set"}
 intent_answers: {self.intent_answers}
 ```
 """
@@ -1266,6 +1275,11 @@ intent_answers: {self.intent_answers}
             pass
 
     @rx.event
+    def set_compute_backend(self, value: str):
+        if value in ("local", "modal", "hf_spaces"):
+            self.compute_backend = value
+
+    @rx.event
     def set_learning_rate(self, value: str):
         self.learning_rate = value
 
@@ -1308,7 +1322,9 @@ intent_answers: {self.intent_answers}
 
     @rx.event
     def set_eval_split_ratio(self, value: list[float]):
-        self.eval_split_ratio = round(float(value[0]) if isinstance(value, list) else float(value), 2)
+        self.eval_split_ratio = round(
+            float(value[0]) if isinstance(value, list) else float(value), 2
+        )
 
     @rx.event
     def set_early_stopping_patience(self, value: str):
@@ -1369,6 +1385,7 @@ intent_answers: {self.intent_answers}
             "user_intent": self.user_intent,
             "experiment_name": exp_name,
             "experiment_id": exp_id,
+            "compute_backend": self.compute_backend,
         }
 
         try:

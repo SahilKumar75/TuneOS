@@ -1244,6 +1244,7 @@ def _step1() -> rx.Component:
 
 # ── Step 2: Intent ────────────────────────────────────────────────
 
+
 def _intent_filter_chip(value: str, label: str, current_var, event_handler) -> rx.Component:
     return rx.badge(
         label,
@@ -1278,24 +1279,33 @@ def _intent_phase_a() -> rx.Component:
                 _intent_filter_row(
                     "Use for?",
                     [
-                        _intent_filter_chip(v, l, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for)
-                        for v, l in _FILTER_USE_FOR
+                        _intent_filter_chip(
+                            v, lbl, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for
+                        )
+                        for v, lbl in _FILTER_USE_FOR
                     ],
                 ),
                 rx.divider(),
                 _intent_filter_row(
                     "Domain?",
                     [
-                        _intent_filter_chip(v, l, FinetuneState.intent_domain, FinetuneState.set_intent_domain)
-                        for v, l in _FILTER_DOMAIN
+                        _intent_filter_chip(
+                            v, lbl, FinetuneState.intent_domain, FinetuneState.set_intent_domain
+                        )
+                        for v, lbl in _FILTER_DOMAIN
                     ],
                 ),
                 rx.divider(),
                 _intent_filter_row(
                     "Task type?",
                     [
-                        _intent_filter_chip(v, l, FinetuneState.intent_task_type, FinetuneState.set_intent_task_type)
-                        for v, l in _FILTER_TASK
+                        _intent_filter_chip(
+                            v,
+                            lbl,
+                            FinetuneState.intent_task_type,
+                            FinetuneState.set_intent_task_type,
+                        )
+                        for v, lbl in _FILTER_TASK
                     ],
                 ),
                 spacing="4",
@@ -2435,9 +2445,7 @@ def _step6() -> rx.Component:
                                 font_weight="700",
                                 color=c("accent"),
                             ),
-                            rx.text(
-                                "Higher is better", font_size="0.7rem", color=c("text_muted")
-                            ),
+                            rx.text("Higher is better", font_size="0.7rem", color=c("text_muted")),
                             spacing="0",
                         ),
                         rx.vstack(
@@ -2448,9 +2456,7 @@ def _step6() -> rx.Component:
                                 font_weight="700",
                                 color=c("accent"),
                             ),
-                            rx.text(
-                                "Higher is better", font_size="0.7rem", color=c("text_muted")
-                            ),
+                            rx.text("Higher is better", font_size="0.7rem", color=c("text_muted")),
                             spacing="0",
                         ),
                         rx.vstack(

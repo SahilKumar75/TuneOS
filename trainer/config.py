@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Literal
 
 _logger = logging.getLogger(__name__)
 
@@ -94,3 +95,5 @@ class TrainingConfig:
     # Opt-in PyTorch 2.0 compilation of the model for faster training. Off by
     # default so CPU/CI and GPUs without a working dynamo backend are unaffected.
     use_torch_compile: bool = False
+    # Where training runs. Routing happens in workers/train_task.py.
+    compute_backend: Literal["local", "modal", "hf_spaces"] = "local"

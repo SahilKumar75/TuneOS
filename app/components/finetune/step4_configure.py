@@ -14,6 +14,58 @@ _LR_PRESETS = [
     ("5e-4", "Aggressive — large datasets, fast convergence"),
 ]
 
+_COMPUTE_BACKENDS = [
+    ("local", "Local GPU", "Train on this machine — uses your detected device"),
+    (
+        "modal",
+        "Modal",
+        "Free T4 cloud GPU (~$30/mo credits) — needs MODAL_TOKEN_ID + MODAL_TOKEN_SECRET",
+    ),
+    ("hf_spaces", "HF Spaces", "ZeroGPU A100 — 30 min/job limit when deployed there"),
+]
+
+
+def _compute_option(value: str, title: str, desc: str) -> rx.Component:
+    selected = FinetuneState.compute_backend == value
+    return rx.box(
+        rx.vstack(
+            rx.text(title, font_size="0.86rem", font_weight="600", color=c("text_primary")),
+            rx.text(desc, font_size="0.72rem", color=c("text_muted")),
+            spacing="1",
+            align_items="flex-start",
+        ),
+        on_click=FinetuneState.set_compute_backend(value),
+        cursor="pointer",
+        padding="12px 14px",
+        border_radius="10px",
+        border=rx.cond(selected, f"1.5px solid {c('accent')}", f"1px solid {c('border')}"),
+        background=rx.cond(selected, c("bg_input"), "transparent"),
+        flex="1",
+        transition="border 0.15s ease",
+    )
+
+
+def _compute_section() -> rx.Component:
+    return _card(
+        rx.vstack(
+            rx.text(
+                "Compute backend",
+                font_size="0.82rem",
+                font_weight="600",
+                color=c("text_secondary"),
+                margin_bottom="8px",
+            ),
+            rx.hstack(
+                *[_compute_option(v, t, d) for v, t, d in _COMPUTE_BACKENDS],
+                spacing="3",
+                width="100%",
+                align_items="stretch",
+            ),
+            spacing="0",
+            width="100%",
+        )
+    )
+
 
 def _step4() -> rx.Component:
     return rx.vstack(
@@ -84,7 +136,10 @@ def _step4() -> rx.Component:
                         rx.select.root(
                             rx.select.trigger(width="100%"),
                             rx.select.content(
-                                *[rx.select.item(str(v), value=str(v)) for v in [256, 512, 1024, 2048]],
+                                *[
+                                    rx.select.item(str(v), value=str(v))
+                                    for v in [256, 512, 1024, 2048]
+                                ],
                             ),
                             value=FinetuneState.max_seq_length.to_string(),
                             on_change=FinetuneState.set_max_seq_length,
@@ -131,7 +186,13 @@ def _step4() -> rx.Component:
                         margin_bottom="12px",
                     ),
                     # Section 1 — LoRA
-                    rx.text("LoRA Adapter", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="8px"),
+                    rx.text(
+                        "LoRA Adapter",
+                        font_size="0.78rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_top="8px",
+                    ),
                     rx.divider(margin_y="6px"),
                     rx.grid(
                         rx.vstack(
@@ -179,7 +240,13 @@ def _step4() -> rx.Component:
                         width="100%",
                     ),
                     # Section 2 — Batch & Memory
-                    rx.text("Batch & Memory", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="16px"),
+                    rx.text(
+                        "Batch & Memory",
+                        font_size="0.78rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_top="16px",
+                    ),
                     rx.divider(margin_y="6px"),
                     rx.grid(
                         rx.vstack(
@@ -246,7 +313,13 @@ def _step4() -> rx.Component:
                         width="100%",
                     ),
                     # Section 3 — Scheduler & Tracking
-                    rx.text("Scheduler & Tracking", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="16px"),
+                    rx.text(
+                        "Scheduler & Tracking",
+                        font_size="0.78rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_top="16px",
+                    ),
                     rx.divider(margin_y="6px"),
                     rx.grid(
                         rx.vstack(
@@ -281,14 +354,33 @@ def _step4() -> rx.Component:
                         ),
                         rx.vstack(
                             _label("Eval split ratio"),
-                            rx.slider(min=0.0, max=0.3, step=0.05, default_value=[FinetuneState.eval_split_ratio], on_value_commit=FinetuneState.set_eval_split_ratio),
-                            rx.text(FinetuneState.eval_split_ratio.to_string(), font_size="0.82rem", color=c("text_secondary")),
-                            rx.text("Fraction held out for validation", font_size="0.72rem", color=c("text_muted")),
+                            rx.slider(
+                                min=0.0,
+                                max=0.3,
+                                step=0.05,
+                                default_value=[FinetuneState.eval_split_ratio],
+                                on_value_commit=FinetuneState.set_eval_split_ratio,
+                            ),
+                            rx.text(
+                                FinetuneState.eval_split_ratio.to_string(),
+                                font_size="0.82rem",
+                                color=c("text_secondary"),
+                            ),
+                            rx.text(
+                                "Fraction held out for validation",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
                             spacing="1",
                         ),
                         rx.vstack(
                             _label("Early stopping patience"),
-                            rx.input(value=FinetuneState.early_stopping_patience.to_string(), on_change=FinetuneState.set_early_stopping_patience, type="number", width="100%"),
+                            rx.input(
+                                value=FinetuneState.early_stopping_patience.to_string(),
+                                on_change=FinetuneState.set_early_stopping_patience,
+                                type="number",
+                                width="100%",
+                            ),
                             rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
                             spacing="1",
                         ),
@@ -311,6 +403,8 @@ def _step4() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        # Compute backend selector
+        _compute_section(),
         # Run summary
         _card(
             rx.vstack(

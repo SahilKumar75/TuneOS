@@ -946,8 +946,13 @@ class AppState(rx.State):
 
         # ── Fine-tune wizard context (steps 1–7) ──────────────────
         _step_names = {
-            1: "Model selection", 2: "Intent", 3: "Data",
-            4: "Configure", 5: "Training", 6: "Results", 7: "Deploy",
+            1: "Model selection",
+            2: "Intent",
+            3: "Data",
+            4: "Configure",
+            5: "Training",
+            6: "Results",
+            7: "Deploy",
         }
         ft = self.get_state(FinetuneState)  # type: ignore[attr-defined]
         wizard_lines = []
@@ -957,19 +962,27 @@ class AppState(rx.State):
             if ft.technique_label:
                 wizard_lines.append(f"technique={ft.technique_label}")
             if ft.dataset_row_count:
-                wizard_lines.append(f"dataset_rows={ft.dataset_row_count}, avg_tokens={ft.dataset_avg_tokens:.0f}")
+                wizard_lines.append(
+                    f"dataset_rows={ft.dataset_row_count}, avg_tokens={ft.dataset_avg_tokens:.0f}"
+                )
             if ft.learning_rate:
-                wizard_lines.append(f"lr={ft.learning_rate}, epochs={ft.epochs}, batch={ft.batch_size}, seq_len={ft.max_seq_length}")
+                wizard_lines.append(
+                    f"lr={ft.learning_rate}, epochs={ft.epochs}, batch={ft.batch_size}, seq_len={ft.max_seq_length}"
+                )
             if ft.training_status and ft.training_status != "idle":
                 wizard_lines.append(f"training_status={ft.training_status}")
             if ft.current_step:
-                wizard_lines.append(f"current_step={ft.current_step} ({_step_names.get(ft.current_step, '')})")
+                wizard_lines.append(
+                    f"current_step={ft.current_step} ({_step_names.get(ft.current_step, '')})"
+                )
         except Exception:
             pass
 
         wizard_block = ""
         if wizard_lines:
-            wizard_block = "\n<wizard_context>\n  " + "\n  ".join(wizard_lines) + "\n</wizard_context>\n"
+            wizard_block = (
+                "\n<wizard_context>\n  " + "\n  ".join(wizard_lines) + "\n</wizard_context>\n"
+            )
 
         return f"""<role>
 You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling. You help users at every step of the fine-tuning wizard: picking models, preparing datasets, configuring hyperparameters, diagnosing training issues, and deploying models.

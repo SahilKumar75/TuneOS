@@ -187,76 +187,81 @@ def chat_panel() -> rx.Component:
         rx.cond(
             AppState.chat_open,
             rx.box(
-            rx.vstack(
-                # Header
-                rx.hstack(
+                rx.vstack(
+                    # Header
                     rx.hstack(
-                        rx.icon("bot", size=14, color=c("accent")),
-                        rx.text("Assistant", font_size="0.82rem", font_weight="600", color=c("text_primary")),
-                        spacing="2",
-                        align="center",
-                    ),
-                    rx.spacer(),
-                    rx.button(
-                        rx.icon("x", size=14),
-                        on_click=AppState.toggle_chat,
-                        variant="ghost",
-                        size="1",
-                        color_scheme="gray",
-                    ),
-                    width="100%",
-                    align="center",
-                    padding="10px 12px 6px",
-                    border_bottom=f"1px solid {c('border')}",
-                ),
-                # Messages or empty state + hints
-                rx.box(
-                    rx.vstack(
-                        _messages_area(),
-                        rx.cond(
-                            AppState.chat_messages.length() == 0,
-                            _dynamic_hints(),
-                            rx.fragment(),
+                        rx.hstack(
+                            rx.icon("bot", size=14, color=c("accent")),
+                            rx.text(
+                                "Assistant",
+                                font_size="0.82rem",
+                                font_weight="600",
+                                color=c("text_primary"),
+                            ),
+                            spacing="2",
+                            align="center",
                         ),
-                        spacing="0",
+                        rx.spacer(),
+                        rx.button(
+                            rx.icon("x", size=14),
+                            on_click=AppState.toggle_chat,
+                            variant="ghost",
+                            size="1",
+                            color_scheme="gray",
+                        ),
+                        width="100%",
+                        align="center",
+                        padding="10px 12px 6px",
+                        border_bottom=f"1px solid {c('border')}",
+                    ),
+                    # Messages or empty state + hints
+                    rx.box(
+                        rx.vstack(
+                            _messages_area(),
+                            rx.cond(
+                                AppState.chat_messages.length() == 0,
+                                _dynamic_hints(),
+                                rx.fragment(),
+                            ),
+                            spacing="0",
+                            width="100%",
+                        ),
+                        flex="1",
+                        overflow_y="auto",
                         width="100%",
                     ),
-                    flex="1",
-                    overflow_y="auto",
+                    # Input
+                    _input_row(),
+                    spacing="0",
+                    height="100%",
                     width="100%",
                 ),
-                # Input
-                _input_row(),
-                spacing="0",
-                height="100%",
-                width="100%",
+                width="272px",
+                min_width="272px",
+                height="100vh",
+                border_left=f"1px solid {c('border')}",
+                background=c("bg_primary"),
+                flex_shrink="0",
+                display="flex",
+                flex_direction="column",
+                overflow="hidden",
             ),
-            width="272px",
-            min_width="272px",
-            height="100vh",
-            border_left=f"1px solid {c('border')}",
-            background=c("bg_primary"),
-            flex_shrink="0",
-            display="flex",
-            flex_direction="column",
-            overflow="hidden",
-        ),
-        # Collapsed: just show toggle button
-        rx.box(
-            rx.button(
-                rx.icon("bot", size=16),
-                on_click=AppState.toggle_chat,
-                variant="soft",
-                color_scheme="blue",
-                size="2",
-                border_radius="8px 0 0 8px",
+            # Collapsed: just show toggle button
+            rx.box(
+                rx.button(
+                    rx.icon("bot", size=16),
+                    on_click=AppState.toggle_chat,
+                    variant="soft",
+                    color_scheme="blue",
+                    size="2",
+                    border_radius="8px 0 0 8px",
+                ),
+                position="fixed",
+                right="0",
+                top="50%",
+                transform="translateY(-50%)",
+                z_index="100",
             ),
-            position="fixed",
-            right="0",
-            top="50%",
-            transform="translateY(-50%)",
-            z_index="100",
-        ),
         ),
         rx.fragment(),  # nothing shown before user starts working
     )

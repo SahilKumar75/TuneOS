@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Modal.com cloud-GPU training backend.** Jobs can now run on a free Modal T4
+  GPU instead of the local device — useful when no local GPU is available. Step 4
+  (Configure) has a new **Compute backend** selector (Local GPU / Modal / HF
+  Spaces), threaded end-to-end through `JobConfig.compute_backend` →
+  `TrainingConfig.compute_backend` → `workers/train_task.py`. The new
+  `workers/modal_runner.py` serializes the dataset, runs the identical
+  `trainer.finetune` pipeline remotely on a Modal T4, and streams the adapter +
+  eval metrics back to local disk so the status/metrics layer is unchanged.
+  Evaluation logic is shared between backends via `train_task._compute_eval`.
+  Enabled by setting `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`; `modal` is an
+  optional dependency (`poetry install --with modal`) so nothing changes for
+  local-only users. Live loss streaming from Modal is deferred to a later phase.
 - **Reproducible runs via a configurable seed.** `TrainingConfig.seed` (default
   `42`) now drives every source of randomness — the train/validation split,
   data shuffling, and weight initialization — through `transformers.set_seed`

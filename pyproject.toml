@@ -26,6 +26,9 @@ pandas = ">=2.0.0"
 [tool.poetry.group.postgres.dependencies]
 psycopg2-binary = ">=2.9.0"
 
+[tool.poetry.group.modal.dependencies]
+modal = ">=0.64.0"
+
 [tool.poetry.group.desktop.dependencies]
 PyQt6 = ">=6.6.0"
 PyQt6-WebEngine = ">=6.6.0"

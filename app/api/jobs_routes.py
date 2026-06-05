@@ -91,6 +91,26 @@ async def create_job(config: JobConfig):
         "use_torch_compile": config.use_torch_compile,
     }
 
+    # Guard: refuse to queue if no worker is listening — job would silently sit forever.
+    try:
+        from workers.celery_app import celery_app as _celery
+
+        _inspector = _celery.control.inspect(timeout=2.0)
+        if not _inspector.active():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No training workers are running. "
+                    "Start the desktop app, or run manually: "
+                    "celery -A workers.celery_app worker --loglevel=info"
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # If inspect itself fails (e.g. Redis down), let apply_async surface the error below.
+        pass
+
     try:
         from workers.train_task import run_finetune
 

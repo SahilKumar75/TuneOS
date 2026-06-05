@@ -11,6 +11,13 @@ from workers.celery_app import celery_app
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+# Models that reliably require an HF token to download (accept-on-Hub gating).
+# Only include families where a missing token causes a cryptic silent failure.
+_GATED_MODEL_PREFIXES = (
+    "meta-llama/",
+    "meta-llama/Meta-Llama",
+)
+
 try:
     import spaces
 
@@ -40,6 +47,20 @@ def _run_finetune_impl(
     started_at = datetime.now(timezone.utc).isoformat()
 
     try:
+        # Early-fail for gated models with no token — avoids a silent hang during download.
+        _model_name = model_cfg.get("model_name", "")
+        _hf_token = model_cfg.get("hf_token", "") or os.getenv("HF_TOKEN", "")
+        if not _hf_token and any(
+            _model_name.startswith(p) for p in _GATED_MODEL_PREFIXES
+        ):
+            _msg = (
+                f"Model '{_model_name}' requires a Hugging Face token. "
+                "Add HF_TOKEN to your .env file or paste it in the model settings."
+            )
+            write_job_status(job_id, "failed", started_at=started_at, finished_at=started_at)
+            r.set(status_key, json.dumps({"status": "failed", "job_id": job_id, "error": _msg}))
+            raise RuntimeError(_msg)
+
         # Durable record so GET /jobs works even if Redis is unavailable
         write_job_status(job_id, "running", started_at=started_at)
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))

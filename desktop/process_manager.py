@@ -15,6 +15,7 @@ Qt signals.
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 import sys
 import time
@@ -54,6 +55,8 @@ class ProcessManager(QObject):
         super().__init__(parent)
         self._reflex_process: subprocess.Popen | None = None
         self._docker_started: bool = False
+        self._local_redis_process: subprocess.Popen | None = None
+        self._local_celery_process: subprocess.Popen | None = None
 
     # ── Docker helpers ───────────────────────────────────────────
     @staticmethod
@@ -111,6 +114,74 @@ class ProcessManager(QObject):
             log.warning("Error stopping Docker services: %s", exc)
         finally:
             self._docker_started = False
+
+    # ── Local fallback helpers (no Docker) ──────────────────────
+    def _start_local_redis(self) -> bool:
+        """Start a Redis server as a local subprocess fallback."""
+        if not shutil.which("redis-server"):
+            log.warning("redis-server not found in PATH; skipping local Redis.")
+            self.status_changed.emit(
+                "redis-server not found. Install Redis or start Docker."
+            )
+            return False
+        self.status_changed.emit("Starting local Redis server…")
+        try:
+            self._local_redis_process = subprocess.Popen(
+                ["redis-server", "--daemonize", "no"],
+                cwd=PROJECT_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            # Brief pause to let Redis bind its port
+            time.sleep(1.0)
+            log.info("Local Redis started (PID %s).", self._local_redis_process.pid)
+            return True
+        except OSError as exc:
+            log.error("Failed to start local Redis: %s", exc)
+            return False
+
+    def _start_local_celery(self) -> bool:
+        """Start a Celery worker as a local subprocess fallback."""
+        self.status_changed.emit("Starting local Celery worker…")
+        try:
+            self._local_celery_process = subprocess.Popen(
+                [
+                    sys.executable, "-m", "celery",
+                    "-A", "workers.celery_app",
+                    "worker",
+                    "--loglevel=info",
+                    "--concurrency=1",
+                    "--without-heartbeat",
+                ],
+                cwd=PROJECT_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            log.info("Local Celery worker started (PID %s).", self._local_celery_process.pid)
+            return True
+        except OSError as exc:
+            log.error("Failed to start local Celery worker: %s", exc)
+            return False
+
+    def _stop_local_services(self) -> None:
+        """Terminate locally-spawned Redis and Celery processes."""
+        for name, proc in [
+            ("Celery worker", self._local_celery_process),
+            ("Redis", self._local_redis_process),
+        ]:
+            if proc is None:
+                continue
+            try:
+                proc.terminate()
+                proc.wait(timeout=8)
+                log.info("Local %s stopped.", name)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                log.warning("Local %s killed after timeout.", name)
+            except OSError as exc:
+                log.warning("Error stopping local %s: %s", name, exc)
+        self._local_redis_process = None
+        self._local_celery_process = None
 
     # ── Reflex server helpers ────────────────────────────────────
     def _start_reflex(self) -> bool:
@@ -191,8 +262,18 @@ class ProcessManager(QObject):
         if self.is_docker_available():
             docker_ok = self._start_docker_services()
         else:
-            self.status_changed.emit("Docker not available — skipping containers.")
-            log.warning("Docker not available; skipping container startup.")
+            self.status_changed.emit(
+                "Docker not available — starting Redis & Celery locally…"
+            )
+            log.warning("Docker not available; falling back to local subprocesses.")
+            redis_ok = self._start_local_redis()
+            celery_ok = self._start_local_celery()
+            docker_ok = redis_ok and celery_ok
+            if not docker_ok:
+                self.status_changed.emit(
+                    "⚠ Could not start Redis/Celery. "
+                    "Run manually: celery -A workers.celery_app worker"
+                )
 
         reflex_ok = self._start_reflex()
 
@@ -203,8 +284,9 @@ class ProcessManager(QObject):
         return docker_ok
 
     def stop(self) -> None:
-        """Stop the Reflex server and Docker containers (in that order)."""
+        """Stop the Reflex server, Docker containers, and any local services."""
         self.status_changed.emit("Shutting down…")
         self._stop_reflex()
         self._stop_docker_services()
+        self._stop_local_services()
         self.status_changed.emit("Stopped.")

@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from app.components.chat_panel import chat_panel
 from app.components.settings_panel import settings_panel
 from app.components.sidebar import sidebar
 from app.pages.datasets import datasets_page
@@ -80,6 +81,7 @@ def two_panel_layout() -> rx.Component:
             height="100vh",
             overflow="hidden",
         ),
+        chat_panel(),
         spacing="0",
         width="100vw",
         height="100vh",

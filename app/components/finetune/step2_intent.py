@@ -77,12 +77,13 @@ def _filter_chip(
     label: str,
     current_var,
     event_handler,
+    color: str = "blue",
 ) -> rx.Component:
     return rx.badge(
         label,
         cursor="pointer",
         on_click=event_handler(value),
-        color_scheme="blue",
+        color_scheme=color,
         variant=rx.cond(current_var == value, "solid", "soft"),
         size="2",
         padding="6px 12px",
@@ -100,6 +101,7 @@ def _filter_row(row_label: str, chips: list) -> rx.Component:
 
 def _phase_a() -> rx.Component:
     return rx.vstack(
+        rx.text("Step 1 of 3 — Context filters", font_size="0.75rem", color=c("text_muted"), margin_bottom="8px"),
         _card(
             rx.vstack(
                 rx.text(
@@ -111,26 +113,29 @@ def _phase_a() -> rx.Component:
                 _filter_row(
                     "Use for?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for)
+                        _filter_chip(v, l, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for, color="blue")
                         for v, l in _FILTER_USE_FOR
                     ],
                 ),
+                rx.text("Who will benefit from this model?", font_size="0.75rem", color=c("text_muted")),
                 rx.divider(),
                 _filter_row(
                     "Domain?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_domain, FinetuneState.set_intent_domain)
+                        _filter_chip(v, l, FinetuneState.intent_domain, FinetuneState.set_intent_domain, color="violet")
                         for v, l in _FILTER_DOMAIN
                     ],
                 ),
+                rx.text("What industry or field?", font_size="0.75rem", color=c("text_muted")),
                 rx.divider(),
                 _filter_row(
                     "Task type?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_task_type, FinetuneState.set_intent_task_type)
+                        _filter_chip(v, l, FinetuneState.intent_task_type, FinetuneState.set_intent_task_type, color="green")
                         for v, l in _FILTER_TASK
                     ],
                 ),
+                rx.text("What kind of output does it produce?", font_size="0.75rem", color=c("text_muted")),
                 spacing="4",
                 width="100%",
             )
@@ -295,11 +300,21 @@ def _phase_c() -> rx.Component:
             margin_bottom="8px",
         ),
         _card(
-            rx.box(
-                rx.markdown(FinetuneState.intent_md),
-                max_height="420px",
-                overflow_y="auto",
-                padding="4px",
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("check-circle", size=16, color=c("accent")),
+                    rx.text("Intent profile ready", font_size="0.88rem", font_weight="600", color=c("text_primary")),
+                    spacing="2", align="center",
+                ),
+                rx.box(height="8px"),
+                rx.box(
+                    rx.markdown(FinetuneState.intent_md),
+                    max_height="380px",
+                    overflow_y="auto",
+                    padding="4px",
+                    width="100%",
+                ),
+                spacing="0",
                 width="100%",
             ),
             padding="16px",

@@ -259,6 +259,10 @@ class FinetuneState(rx.State):
     generation_diversity_score: float = 0.0
     seed_examples: list[SeedExample] = []
 
+    # ── Step 3: Data stats ────────────────────────────────────────
+    dataset_row_count: int = 0
+    dataset_avg_tokens: float = 0.0
+
     # ── Step 4: Configure ─────────────────────────────────────────
     ui_mode: str = "simple"  # "simple" | "advanced"
     lora_r: int = 16
@@ -273,6 +277,8 @@ class FinetuneState(rx.State):
     lr_scheduler: str = "cosine"
     bf16: bool = False
     experiment_name: str = ""
+    eval_split_ratio: float = 0.1
+    early_stopping_patience: int = 0
 
     # ── Step 5: Training dashboard ────────────────────────────────
     job_id: str = ""
@@ -1299,6 +1305,17 @@ intent_answers: {self.intent_answers}
     @rx.event
     def set_experiment_name(self, value: str):
         self.experiment_name = value
+
+    @rx.event
+    def set_eval_split_ratio(self, value: list[float]):
+        self.eval_split_ratio = round(float(value[0]) if isinstance(value, list) else float(value), 2)
+
+    @rx.event
+    def set_early_stopping_patience(self, value: str):
+        try:
+            self.early_stopping_patience = max(0, int(value))
+        except (ValueError, TypeError):
+            pass
 
     # ── Step 5: Start training ────────────────────────────────────
     @rx.event(background=True)

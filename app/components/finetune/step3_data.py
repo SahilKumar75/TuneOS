@@ -65,6 +65,21 @@ def _upload_panel() -> rx.Component:
                 _preview_table(FinetuneState.dataset_preview, "File preview (first 5 rows)"),
                 rx.fragment(),
             ),
+            rx.cond(
+                FinetuneState.dataset_row_count > 0,
+                rx.hstack(
+                    rx.badge(FinetuneState.dataset_row_count.to_string() + " rows", color_scheme="blue", size="1"),
+                    rx.badge("~" + FinetuneState.dataset_avg_tokens.to_string() + " avg tokens", color_scheme="gray", size="1"),
+                    rx.cond(
+                        FinetuneState.dataset_row_count < 100,
+                        rx.badge("⚠ Small dataset", color_scheme="orange", size="1"),
+                        rx.fragment(),
+                    ),
+                    spacing="2",
+                    margin_top="8px",
+                ),
+                rx.fragment(),
+            ),
             spacing="3",
         )
     )
@@ -230,7 +245,7 @@ def _generate_panel() -> rx.Component:
                     FinetuneState.is_generating,
                     rx.hstack(rx.spinner(size="2"), rx.text("Generating..."), spacing="2"),
                     rx.hstack(
-                        rx.icon("sparkles", size=14), rx.text("Generate examples"), spacing="2"
+                        rx.icon("sparkles", size=14), rx.text("Generate examples (~2 min)"), spacing="2"
                     ),
                 ),
                 on_click=FinetuneState.generate_starter_dataset,
@@ -259,9 +274,10 @@ def _step3() -> rx.Component:
     return rx.vstack(
         _section_heading("Add your training data"),
         rx.hstack(
-            _data_mode_btn("upload", "Upload a file", "upload"),
+            _data_mode_btn("upload", "Upload a file ✓", "upload"),
+            rx.badge("Recommended", color_scheme="green", size="1", variant="soft"),
             _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
-            _data_mode_btn("generate", "Generate with AI", "sparkles"),
+            _data_mode_btn("generate", "Generate with AI ✨", "sparkles"),
             spacing="2",
             margin_bottom="16px",
         ),

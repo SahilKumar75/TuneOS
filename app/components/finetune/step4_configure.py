@@ -9,9 +9,9 @@ from app.state.finetune_state import FinetuneState
 from app.styles import c
 
 _LR_PRESETS = [
-    ("1e-4", "Slow & careful"),
-    ("2e-4", "Balanced (recommended)"),
-    ("5e-4", "Fast learning"),
+    ("1e-4", "Conservative — small datasets / sensitive tasks"),
+    ("2e-4", "Balanced — good for most datasets (recommended)"),
+    ("5e-4", "Aggressive — large datasets, fast convergence"),
 ]
 
 
@@ -67,6 +67,32 @@ def _step4() -> rx.Component:
                         spacing="1",
                     ),
                     rx.vstack(
+                        _label("Batch size"),
+                        rx.select.root(
+                            rx.select.trigger(width="100%"),
+                            rx.select.content(
+                                *[rx.select.item(str(v), value=str(v)) for v in [1, 2, 4, 8]],
+                            ),
+                            value=FinetuneState.batch_size.to_string(),
+                            on_change=FinetuneState.set_batch_size,
+                        ),
+                        rx.text("Samples per GPU step", font_size="0.72rem", color=c("text_muted")),
+                        spacing="1",
+                    ),
+                    rx.vstack(
+                        _label("Max sequence length"),
+                        rx.select.root(
+                            rx.select.trigger(width="100%"),
+                            rx.select.content(
+                                *[rx.select.item(str(v), value=str(v)) for v in [256, 512, 1024, 2048]],
+                            ),
+                            value=FinetuneState.max_seq_length.to_string(),
+                            on_change=FinetuneState.set_max_seq_length,
+                        ),
+                        rx.text("Tokens per sample", font_size="0.72rem", color=c("text_muted")),
+                        spacing="1",
+                    ),
+                    rx.vstack(
                         _label("Technique"),
                         rx.text(
                             FinetuneState.technique_label,
@@ -74,10 +100,18 @@ def _step4() -> rx.Component:
                             font_weight="500",
                             color=c("accent"),
                         ),
-                        rx.text("Change in Step 1", font_size="0.72rem", color=c("text_muted")),
+                        rx.button(
+                            "← Edit in Step 1",
+                            on_click=FinetuneState.go_to_step(1),
+                            variant="ghost",
+                            size="1",
+                            color_scheme="blue",
+                            padding="0",
+                            height="auto",
+                        ),
                         spacing="1",
                     ),
-                    columns="3",
+                    columns="2",
                     spacing="4",
                     width="100%",
                 ),
@@ -96,6 +130,9 @@ def _step4() -> rx.Component:
                         color=c("text_primary"),
                         margin_bottom="12px",
                     ),
+                    # Section 1 — LoRA
+                    rx.text("LoRA Adapter", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="8px"),
+                    rx.divider(margin_y="6px"),
                     rx.grid(
                         rx.vstack(
                             _label("LoRA rank (r)"),
@@ -137,6 +174,14 @@ def _step4() -> rx.Component:
                             ),
                             spacing="1",
                         ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    # Section 2 — Batch & Memory
+                    rx.text("Batch & Memory", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="16px"),
+                    rx.divider(margin_y="6px"),
+                    rx.grid(
                         rx.vstack(
                             _label("Batch size"),
                             rx.select.root(
@@ -183,6 +228,28 @@ def _step4() -> rx.Component:
                             spacing="1",
                         ),
                         rx.vstack(
+                            _label("BF16 mode (A100/H100 only)"),
+                            rx.switch(
+                                checked=FinetuneState.bf16,
+                                on_change=FinetuneState.set_bf16,
+                                size="2",
+                            ),
+                            rx.text(
+                                "Better precision than FP16 on Ampere+ GPUs",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    # Section 3 — Scheduler & Tracking
+                    rx.text("Scheduler & Tracking", font_size="0.78rem", font_weight="600", color=c("text_secondary"), margin_top="16px"),
+                    rx.divider(margin_y="6px"),
+                    rx.grid(
+                        rx.vstack(
                             _label("LR scheduler"),
                             rx.select.root(
                                 rx.select.trigger(width="100%"),
@@ -203,20 +270,6 @@ def _step4() -> rx.Component:
                             spacing="1",
                         ),
                         rx.vstack(
-                            _label("BF16 mode (A100/H100 only)"),
-                            rx.switch(
-                                checked=FinetuneState.bf16,
-                                on_change=FinetuneState.set_bf16,
-                                size="2",
-                            ),
-                            rx.text(
-                                "Better precision than FP16 on Ampere+ GPUs",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
                             _label("Experiment name"),
                             rx.input(
                                 placeholder="my-run-1",
@@ -226,12 +279,35 @@ def _step4() -> rx.Component:
                             ),
                             spacing="1",
                         ),
+                        rx.vstack(
+                            _label("Eval split ratio"),
+                            rx.slider(min=0.0, max=0.3, step=0.05, default_value=[FinetuneState.eval_split_ratio], on_value_commit=FinetuneState.set_eval_split_ratio),
+                            rx.text(FinetuneState.eval_split_ratio.to_string(), font_size="0.82rem", color=c("text_secondary")),
+                            rx.text("Fraction held out for validation", font_size="0.72rem", color=c("text_muted")),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Early stopping patience"),
+                            rx.input(value=FinetuneState.early_stopping_patience.to_string(), on_change=FinetuneState.set_early_stopping_patience, type="number", width="100%"),
+                            rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
+                            spacing="1",
+                        ),
                         columns="3",
                         spacing="4",
                         width="100%",
                     ),
                     spacing="0",
                 )
+            ),
+            rx.fragment(),
+        ),
+        # VRAM warning
+        rx.cond(
+            (FinetuneState.batch_size * FinetuneState.max_seq_length) > 4096,
+            rx.callout(
+                "⚠ High memory config — estimated >12GB VRAM. Reduce batch size or sequence length if you hit OOM.",
+                color_scheme="orange",
+                size="1",
             ),
             rx.fragment(),
         ),

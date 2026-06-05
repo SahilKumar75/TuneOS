@@ -97,6 +97,7 @@ class AppState(rx.State):
     is_chat_loading: bool = False
     chat_model: str = "auto"
     last_used_model: str = ""
+    chat_open: bool = True
 
     # ── Project history (real, built from user actions) ───────────
     projects: list[ProjectItem] = []
@@ -846,6 +847,10 @@ class AppState(rx.State):
     def set_chat_model(self, model_id: str):
         self.chat_model = model_id
 
+    @rx.event
+    def toggle_chat(self):
+        self.chat_open = not self.chat_open
+
     # Fallback chain tried in order when a model is rate-limited
     # Each entry: (model_id, base_url, env_key)
     # base_url=None means OpenRouter
@@ -908,6 +913,9 @@ class AppState(rx.State):
         return ("llama-3.3-70b-versatile", "groq", "GROQ_API_KEY")
 
     def _build_system_prompt(self) -> str:
+        from app.state.finetune_state import FinetuneState
+
+        # ── Model preview context (landing page) ──────────────────
         context_lines = []
         if self.preview_title:
             context_lines.append(f"  <model_name>{self.preview_title}</model_name>")
@@ -932,20 +940,46 @@ class AppState(rx.State):
         if self.preview_readme:
             context_lines.append(f"  <model_card>{self.preview_readme[:6000]}</model_card>")
 
-        context_block = ""
+        model_block = ""
         if context_lines:
-            context_block = (
-                "\n<current_model>\n" + "\n".join(context_lines) + "\n</current_model>\n"
-            )
+            model_block = "\n<current_model>\n" + "\n".join(context_lines) + "\n</current_model>\n"
+
+        # ── Fine-tune wizard context (steps 1–7) ──────────────────
+        _step_names = {
+            1: "Model selection", 2: "Intent", 3: "Data",
+            4: "Configure", 5: "Training", 6: "Results", 7: "Deploy",
+        }
+        ft = self.get_state(FinetuneState)  # type: ignore[attr-defined]
+        wizard_lines = []
+        try:
+            if ft.selected_model_id:
+                wizard_lines.append(f"model={ft.selected_model_id}")
+            if ft.technique_label:
+                wizard_lines.append(f"technique={ft.technique_label}")
+            if ft.dataset_row_count:
+                wizard_lines.append(f"dataset_rows={ft.dataset_row_count}, avg_tokens={ft.dataset_avg_tokens:.0f}")
+            if ft.learning_rate:
+                wizard_lines.append(f"lr={ft.learning_rate}, epochs={ft.epochs}, batch={ft.batch_size}, seq_len={ft.max_seq_length}")
+            if ft.training_status and ft.training_status != "idle":
+                wizard_lines.append(f"training_status={ft.training_status}")
+            if ft.current_step:
+                wizard_lines.append(f"current_step={ft.current_step} ({_step_names.get(ft.current_step, '')})")
+        except Exception:
+            pass
+
+        wizard_block = ""
+        if wizard_lines:
+            wizard_block = "\n<wizard_context>\n  " + "\n  ".join(wizard_lines) + "\n</wizard_context>\n"
 
         return f"""<role>
-You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling. You help users explore models, prepare datasets, plan training runs, and debug ML workflows.
+You are TuneOS Assistant — an expert in LLM fine-tuning, LoRA, QLoRA, and Hugging Face tooling. You help users at every step of the fine-tuning wizard: picking models, preparing datasets, configuring hyperparameters, diagnosing training issues, and deploying models.
 </role>
-{context_block}
+{model_block}{wizard_block}
 <rules>
-- Be concise and practical. For code/configs, use fenced code blocks.
-- Never speculate about a model you haven't been given context for. If the user asks about a model not shown above, say you don't have its details loaded yet.
-- When comparing options, give a direct recommendation instead of listing pros and cons without a conclusion.
+- Be concise and practical. Use fenced code blocks for configs/code.
+- When you have wizard_context, tailor answers to the user's actual setup (model, dataset size, technique).
+- Give direct recommendations — no wishy-washy pros/cons without a conclusion.
+- For VRAM questions: 7B QLoRA ≈ 8–10GB, 7B LoRA ≈ 16GB, 13B QLoRA ≈ 12–14GB.
 </rules>"""
 
     @rx.event

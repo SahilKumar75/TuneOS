@@ -101,7 +101,12 @@ def _filter_row(row_label: str, chips: list) -> rx.Component:
 
 def _phase_a() -> rx.Component:
     return rx.vstack(
-        rx.text("Step 1 of 3 — Context filters", font_size="0.75rem", color=c("text_muted"), margin_bottom="8px"),
+        rx.text(
+            "Step 1 of 3 — Context filters",
+            font_size="0.75rem",
+            color=c("text_muted"),
+            margin_bottom="8px",
+        ),
         _card(
             rx.vstack(
                 rx.text(
@@ -113,17 +118,31 @@ def _phase_a() -> rx.Component:
                 _filter_row(
                     "Use for?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_use_for, FinetuneState.set_intent_use_for, color="blue")
-                        for v, l in _FILTER_USE_FOR
+                        _filter_chip(
+                            v,
+                            lbl,
+                            FinetuneState.intent_use_for,
+                            FinetuneState.set_intent_use_for,
+                            color="blue",
+                        )
+                        for v, lbl in _FILTER_USE_FOR
                     ],
                 ),
-                rx.text("Who will benefit from this model?", font_size="0.75rem", color=c("text_muted")),
+                rx.text(
+                    "Who will benefit from this model?", font_size="0.75rem", color=c("text_muted")
+                ),
                 rx.divider(),
                 _filter_row(
                     "Domain?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_domain, FinetuneState.set_intent_domain, color="violet")
-                        for v, l in _FILTER_DOMAIN
+                        _filter_chip(
+                            v,
+                            lbl,
+                            FinetuneState.intent_domain,
+                            FinetuneState.set_intent_domain,
+                            color="violet",
+                        )
+                        for v, lbl in _FILTER_DOMAIN
                     ],
                 ),
                 rx.text("What industry or field?", font_size="0.75rem", color=c("text_muted")),
@@ -131,11 +150,21 @@ def _phase_a() -> rx.Component:
                 _filter_row(
                     "Task type?",
                     [
-                        _filter_chip(v, l, FinetuneState.intent_task_type, FinetuneState.set_intent_task_type, color="green")
-                        for v, l in _FILTER_TASK
+                        _filter_chip(
+                            v,
+                            lbl,
+                            FinetuneState.intent_task_type,
+                            FinetuneState.set_intent_task_type,
+                            color="green",
+                        )
+                        for v, lbl in _FILTER_TASK
                     ],
                 ),
-                rx.text("What kind of output does it produce?", font_size="0.75rem", color=c("text_muted")),
+                rx.text(
+                    "What kind of output does it produce?",
+                    font_size="0.75rem",
+                    color=c("text_muted"),
+                ),
                 spacing="4",
                 width="100%",
             )
@@ -224,7 +253,9 @@ def _progress_dots() -> rx.Component:
 
 def _phase_b_question(q_idx: int) -> rx.Component:
     q = _QUESTIONS[q_idx]
-    is_answered = (FinetuneState.intent_answers[q_idx] != "") | FinetuneState.intent_is_custom[q_idx]
+    is_answered = (FinetuneState.intent_answers[q_idx] != "") | FinetuneState.intent_is_custom[
+        q_idx
+    ]
     is_last = q_idx == 4
     return _card(
         rx.vstack(
@@ -303,8 +334,14 @@ def _phase_c() -> rx.Component:
             rx.vstack(
                 rx.hstack(
                     rx.icon("check-circle", size=16, color=c("accent")),
-                    rx.text("Intent profile ready", font_size="0.88rem", font_weight="600", color=c("text_primary")),
-                    spacing="2", align="center",
+                    rx.text(
+                        "Intent profile ready",
+                        font_size="0.88rem",
+                        font_weight="600",
+                        color=c("text_primary"),
+                    ),
+                    spacing="2",
+                    align="center",
                 ),
                 rx.box(height="8px"),
                 rx.box(

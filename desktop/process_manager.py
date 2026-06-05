@@ -120,9 +120,7 @@ class ProcessManager(QObject):
         """Start a Redis server as a local subprocess fallback."""
         if not shutil.which("redis-server"):
             log.warning("redis-server not found in PATH; skipping local Redis.")
-            self.status_changed.emit(
-                "redis-server not found. Install Redis or start Docker."
-            )
+            self.status_changed.emit("redis-server not found. Install Redis or start Docker.")
             return False
         self.status_changed.emit("Starting local Redis server…")
         try:
@@ -146,8 +144,11 @@ class ProcessManager(QObject):
         try:
             self._local_celery_process = subprocess.Popen(
                 [
-                    sys.executable, "-m", "celery",
-                    "-A", "workers.celery_app",
+                    sys.executable,
+                    "-m",
+                    "celery",
+                    "-A",
+                    "workers.celery_app",
                     "worker",
                     "--loglevel=info",
                     "--concurrency=1",
@@ -262,9 +263,7 @@ class ProcessManager(QObject):
         if self.is_docker_available():
             docker_ok = self._start_docker_services()
         else:
-            self.status_changed.emit(
-                "Docker not available — starting Redis & Celery locally…"
-            )
+            self.status_changed.emit("Docker not available — starting Redis & Celery locally…")
             log.warning("Docker not available; falling back to local subprocesses.")
             redis_ok = self._start_local_redis()
             celery_ok = self._start_local_celery()

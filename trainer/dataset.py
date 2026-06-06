@@ -121,24 +121,35 @@ def load_preference_pairs(
 ) -> Dataset:
     """Load a preference dataset for DPO, normalised to ``prompt``/``chosen``/
     ``rejected`` text columns (the shape ``trl.DPOTrainer`` expects)."""
+    required = (prompt_col, chosen_col, rejected_col)
+
+    def _check(available: list[str]) -> None:
+        missing = [c for c in required if c not in available]
+        if missing:
+            raise ValueError(
+                f"Preference dataset missing column(s) {missing}. Available columns: {available}"
+            )
+
+    # Validate columns on the raw source before constructing a HF Dataset, so an
+    # invalid request fails fast (and without triggering dataset fingerprinting).
     if hub_dataset_id:
         raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=False)
+        _check(raw.column_names)
     elif file_path.endswith(".csv"):
-        raw = Dataset.from_pandas(pd.read_csv(file_path))
+        df = pd.read_csv(file_path)
+        _check(list(df.columns))
+        raw = Dataset.from_pandas(df)
     elif file_path.endswith(".json") and not file_path.endswith(".jsonl"):
         import json
 
         with open(file_path) as f:
             data = json.load(f)
-        raw = Dataset.from_list(data if isinstance(data, list) else [data])
+        records = data if isinstance(data, list) else [data]
+        _check(list(records[0].keys()) if records else [])
+        raw = Dataset.from_list(records)
     else:
         raw = load_dataset("json", data_files=file_path, split="train")
-
-    missing = [c for c in (prompt_col, chosen_col, rejected_col) if c not in raw.column_names]
-    if missing:
-        raise ValueError(
-            f"Preference dataset missing column(s) {missing}. Available columns: {raw.column_names}"
-        )
+        _check(raw.column_names)
 
     for src, dst in ((prompt_col, "prompt"), (chosen_col, "chosen"), (rejected_col, "rejected")):
         if src != dst and src in raw.column_names:

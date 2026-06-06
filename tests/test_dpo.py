@@ -1,12 +1,25 @@
-"""Tests for the DPO data path and config — no torch/trl required."""
+"""Tests for the DPO data path and config — no torch/trl required.
+
+Tests that construct a real HF ``Dataset`` are gated behind
+``TUNEOS_INTEGRATION_TESTS`` because the unit suite mocks torch/transformers in
+``sys.modules`` (for the worker tests), which breaks ``datasets`` fingerprinting.
+Column-validation and pure-config tests run unconditionally.
+"""
 
 from __future__ import annotations
+
+import os
 
 import pandas as pd
 import pytest
 
 from trainer.config import DPOConfig
 from trainer.dataset import detect_dataset_type, load_preference_pairs
+
+_needs_real_datasets = pytest.mark.skipif(
+    not os.getenv("TUNEOS_INTEGRATION_TESTS"),
+    reason="constructs a real HF Dataset; set TUNEOS_INTEGRATION_TESTS=1 to run",
+)
 
 
 def test_detect_dataset_type():
@@ -16,6 +29,7 @@ def test_detect_dataset_type():
     assert detect_dataset_type(["prompt", "chosen"]) == "instruction"
 
 
+@_needs_real_datasets
 def test_load_preference_pairs_csv(tmp_path):
     csv = tmp_path / "prefs.csv"
     pd.DataFrame(
@@ -34,6 +48,7 @@ def test_load_preference_pairs_csv(tmp_path):
     assert ds[0]["rejected"] == "bad1"
 
 
+@_needs_real_datasets
 def test_load_preference_pairs_custom_columns(tmp_path):
     csv = tmp_path / "prefs.csv"
     pd.DataFrame(

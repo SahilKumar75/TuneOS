@@ -8,6 +8,8 @@ celery_app = Celery(
     "finetune_worker",
     broker=REDIS_URL,
     backend=REDIS_URL,
+    # Ensure the worker registers all task modules at startup.
+    include=["workers.train_task", "workers.dpo_task", "workers.merge_task"],
 )
 
 celery_app.conf.update(

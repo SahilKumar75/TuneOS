@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from app.api.deps import OUTPUT_DIR, REDIS_URL, _get_job_status_from_redis
 from app.api.schemas import (
     CommentaryRequest,
+    DPOJobConfig,
     GgufRequest,
     GitHubPushRequest,
     InferRequest,
@@ -140,6 +141,90 @@ async def create_job(config: JobConfig):
         )
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}") from exc
+
+    return JobCreated(job_id=job_id)
+
+
+def _ensure_worker_alive() -> None:
+    """Raise 503 if no Celery worker is listening — avoids silently queuing a
+    job that would sit forever. Inspect failures (e.g. Redis down) are tolerated;
+    the enqueue below will surface those."""
+    try:
+        from workers.celery_app import celery_app as _celery
+
+        if not _celery.control.inspect(timeout=2.0).active():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No training workers are running. Start the desktop app, or run: "
+                    "celery -A workers.celery_app worker --loglevel=info"
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
+@router.post("/jobs/dpo", response_model=JobCreated, status_code=201)
+async def create_dpo_job(config: DPOJobConfig):
+    """Create and enqueue a DPO (preference) fine-tuning job."""
+    job_id = config.experiment_id or str(uuid.uuid4())
+
+    model_cfg = {
+        "model_name": config.model_id,
+        "use_4bit": config.use_4bit,
+        "use_8bit": False,
+        "trust_remote_code": False,
+        "max_seq_length": config.max_length,
+        "hf_token": config.hf_token,
+        "local_model_path": config.local_model_path,
+        "model_source": config.model_source,
+    }
+    lora_cfg = {
+        "r": config.lora_rank,
+        "lora_alpha": config.lora_alpha,
+        "lora_dropout": config.lora_dropout,
+        "bias": "none",
+        "task_type": "CAUSAL_LM",
+        "target_modules": None,
+    }
+    dpo_cfg = {
+        "output_dir": OUTPUT_DIR,
+        "beta": config.beta,
+        "max_length": config.max_length,
+        "max_prompt_length": config.max_prompt_length,
+        "num_train_epochs": config.epochs,
+        "per_device_train_batch_size": config.batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "learning_rate": config.learning_rate,
+        "fp16": not config.bf16,
+        "bf16": config.bf16,
+        "seed": config.seed,
+    }
+
+    _ensure_worker_alive()
+
+    try:
+        from workers.dpo_task import run_dpo
+
+        run_dpo.apply_async(
+            kwargs={
+                "job_id": job_id,
+                "model_cfg": model_cfg,
+                "lora_cfg": lora_cfg,
+                "dpo_cfg": dpo_cfg,
+                "dataset_path": config.dataset_path,
+                "hub_dataset_id": config.hub_dataset_id,
+                "hub_split": config.hub_dataset_split,
+                "prompt_col": config.prompt_col,
+                "chosen_col": config.chosen_col,
+                "rejected_col": config.rejected_col,
+            },
+            task_id=job_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Could not enqueue DPO job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
 

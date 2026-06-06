@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **DPO preference training (P4-C).** A second recipe trains a LoRA adapter on
+  `(prompt, chosen, rejected)` preference triples via `trl.DPOTrainer`. New
+  `trainer/dpo.py` (`train_dpo`, reuses the SFT loader + LoRA injection),
+  `trainer.config.DPOConfig` (beta, max_length, max_prompt_length, …),
+  `trainer.dataset.load_preference_pairs` + `detect_dataset_type`, the
+  `workers/dpo_task.py` Celery task, and `POST /api/jobs/dpo` (`DPOJobConfig`).
+  Tests in `tests/test_dpo.py`. (The Step 3 three-column uploader UI is a
+  follow-up.)
 - **Prompt templates & sample packing (P4-B).** `trainer/dataset.py` now ships a
   `PROMPT_TEMPLATES` registry (`alpaca`, `chatml`, `llama3`, `phi3`, `zephyr`);
   `format_prompt(..., template=)` and `load_and_tokenize(..., template=)` honor

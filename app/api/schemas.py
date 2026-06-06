@@ -72,6 +72,35 @@ class JobConfig(BaseModel):
     experiment_id: str = ""
 
 
+class DPOJobConfig(BaseModel):
+    """Config for a DPO (preference) fine-tuning job — POST /api/jobs/dpo."""
+
+    model_id: str
+    model_source: str = "hub"
+    local_model_path: str = ""
+    hf_token: str = ""
+    dataset_path: str = ""
+    hub_dataset_id: str = ""
+    hub_dataset_split: str = "train"
+    prompt_col: str = "prompt"
+    chosen_col: str = "chosen"
+    rejected_col: str = "rejected"
+    use_4bit: bool = True
+    lora_rank: int = Field(default=16, ge=1, le=256)
+    lora_alpha: int = Field(default=32, ge=1)
+    lora_dropout: float = Field(default=0.05, ge=0.0, le=0.5)
+    beta: float = Field(default=0.1, gt=0.0, le=1.0)
+    learning_rate: float = Field(default=5e-5, gt=0)
+    epochs: int = Field(default=1, ge=1, le=100)
+    batch_size: int = Field(default=2, ge=1)
+    gradient_accumulation_steps: int = Field(default=4, ge=1)
+    max_length: int = Field(default=1024, ge=64)
+    max_prompt_length: int = Field(default=512, ge=16)
+    bf16: bool = False
+    seed: int = Field(default=42, ge=0)
+    experiment_id: str = ""
+
+
 class JobStatus(BaseModel):
     job_id: str
     status: str

@@ -280,6 +280,8 @@ class FinetuneState(rx.State):
     eval_split_ratio: float = 0.1
     early_stopping_patience: int = 0
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
+    prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
+    packing: bool = False
 
     # ── Step 5: Training dashboard ────────────────────────────────
     job_id: str = ""
@@ -1280,6 +1282,15 @@ intent_answers: {self.intent_answers}
             self.compute_backend = value
 
     @rx.event
+    def set_prompt_template(self, value: str):
+        if value in ("alpaca", "chatml", "llama3", "phi3", "zephyr"):
+            self.prompt_template = value
+
+    @rx.event
+    def set_packing(self, value: bool):
+        self.packing = value
+
+    @rx.event
     def set_learning_rate(self, value: str):
         self.learning_rate = value
 
@@ -1386,6 +1397,8 @@ intent_answers: {self.intent_answers}
             "experiment_name": exp_name,
             "experiment_id": exp_id,
             "compute_backend": self.compute_backend,
+            "prompt_template": self.prompt_template,
+            "packing": self.packing,
         }
 
         try:

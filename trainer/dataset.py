@@ -2,17 +2,31 @@ import pandas as pd
 from datasets import Dataset, load_dataset
 from transformers import PreTrainedTokenizer
 
-PROMPT_TEMPLATE = """### Instruction:
-{instruction}
-
-### Response:
-{output}"""
+# Prompt templates keyed by name. Each must contain {instruction} and {output}.
+PROMPT_TEMPLATES: dict[str, str] = {
+    "alpaca": "### Instruction:\n{instruction}\n\n### Response:\n{output}",
+    "chatml": (
+        "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n{output}<|im_end|>"
+    ),
+    "llama3": (
+        "<|start_header_id|>user<|end_header_id|>\n\n{instruction}<|eot_id|>"
+        "<|start_header_id|>assistant<|end_header_id|>\n\n{output}<|eot_id|>"
+    ),
+    "phi3": "<|user|>\n{instruction}<|end|>\n<|assistant|>\n{output}<|end|>",
+    "zephyr": "<|user|>\n{instruction}</s>\n<|assistant|>\n{output}</s>",
+}
+# Back-compat: callers importing PROMPT_TEMPLATE get the default (alpaca).
+PROMPT_TEMPLATE = PROMPT_TEMPLATES["alpaca"]
 
 
 def format_prompt(
-    row: dict, instruction_col: str = "instruction", output_col: str = "output"
+    row: dict,
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+    template: str = "alpaca",
 ) -> str:
-    return PROMPT_TEMPLATE.format(
+    tmpl = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"])
+    return tmpl.format(
         instruction=row.get(instruction_col, row.get("instruction", "")),
         output=row.get(output_col, row.get("output", "")),
     )
@@ -88,6 +102,32 @@ def load_instruction_pairs(
     )
 
 
+def load_raw_text(
+    file_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+    template: str = "alpaca",
+) -> Dataset:
+    """Return the dataset with a single formatted ``text`` column (untokenized).
+
+    Used for SFTTrainer sample packing, which does its own tokenization and
+    concatenates examples up to the sequence length for higher GPU efficiency.
+    """
+    raw = _load_raw(
+        file_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
+    )
+    return raw.map(
+        lambda x: {"text": format_prompt(x, template=template)},
+        remove_columns=raw.column_names,
+    )
+
+
 def load_and_tokenize(
     file_path: str,
     tokenizer: PreTrainedTokenizer,
@@ -96,6 +136,7 @@ def load_and_tokenize(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
+    template: str = "alpaca",
 ) -> Dataset:
     """
     Load from a local file or HF Hub dataset, apply column mapping,
@@ -109,7 +150,7 @@ def load_and_tokenize(
         output_col=output_col,
     )
 
-    raw = raw.map(lambda x: {"text": format_prompt(x)})
+    raw = raw.map(lambda x: {"text": format_prompt(x, template=template)})
     tokenized = raw.map(
         lambda x: tokenizer(
             x["text"],

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Prompt templates & sample packing (P4-B).** `trainer/dataset.py` now ships a
+  `PROMPT_TEMPLATES` registry (`alpaca`, `chatml`, `llama3`, `phi3`, `zephyr`);
+  `format_prompt(..., template=)` and `load_and_tokenize(..., template=)` honor
+  the choice, and a new `load_raw_text()` feeds SFTTrainer sample packing.
+  `TrainingConfig` gains `prompt_template` and `packing`, wired through
+  `JobConfig` / `POST /api/jobs` and exposed in Step 4 (a "Data formatting"
+  section with a template picker and a packing toggle).
 - **API hardening (P4-A).** `GET /api/jobs` now supports `limit`/`offset`
   pagination (default 50, capped at 500). The inference model cache is a bounded
   `cachetools.LRUCache(maxsize=3)` behind a single lock, so loaded models (GBs

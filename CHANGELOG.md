@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **DPO in the wizard UI.** Direct Preference Optimization is now selectable as a
+  training technique (Step 1). Step 3 shows a preference-data card with
+  prompt/chosen/rejected column mapping, Step 4 exposes the DPO `beta`, and
+  `FinetuneState.start_training` routes DPO runs to `POST /api/jobs/dpo`. Surfaces
+  the DPO backend shipped earlier.
 - **Richer evaluation + live validation curve (P4-D).** `trainer/metrics.py` adds
   `rouge2`, `rougeL`, and `meteor` (dependency-free); post-training eval now
   reports all of perplexity/rouge1/rouge2/rougeL/bleu/meteor. `generate_predictions`

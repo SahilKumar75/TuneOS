@@ -312,6 +312,54 @@ def _step4() -> rx.Component:
                         spacing="4",
                         width="100%",
                     ),
+                    # Section 2b — Data formatting
+                    rx.text(
+                        "Data formatting",
+                        font_size="0.78rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_top="16px",
+                    ),
+                    rx.divider(margin_y="6px"),
+                    rx.grid(
+                        rx.vstack(
+                            _label("Prompt template"),
+                            rx.select.root(
+                                rx.select.trigger(width="100%"),
+                                rx.select.content(
+                                    *[
+                                        rx.select.item(v, value=v)
+                                        for v in ["alpaca", "chatml", "llama3", "phi3", "zephyr"]
+                                    ],
+                                ),
+                                value=FinetuneState.prompt_template,
+                                on_change=FinetuneState.set_prompt_template,
+                            ),
+                            rx.text(
+                                "How prompts are wrapped for the model",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Sample packing"),
+                            rx.switch(
+                                checked=FinetuneState.packing,
+                                on_change=FinetuneState.set_packing,
+                                size="2",
+                            ),
+                            rx.text(
+                                "Concatenate examples to fill the sequence — faster on GPU",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        columns="2",
+                        spacing="4",
+                        width="100%",
+                    ),
                     # Section 3 — Scheduler & Tracking
                     rx.text(
                         "Scheduler & Tracking",

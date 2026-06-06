@@ -55,16 +55,31 @@ def finetune(
     # 1. Prepare model
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
-    # 2. Load dataset, optionally splitting off a held-out validation set
-    dataset = load_and_tokenize(
-        dataset_path,
-        tokenizer,
-        model_cfg.max_seq_length,
-        hub_dataset_id=hub_dataset_id,
-        hub_split=hub_split,
-        instruction_col=instruction_col,
-        output_col=output_col,
-    )
+    # 2. Load dataset (optionally splitting off a validation set below). With
+    # packing the trainer tokenizes raw text itself; otherwise we pre-tokenize.
+    # Both honor the selected prompt template.
+    if train_cfg.packing:
+        from trainer.dataset import load_raw_text
+
+        dataset = load_raw_text(
+            dataset_path,
+            hub_dataset_id=hub_dataset_id,
+            hub_split=hub_split,
+            instruction_col=instruction_col,
+            output_col=output_col,
+            template=train_cfg.prompt_template,
+        )
+    else:
+        dataset = load_and_tokenize(
+            dataset_path,
+            tokenizer,
+            model_cfg.max_seq_length,
+            hub_dataset_id=hub_dataset_id,
+            hub_split=hub_split,
+            instruction_col=instruction_col,
+            output_col=output_col,
+            template=train_cfg.prompt_template,
+        )
 
     eval_dataset = None
     ratio = train_cfg.eval_split_ratio
@@ -121,6 +136,7 @@ def finetune(
         tokenizer=tokenizer,
         dataset_text_field="text",
         max_seq_length=model_cfg.max_seq_length,
+        packing=train_cfg.packing,
         callbacks=callbacks,
     )
 

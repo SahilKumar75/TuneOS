@@ -50,6 +50,21 @@ class RedisLossCallback(TrainerCallback):
         # Also accumulate in a list key so the worker can persist to run_metrics
         self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
 
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        """Publish the validation loss at each eval step so the live chart can
+        overlay it against the training curve."""
+        if not metrics or "eval_loss" not in metrics:
+            return
+        payload = {
+            "step": state.global_step,
+            "epoch": round(state.epoch, 2) if state.epoch else 0,
+            "eval_loss": round(float(metrics["eval_loss"]), 4),
+            "elapsed_seconds": int(time.time() - self._start_time),
+            "status": "running",
+        }
+        self.redis.publish(self.channel, json.dumps(payload))
+        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
+
     def on_train_end(self, args, state, control, **kwargs):
         payload = {
             "status": "done",

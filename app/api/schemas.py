@@ -57,6 +57,7 @@ class JobConfig(BaseModel):
     # ── Phase 2: validation + resumption ──────────────────────────
     eval_split_ratio: float = Field(default=0.1, ge=0.0, lt=1.0)
     early_stopping_patience: int = Field(default=0, ge=0, le=20)
+    eval_steps: int = Field(default=0, ge=0)
     resume_from_checkpoint: str = ""
     # Seeds every source of randomness so a run is reproducible.
     seed: int = Field(default=42, ge=0)

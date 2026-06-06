@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Richer evaluation + live validation curve (P4-D).** `trainer/metrics.py` adds
+  `rouge2`, `rougeL`, and `meteor` (dependency-free); post-training eval now
+  reports all of perplexity/rouge1/rouge2/rougeL/bleu/meteor. `generate_predictions`
+  is batched (with an optional `generation_config`). `RedisLossCallback.on_evaluate`
+  publishes `eval_loss` at each eval, and `TrainingConfig.eval_steps` (exposed on
+  `JobConfig`) enables step-level evaluation for a denser validation curve.
+- **Live Modal training stream (P4-E).** The Modal cloud backend now streams
+  progress to the shared Redis broker during a remote run (the in-trainer callback
+  is pointed at `REDIS_URL`), so the loss chart updates live just like a local run.
+  The Modal image now includes `redis` (also fixing a latent import error in the
+  remote trainer).
 - **DPO preference training (P4-C).** A second recipe trains a LoRA adapter on
   `(prompt, chosen, rejected)` preference triples via `trl.DPOTrainer`. New
   `trainer/dpo.py` (`train_dpo`, reuses the SFT loader + LoRA injection),

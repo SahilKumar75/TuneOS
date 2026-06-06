@@ -89,9 +89,24 @@ def finetune(
         dataset, eval_dataset = split["train"], split["test"]
 
     use_early_stopping = bool(train_cfg.early_stopping_patience) and eval_dataset is not None
-    eval_strategy = "epoch" if eval_dataset is not None else "no"
-    # load_best_model_at_end requires matching eval/save strategies.
-    save_strategy = "epoch" if use_early_stopping else "steps"
+    # Step-level eval (denser eval_loss curve) when eval_steps>0 and a split exists.
+    eval_steps = (
+        train_cfg.eval_steps if (eval_dataset is not None and train_cfg.eval_steps > 0) else None
+    )
+    if eval_dataset is None:
+        eval_strategy = "no"
+    elif eval_steps:
+        eval_strategy = "steps"
+    else:
+        eval_strategy = "epoch"
+    # load_best_model_at_end requires matching eval/save strategies (and, for
+    # step strategy, save_steps to be a multiple of eval_steps).
+    if use_early_stopping:
+        save_strategy = eval_strategy
+        save_steps = eval_steps if eval_strategy == "steps" else train_cfg.save_steps
+    else:
+        save_strategy = "steps"
+        save_steps = train_cfg.save_steps
 
     # 3. Training arguments
     output_path = os.path.join(train_cfg.output_dir, job_id)
@@ -104,7 +119,7 @@ def finetune(
         fp16=train_cfg.fp16,
         bf16=train_cfg.bf16,
         logging_steps=train_cfg.logging_steps,
-        save_steps=train_cfg.save_steps,
+        save_steps=save_steps,
         warmup_ratio=train_cfg.warmup_ratio,
         lr_scheduler_type=train_cfg.lr_scheduler_type,
         optim=train_cfg.optim,
@@ -115,6 +130,7 @@ def finetune(
         data_seed=train_cfg.seed,
         torch_compile=train_cfg.use_torch_compile,
         eval_strategy=eval_strategy,
+        eval_steps=eval_steps,
         save_strategy=save_strategy,
         load_best_model_at_end=use_early_stopping,
         metric_for_best_model="eval_loss" if use_early_stopping else None,

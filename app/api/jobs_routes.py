@@ -94,6 +94,7 @@ async def create_job(config: JobConfig):
         "max_grad_norm": 0.3,
         "eval_split_ratio": config.eval_split_ratio,
         "early_stopping_patience": config.early_stopping_patience,
+        "eval_steps": config.eval_steps,
         "resume_from_checkpoint": config.resume_from_checkpoint or None,
         "seed": config.seed,
         "use_torch_compile": config.use_torch_compile,

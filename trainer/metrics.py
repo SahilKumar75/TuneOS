@@ -146,5 +146,108 @@ def compute_bleu(predictions: list[str], references: list[str]) -> float | None:
     return round(bp * precision, 4)
 
 
+def _f1(overlap: int, n_pred: int, n_ref: int) -> float:
+    if n_pred == 0 or n_ref == 0:
+        return 0.0
+    precision = overlap / n_pred
+    recall = overlap / n_ref
+    if precision + recall == 0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
+
+
+def _ngram_overlap(pred: list[str], ref: list[str], n: int) -> tuple[int, int, int]:
+    def ngrams(toks: list[str]) -> list[tuple]:
+        return [tuple(toks[i : i + n]) for i in range(len(toks) - n + 1)]
+
+    p, r = ngrams(pred), ngrams(ref)
+    ref_counts: dict[tuple, int] = {}
+    for g in r:
+        ref_counts[g] = ref_counts.get(g, 0) + 1
+    overlap = 0
+    seen: dict[tuple, int] = {}
+    for g in p:
+        seen[g] = seen.get(g, 0) + 1
+        if seen[g] <= ref_counts.get(g, 0):
+            overlap += 1
+    return overlap, len(p), len(r)
+
+
+@register("rouge2", greater_is_better=True, kind="reference")
+def compute_rouge2(predictions: list[str], references: list[str]) -> float | None:
+    """Mean ROUGE-2 (bigram) F1 over (prediction, reference) pairs."""
+    if not predictions or len(predictions) != len(references):
+        return None
+    scores = []
+    for pred, ref in zip(predictions, references, strict=False):
+        overlap, np_, nr = _ngram_overlap(_tokenize(pred), _tokenize(ref), 2)
+        scores.append(_f1(overlap, np_, nr))
+    return round(sum(scores) / len(scores), 4)
+
+
+def _lcs_len(a: list[str], b: list[str]) -> int:
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for x in a:
+        curr = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            curr[j] = prev[j - 1] + 1 if x == y else max(prev[j], curr[j - 1])
+        prev = curr
+    return prev[len(b)]
+
+
+@register("rougeL", greater_is_better=True, kind="reference")
+def compute_rougeL(predictions: list[str], references: list[str]) -> float | None:
+    """Mean ROUGE-L (longest-common-subsequence) F1 over pairs."""
+    if not predictions or len(predictions) != len(references):
+        return None
+    scores = []
+    for pred, ref in zip(predictions, references, strict=False):
+        pt, rt = _tokenize(pred), _tokenize(ref)
+        scores.append(_f1(_lcs_len(pt, rt), len(pt), len(rt)))
+    return round(sum(scores) / len(scores), 4)
+
+
+@register("meteor", greater_is_better=True, kind="reference")
+def compute_meteor(predictions: list[str], references: list[str]) -> float | None:
+    """Lightweight METEOR approximation (unigram match Fmean with a
+    fragmentation penalty) — dependency-free, tracks relative quality."""
+    if not predictions or len(predictions) != len(references):
+        return None
+    scores = []
+    for pred, ref in zip(predictions, references, strict=False):
+        pt, rt = _tokenize(pred), _tokenize(ref)
+        if not pt or not rt:
+            scores.append(0.0)
+            continue
+        ref_counts: dict[str, int] = {}
+        for t in rt:
+            ref_counts[t] = ref_counts.get(t, 0) + 1
+        matches = 0
+        seen: dict[str, int] = {}
+        for t in pt:
+            seen[t] = seen.get(t, 0) + 1
+            if seen[t] <= ref_counts.get(t, 0):
+                matches += 1
+        if matches == 0:
+            scores.append(0.0)
+            continue
+        precision, recall = matches / len(pt), matches / len(rt)
+        fmean = 10 * precision * recall / (recall + 9 * precision)
+        # Fragmentation: count contiguous matched chunks in the prediction.
+        chunks, in_chunk = 0, False
+        for t in pt:
+            if t in ref_counts:
+                if not in_chunk:
+                    chunks += 1
+                    in_chunk = True
+            else:
+                in_chunk = False
+        penalty = 0.5 * (chunks / matches) ** 3
+        scores.append(fmean * (1 - penalty))
+    return round(sum(scores) / len(scores), 4)
+
+
 def available_metrics() -> list[str]:
     return sorted(REGISTRY)

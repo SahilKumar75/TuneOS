@@ -100,6 +100,9 @@ class TrainingConfig:
     eval_split_ratio: float = 0.1
     # Stop after this many evals with no improvement. 0 disables early stopping.
     early_stopping_patience: int = 0
+    # Evaluate every N steps (instead of once per epoch) when >0 and a validation
+    # split exists — gives a denser eval_loss curve.
+    eval_steps: int = 0
     # Path to a checkpoint dir to resume from, or True to auto-detect the latest
     # checkpoint under output_dir. None/"" starts fresh.
     resume_from_checkpoint: str | bool | None = None

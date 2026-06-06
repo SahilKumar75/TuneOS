@@ -88,12 +88,18 @@ def evaluate_run(
             instructions = [row["instruction"] for row in ref_sample]
             references = [row["output"] for row in ref_sample]
             predictions = generate_predictions(model, tokenizer, instructions)
-            eval_results.update(evaluate_references(predictions, references))
+            eval_results.update(
+                evaluate_references(
+                    predictions,
+                    references,
+                    metrics=["rouge1", "rouge2", "rougeL", "bleu", "meteor"],
+                )
+            )
         except Exception as e:
             # Reference metrics are best-effort; never let them break eval.
             _logger.warning("Reference eval failed (%s): %s", type(e).__name__, e)
-            eval_results.setdefault("rouge1", None)
-            eval_results.setdefault("bleu", None)
+            for _m in ("rouge1", "rouge2", "rougeL", "bleu", "meteor"):
+                eval_results.setdefault(_m, None)
 
         return eval_results
     except Exception as e:
@@ -106,28 +112,48 @@ def generate_predictions(
     tokenizer,
     instructions: list[str],
     max_new_tokens: int = 128,
+    batch_size: int = 8,
+    generation_config: dict | None = None,
 ) -> list[str]:
-    """Greedily generate a response for each instruction, returning only the text
-    after the prompt. Used to obtain predictions for reference metrics."""
+    """Generate a response for each instruction (batched), returning only the
+    text after the prompt. Used to obtain predictions for reference metrics.
+
+    Batched generation is much faster than one-by-one on GPU. ``generation_config``
+    overrides the defaults (greedy) — e.g. ``{"do_sample": True, "temperature": 0.7}``.
+    """
     import torch
 
     from trainer.dataset import PROMPT_TEMPLATE
 
+    gen_kwargs = {
+        "max_new_tokens": max_new_tokens,
+        "do_sample": False,
+        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+    }
+    if generation_config:
+        gen_kwargs.update(generation_config)
+
+    # Left-pad so generated tokens align at the end of each row in the batch.
+    prev_side = tokenizer.padding_side
+    tokenizer.padding_side = "left"
     predictions: list[str] = []
     device = next(model.parameters()).device
     model.eval()
-    for instruction in instructions:
-        prompt = PROMPT_TEMPLATE.format(instruction=instruction, output="")
-        inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
-        with torch.no_grad():
-            out = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+    try:
+        for i in range(0, len(instructions), batch_size):
+            chunk = instructions[i : i + batch_size]
+            prompts = [PROMPT_TEMPLATE.format(instruction=ins, output="") for ins in chunk]
+            inputs = tokenizer(prompts, return_tensors="pt", truncation=True, padding=True).to(
+                device
             )
-        generated = out[0][inputs["input_ids"].shape[1] :]
-        predictions.append(tokenizer.decode(generated, skip_special_tokens=True).strip())
+            with torch.no_grad():
+                out = model.generate(**inputs, **gen_kwargs)
+            gen = out[:, inputs["input_ids"].shape[1] :]
+            predictions.extend(
+                tokenizer.decode(row, skip_special_tokens=True).strip() for row in gen
+            )
+    finally:
+        tokenizer.padding_side = prev_side
     return predictions
 
 

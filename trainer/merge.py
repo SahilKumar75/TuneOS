@@ -35,7 +35,7 @@ def merge_adapter(
     model = model.merge_and_unload()
 
     os.makedirs(output_path, exist_ok=True)
-    model.save_pretrained(output_path)
+    model.save_pretrained(output_path, safe_serialization=True)
 
     tokenizer = AutoTokenizer.from_pretrained(
         base_model_id,

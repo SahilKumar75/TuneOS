@@ -33,6 +33,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
         bias=lora_cfg.bias,
         task_type=TaskType.CAUSAL_LM,
         target_modules=target_modules,
+        init_lora_weights=lora_cfg.init_lora_weights,
     )
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()  # log how many params are trainable
@@ -41,7 +42,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
 
 def save_adapter(model, output_dir: str):
     """Save only the LoRA adapter weights (small — a few MB)."""
-    model.save_pretrained(output_dir)
+    model.save_pretrained(output_dir, safe_serialization=True)
     print(f"Adapter saved to {output_dir}")
 
 
@@ -51,6 +52,6 @@ def merge_and_save(model, tokenizer, output_dir: str):
     full merged model. Use when the client wants a standalone model.
     """
     merged = model.merge_and_unload()
-    merged.save_pretrained(output_dir)
+    merged.save_pretrained(output_dir, safe_serialization=True)
     tokenizer.save_pretrained(output_dir)
     print(f"Merged model saved to {output_dir}")

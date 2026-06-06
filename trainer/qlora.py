@@ -10,8 +10,10 @@ def prepare_qlora_model(model_cfg: ModelConfig, lora_cfg: LoraConfig):
       2. Prepare for k-bit training (cast layer norms to fp32)
       3. Inject LoRA adapters
     Returns (model, tokenizer) ready for training.
+
+    Honors ``model_cfg.use_4bit`` instead of forcing it on — callers select
+    QLoRA (4-bit) vs plain LoRA (full/8-bit) via the config.
     """
-    model_cfg.use_4bit = True
     model, tokenizer = load_model_and_tokenizer(model_cfg)
     model = inject_lora(model, lora_cfg)
     return model, tokenizer

@@ -6,6 +6,24 @@ from app.state.app_state import AppState, SavedNotebook
 from app.styles import c
 
 
+def _brand_mark() -> rx.Component:
+    """Reserved logo slot (22×22). Leaves room for the TuneOS logo without a
+    layout shift — when the asset lands, swap the inner box for
+    ``rx.image(src="/logo.svg", width="22px", height="22px")``."""
+    return rx.box(
+        rx.text("T", font_size="0.82rem", font_weight="700", color=c("accent")),
+        width="22px",
+        height="22px",
+        min_width="22px",
+        border_radius="6px",
+        background=c("accent_soft"),
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        flex_shrink="0",
+    )
+
+
 def _nav_item(icon_name: str, label: str, active=False, on_click=None) -> rx.Component:
     click_props = {"on_click": on_click} if on_click is not None else {}
     return rx.hstack(
@@ -199,6 +217,7 @@ def _expanded_sidebar() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             _panel_button(),
+            _brand_mark(),
             rx.text("TuneOS", font_size="0.98rem", font_weight="600", color=c("text_primary")),
             spacing="3",
             align="center",
@@ -322,6 +341,7 @@ def _collapsed_icon_btn(icon_name: str, active=False, on_click=None) -> rx.Compo
 def _collapsed_sidebar() -> rx.Component:
     return rx.vstack(
         _panel_button(),
+        _brand_mark(),
         _collapsed_icon_btn(
             "square-pen", active=AppState.is_on_start_screen, on_click=AppState.new_project
         ),

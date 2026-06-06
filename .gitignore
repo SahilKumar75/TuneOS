@@ -21,6 +21,9 @@ ENV/
 # Claude Code
 .claude/
 
+# Vendored agent skills (restore via `npx skills install`; lockfile is committed)
+.agents/
+
 # OS
 .DS_Store
 Thumbs.db

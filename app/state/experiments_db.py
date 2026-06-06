@@ -266,18 +266,22 @@ def write_job_status(
         _logger.exception("Failed to write job status for run_id=%s", run_id)
 
 
-def list_runs() -> list[dict[str, Any]]:
-    """Return all runs as plain dicts, most-recent first (empty list on error).
+def list_runs(limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
+    """Return runs as plain dicts, most-recent first (empty list on error).
 
-    Public accessor so callers (e.g. the API layer) don't reach into the
-    private connection helpers.
+    Optionally paginated: pass ``limit`` (and ``offset``) to page through large
+    histories. ``limit=None`` returns everything (back-compat). Public accessor
+    so callers (e.g. the API layer) don't reach into the private connection helpers.
     """
     try:
         _init_db()
+        sql = "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
+        params: tuple = ()
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            params = (int(limit), int(offset))
         with _get_conn() as conn:
-            rows = conn.execute(
-                "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
-            ).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return [
             {
                 "job_id": r["id"],
@@ -289,6 +293,23 @@ def list_runs() -> list[dict[str, Any]]:
     except Exception:
         _logger.exception("Failed to list runs")
         return []
+
+
+def get_final_metrics(run_id: str) -> dict[str, float]:
+    """Return run-level final metrics (perplexity/rouge1/bleu) persisted at
+    step=-1 by ``save_final_metrics``. Empty dict on miss or error — this is the
+    durable fallback for ``GET /jobs/{id}/eval`` when Redis has expired."""
+    try:
+        _init_db()
+        with _get_conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM run_metrics WHERE run_id = ? AND step = -1",
+                (run_id,),
+            ).fetchall()
+        return {r["key"]: r["value"] for r in rows}
+    except Exception:
+        _logger.exception("Failed to read final metrics for run_id=%s", run_id)
+        return {}
 
 
 def get_run_metrics(

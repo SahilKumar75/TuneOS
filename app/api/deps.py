@@ -69,22 +69,44 @@ def _get_job_status_from_redis(job_id: str) -> dict:
         return {"status": "unknown", "job_id": job_id}
 
 
+def _cuda_version() -> str:
+    """CUDA version from torch if it's already imported — never force-import it."""
+    import sys
+
+    torch = sys.modules.get("torch")
+    if torch is None:
+        return ""
+    return getattr(getattr(torch, "version", None), "cuda", "") or ""
+
+
 def _detect_gpu() -> GpuInfo:
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
             capture_output=True,
             text=True,
             timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
+            lines = [ln for ln in result.stdout.strip().split("\n") if ln.strip()]
+            first = [c.strip() for c in lines[0].split(",")]
+            total_gb = round(float(first[1]) / 1024, 1) if len(first) > 1 else 0.0
+            free_gb = round(float(first[2]) / 1024, 1) if len(first) > 2 else 0.0
             return GpuInfo(
                 available=True,
                 backend="cuda",
-                name=result.stdout.strip().split("\n")[0],
+                name=first[0],
                 detail=result.stdout.strip(),
+                device_count=len(lines),
+                vram_total_gb=total_gb,
+                vram_free_gb=free_gb,
+                cuda_version=_cuda_version(),
             )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
         pass
 
     if platform.system() == "Darwin":

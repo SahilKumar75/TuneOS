@@ -75,7 +75,8 @@ def _model_option(m: rx.Var[dict]) -> rx.Component:
     return rx.select.item(m["label"], value=m["id"])
 
 
-def _action_icon_btn(icon_name: str) -> rx.Component:
+def _action_icon_btn(icon_name: str, on_click=None) -> rx.Component:
+    extra = {"on_click": on_click} if on_click is not None else {}
     return rx.icon_button(
         rx.icon(icon_name, size=14),
         variant="ghost",
@@ -84,6 +85,7 @@ def _action_icon_btn(icon_name: str) -> rx.Component:
         border_radius="6px",
         cursor="pointer",
         _hover={"color": c("text_primary"), "background": c("hover")},
+        **extra,
     )
 
 
@@ -109,7 +111,11 @@ def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
         # Assistant message — plain text left, copy action below.
         rx.vstack(
             rx.markdown(msg["text"], font_size="0.9rem", color=c("text_primary")),
-            rx.hstack(_action_icon_btn("copy"), spacing="0", align="center"),
+            rx.hstack(
+                _action_icon_btn("copy", on_click=rx.set_clipboard(msg["text"])),
+                spacing="0",
+                align="center",
+            ),
             spacing="1",
             align="start",
             width="100%",
@@ -383,12 +389,13 @@ def _collapsed() -> rx.Component:
 
 
 def _has_started() -> rx.Var:
-    """Show the assistant only once the user is actually working."""
-    return (
-        (FinetuneState.selected_model_id != "")
-        | (FinetuneState.current_step > 1)
-        | AppState.workspace_active
-    )
+    """Show the assistant only while the user is in the workspace.
+
+    ``workspace_active`` is the real lifecycle signal — true once a project is
+    opened, reset on return to the start screen — so the panel tracks the
+    workspace instead of sticky FinetuneState fields.
+    """
+    return AppState.workspace_active
 
 
 def chat_panel() -> rx.Component:

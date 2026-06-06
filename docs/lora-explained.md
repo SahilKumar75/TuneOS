@@ -10,3 +10,16 @@ QLoRA takes this a step further by quantizing the base model to 4-bit precision 
 - **Rank (r):** Defines the dimension of the injected matrices. Higher values give the adapter more representation capacity but use more memory.
 - **Alpha:** Scaling factor.
 - **Dropout:** Used for regularization to prevent overfitting.
+
+`target_modules` (which projections the adapter attaches to) are auto-detected
+from the model architecture, so the same config works across Mistral, Llama,
+Gemma, Phi-3, Falcon, Qwen2, and GPT-NeoX families.
+
+## DPO (preview)
+
+LoRA/QLoRA above is supervised fine-tuning (SFT) — the model learns to imitate
+reference outputs. **Direct Preference Optimization (DPO)** is a planned
+alternative recipe that trains on *preference* data — triples of
+`(prompt, chosen, rejected)` — to push the model toward responses people prefer,
+without a separate reward model. It reuses the same LoRA adapter machinery; only
+the dataset shape and loss differ. A full DPO guide lands with the DPO recipe.

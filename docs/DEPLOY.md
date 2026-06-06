@@ -78,3 +78,20 @@ adapter + eval metrics back to `OUTPUT_DIR`. Job status and metrics persistence
 are identical to a local run. Modal's free tier provides ~$30/month of compute
 (roughly 10–15 T4 hours). Without the tokens set, selecting Modal fails fast
 with a clear message and no job is queued.
+
+## Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `REDIS_URL` | yes (cloud) | Broker the App and Worker share. Defaults to `redis://localhost:6379/0`; use the Upstash URL for the two-Space setup. |
+| `HF_TOKEN` | for gated models | Hugging Face token to download gated models (Llama, etc.). |
+| `HF_HOME` | no | Model cache dir (default `./models_cache`). |
+| `OUTPUT_DIR` | no | Where adapters/checkpoints are written (default `./outputs`). |
+| `DATASET_DIR` | no | Local dataset storage (default `./storage/datasets`). |
+| `MAX_JOB_DURATION_SECONDS` | no | Hard cap per training job (default `7200`). |
+| `OPENROUTER_API_KEY` / `GROQ_API_KEY` | for chat | Backends for the in-app assistant chat. |
+| `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` | for Modal backend | Enable the Modal cloud-GPU compute backend. |
+| `EXPERIMENTS_DB_URL` | no | `postgresql://…` DSN to share one experiment store across machines (otherwise local SQLite). |
+
+For the two-Space cloud deployment, set the same `REDIS_URL` on both Spaces and
+put secrets (`HF_TOKEN`, `MODAL_TOKEN_*`) in each Space's **Settings → Secrets**.

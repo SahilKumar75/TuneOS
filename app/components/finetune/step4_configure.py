@@ -67,6 +67,40 @@ def _compute_section() -> rx.Component:
     )
 
 
+def _dpo_section() -> rx.Component:
+    """DPO-only control (beta) — shown when the DPO technique is selected."""
+    return rx.cond(
+        FinetuneState.is_dpo,
+        _card(
+            rx.vstack(
+                rx.text(
+                    "DPO preference tuning",
+                    font_size="0.82rem",
+                    font_weight="600",
+                    color=c("text_secondary"),
+                    margin_bottom="8px",
+                ),
+                _label("Beta (KL penalty)"),
+                rx.slider(
+                    min=0.01,
+                    max=0.5,
+                    step=0.01,
+                    default_value=[FinetuneState.dpo_beta],
+                    on_value_commit=FinetuneState.set_dpo_beta,
+                ),
+                rx.text(
+                    "Higher = stay closer to the reference model. Typical: 0.1.",
+                    font_size="0.72rem",
+                    color=c("text_muted"),
+                ),
+                spacing="1",
+                width="100%",
+            )
+        ),
+        rx.fragment(),
+    )
+
+
 def _step4() -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -451,6 +485,8 @@ def _step4() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        # DPO-only beta control
+        _dpo_section(),
         # Compute backend selector
         _compute_section(),
         # Run summary

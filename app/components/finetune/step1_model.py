@@ -312,7 +312,7 @@ def _step1() -> rx.Component:
                     ("qlora", "QLoRA", "4-bit compressed. Runs on 12 GB+ GPU. Recommended.", False),
                     ("lora", "LoRA", "Float16. Needs ~16 GB GPU for 7B models.", False),
                     ("full", "Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", True),
-                    ("dpo", "DPO", "Preference tuning for alignment.", True),
+                    ("dpo", "DPO", "Preference tuning on chosen/rejected pairs.", False),
                 ]
             ],
             wrap="wrap",

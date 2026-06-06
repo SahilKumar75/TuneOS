@@ -280,9 +280,66 @@ def _generate_panel() -> rx.Component:
     )
 
 
+def _dpo_format_card() -> rx.Component:
+    """Shown when the DPO technique is selected — preference data needs three
+    columns (prompt / chosen / rejected); let the user remap them."""
+    return _card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("scale", size=15, color=c("accent")),
+                rx.text("DPO preference data", font_weight="600", color=c("text_primary")),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                "Your dataset needs three columns: the prompt, a chosen (preferred) "
+                "response, and a rejected one. Remap the column names if they differ.",
+                font_size="0.8rem",
+                color=c("text_muted"),
+            ),
+            rx.grid(
+                rx.vstack(
+                    _label("Prompt column"),
+                    rx.input(
+                        value=FinetuneState.dpo_prompt_col,
+                        on_change=FinetuneState.set_dpo_prompt_col,
+                        width="100%",
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Chosen column"),
+                    rx.input(
+                        value=FinetuneState.dpo_chosen_col,
+                        on_change=FinetuneState.set_dpo_chosen_col,
+                        width="100%",
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Rejected column"),
+                    rx.input(
+                        value=FinetuneState.dpo_rejected_col,
+                        on_change=FinetuneState.set_dpo_rejected_col,
+                        width="100%",
+                    ),
+                    spacing="1",
+                ),
+                columns="3",
+                spacing="3",
+                width="100%",
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        margin_bottom="16px",
+    )
+
+
 def _step3() -> rx.Component:
     return rx.vstack(
         _section_heading("Add your training data"),
+        rx.cond(FinetuneState.is_dpo, _dpo_format_card(), rx.fragment()),
         rx.hstack(
             _data_mode_btn("upload", "Upload a file ✓", "upload"),
             rx.badge("Recommended", color_scheme="green", size="1", variant="soft"),

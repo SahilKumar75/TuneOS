@@ -1,0 +1,31 @@
+# markdownlint-cli2 config — pragmatic ruleset for prose docs.
+# Disables whitespace/line-length/style rules that fight hand-written
+# Markdown, while leaving the linter active to catch egregious structural
+# issues in future docs.
+config:
+  MD007: false  # unordered list indentation
+  MD009: false  # trailing spaces
+  MD012: false  # multiple consecutive blank lines
+  MD013: false  # line length — prose wraps freely
+  MD022: false  # blanks around headings
+  MD024: false  # duplicate headings (CHANGELOG repeats "Added"/"Changed")
+  MD025: false  # multiple top-level headings
+  MD026: false  # trailing punctuation in heading
+  MD031: false  # blanks around fenced code
+  MD032: false  # blanks around lists
+  MD033: false  # inline HTML — docs use <details>, <br>, etc.
+  MD034: false  # bare URLs
+  MD036: false  # emphasis used as heading
+  MD037: false  # spaces inside emphasis
+  MD040: false  # fenced code language hint
+  MD041: false  # first line need not be a top-level heading
+  MD046: false  # code block style
+  MD047: false  # file should end with newline
+  MD049: false  # emphasis marker style
+  MD060: false  # table formatting
+globs:
+  - "**/*.md"
+ignores:
+  - ".web/**"
+  - "node_modules/**"
+  - ".agents/**"

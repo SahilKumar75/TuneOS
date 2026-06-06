@@ -45,7 +45,12 @@ _SYNC_THEME_SCRIPT = """
 app = rx.App(
     style=GLOBAL_STYLES,
     stylesheets=STYLESHEETS,
-    head_components=[rx.el.script(_SYNC_THEME_SCRIPT)],
+    head_components=[
+        rx.el.script(_SYNC_THEME_SCRIPT),
+        # Logo/favicon slot — reserved. Drop `assets/favicon.svg` (see assets/README.md),
+        # then uncomment to wire it up (no layout/SEO change until then):
+        # rx.el.link(rel="icon", type="image/svg+xml", href="/favicon.svg"),
+    ],
 )
 
 app.add_page(index, route="/", title="TuneOS — Fine-tune LLMs", on_load=ThemeState.init_theme)

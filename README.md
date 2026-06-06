@@ -31,6 +31,7 @@ The application ships in two forms from one codebase:
 - **7-step fine-tuning wizard** — a guided end-to-end flow from model selection through dataset, technique (LoRA/QLoRA), hyperparameters, live training, and deployment. Opens as a first-class workspace tab.
 - **Experiment tracking** — every training run is recorded in a local SQLite database (`storage/experiments.db`). Run history, hyperparameters, loss curves, and final metrics persist across restarts and are browsable in the Experiments view.
 - **Deploy tab** — after training completes, step 7 provides one-click actions: download the adapter weights, push to Hugging Face Hub, export to GGUF for local inference engines, push to a GitHub repository, and test the model in a built-in chat interface.
+- **Free cloud GPU (Modal)** — no local GPU required: choose the **Modal** compute backend in step 4 to run training on a free T4, with the adapter weights and evaluation metrics streamed back to your machine. Local GPU and Hugging Face ZeroGPU remain available.
 
 ---
 
@@ -39,6 +40,7 @@ The application ships in two forms from one codebase:
 | Domain | Description |
 | --- | --- |
 | Parameter-efficient fine-tuning | LoRA and QLoRA training via PyTorch, PEFT, and TRL, executed locally or on a dedicated worker. Optional `torch.compile()` acceleration. |
+| Compute backends | Run each job on a local GPU, a free Modal.com T4 cloud GPU, or Hugging Face ZeroGPU — selected per job in step 4. |
 | Reproducible runs | A single configurable seed drives the train/validation split, data shuffling, and initialization, so a run can be reproduced exactly. |
 | Dataset preparation | Generate, format, and validate instruction and chat datasets prior to training. |
 | Model conversion | Convert weights between Hugging Face, SafeTensors, and GGUF formats for downstream inference engines. |

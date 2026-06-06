@@ -12,6 +12,12 @@ training jobs via Celery + Redis.
 ### `GET /api/health`
 Liveness probe. Returns `{ "status": "ok", "version": "<semver>" }`.
 
+### `GET /api/health/workers`
+Reports whether at least one Celery worker is alive and ready:
+`{ "workers_alive": true, "workers": ["celery@host"] }`. The UI calls this before
+queuing a job so it can warn when no worker is running (rather than letting the
+job sit in the queue forever).
+
 ### `GET /api/gpu`
 Detects the available accelerator (CUDA, Apple Metal/MPS, or CPU).
 
@@ -57,11 +63,17 @@ Creates and enqueues a fine-tuning job.
   "early_stopping_patience": 0,
   "resume_from_checkpoint": "",
   "seed": 42,
-  "use_torch_compile": false
+  "use_torch_compile": false,
+  "compute_backend": "local"
 }
 ```
 LoRA `target_modules` are auto-detected from the model architecture, so they
 are not part of the request.
+
+`compute_backend` selects where training runs: `"local"` (this worker, default),
+`"modal"` (a Modal.com T4 cloud GPU — requires `MODAL_TOKEN_ID` /
+`MODAL_TOKEN_SECRET`), or `"hf_spaces"` (ZeroGPU on a Hugging Face Space). An
+unknown value is rejected.
 
 Phase 2 training controls:
 

@@ -96,6 +96,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributor Covenant Code of Conduct and Security Policy.
 - Empty `tests` directory with initial pytest configuration.
 
+### Documentation
+- Refreshed docs to match the current product: quickstart now covers the
+  no-Docker Celery worker fallback, gated-model `HF_TOKEN`, and the Modal cloud
+  GPU option; `docs/api.md` documents `GET /api/health/workers` and
+  `compute_backend`; `docs/DEPLOY.md` gains an `.env` reference table;
+  `docs/supported-models.md` reflects auto `target_modules` detection (any HF
+  causal LM); `docs/lora-explained.md` adds a DPO preview; README notes the
+  Modal/local/ZeroGPU compute backends.
+
 ### Changed
 - State data models embedded in `rx.State` now use `pydantic.BaseModel`
   (documented in `CONTRIBUTING.md`); `rx.Base` was removed in newer Reflex.

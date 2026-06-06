@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # TuneOS — Single container (Reflex UI + FastAPI + Celery worker)
 # For HF Spaces: nginx on 7860 proxies to Reflex on 3000.
 # For docker-compose: override CMD per service.
@@ -18,8 +19,13 @@ RUN pip install --no-cache-dir poetry
 WORKDIR /app
 
 # ── Python deps ─────────────────────────────────────────────────
+# BuildKit cache mounts keep the wheel download cache across builds so a small
+# dependency bump doesn't re-download the multi-GB torch wheel. In CI these are
+# persisted run-to-run by buildkit-cache-dance (see .github/workflows/ci.yml).
 COPY pyproject.toml poetry.lock* ./
-RUN poetry config virtualenvs.create false \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/pypoetry \
+    poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root
 
 # ── App source ───────────────────────────────────────────────────

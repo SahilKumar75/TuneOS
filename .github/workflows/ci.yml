@@ -195,21 +195,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The ML stack (torch, transformers, bitsandbytes, …) is large.
-      # Reclaim ~25 GB by removing tools the Docker build doesn't need.
+      # The ML stack (torch, transformers, bitsandbytes, …) is large. Reclaim
+      # disk, but skip the slow/low-yield reclaimers (haskell, large-packages)
+      # and keep swap (heavy builds can OOM without it). android + dotnet +
+      # docker-images free ~16 GB, leaving ample headroom for the CUDA build.
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
           android: true
           dotnet: true
-          haskell: true
-          large-packages: true
+          haskell: false
+          large-packages: false
           docker-images: true
-          swap-storage: true
+          swap-storage: false
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
+
+      # Persist the pip/poetry download cache across runs so a dependency bump
+      # (which busts the install layer) doesn't re-download the ~2 GB torch wheel.
+      - name: Cache build dependency downloads
+        id: dep-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            buildkit-cache/pip
+            buildkit-cache/poetry
+          key: docker-deps-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            docker-deps-
+
+      - name: Inject dependency cache into Buildx
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: |
+            {
+              "buildkit-cache/pip": "/root/.cache/pip",
+              "buildkit-cache/poetry": "/root/.cache/pypoetry"
+            }
+          skip-extraction: ${{ steps.dep-cache.outputs.cache-hit }}
 
       - name: Build image (no push)
         uses: docker/build-push-action@v6

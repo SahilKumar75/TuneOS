@@ -21,6 +21,15 @@ _TARGET_MODULES_BY_ARCH: dict[str, list[str]] = {
     "bloom": ["query_key_value"],
     "t5": ["q", "v"],
     "qwen2": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "qwen3": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "phi4": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "cohere": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "olmo": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "stablelm": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "mixtral": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "mpt": ["Wqkv"],
+    "starcoder2": ["q_proj", "v_proj", "k_proj", "o_proj"],
+    "gpt_bigcode": ["c_attn"],
 }
 _DEFAULT_TARGET_MODULES = ["q_proj", "v_proj"]
 
@@ -51,6 +60,11 @@ class ModelConfig:
     hf_token: str = ""
     local_model_path: str = ""
     model_source: str = "hub"  # "hub" | "local" | "custom_string"
+    # Attention kernel passed to from_pretrained, e.g. "flash_attention_2",
+    # "sdpa", "eager". Empty lets Transformers pick its default.
+    attn_implementation: str = ""
+    # Optional RoPE scaling to extend context, e.g. {"type": "linear", "factor": 2.0}.
+    rope_scaling: dict | None = None
 
 
 @dataclass
@@ -62,6 +76,8 @@ class LoraConfig:
     task_type: str = "CAUSAL_LM"
     # None → auto-detected from model.config.model_type in inject_lora()
     target_modules: list[str] | None = None
+    # PEFT adapter init strategy: True (default), "gaussian", or "pissa" etc.
+    init_lora_weights: str | bool = True
 
 
 @dataclass
@@ -97,3 +113,6 @@ class TrainingConfig:
     use_torch_compile: bool = False
     # Where training runs. Routing happens in workers/train_task.py.
     compute_backend: Literal["local", "modal", "hf_spaces"] = "local"
+    # Experiment-tracker integration for HF Trainer, e.g. "none" (default),
+    # "wandb", "tensorboard". Passed straight to TrainingArguments(report_to=).
+    report_to: str = "none"

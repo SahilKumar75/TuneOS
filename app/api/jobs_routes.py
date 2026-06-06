@@ -5,9 +5,11 @@ from __future__ import annotations
 import io
 import json
 import os
+import threading
 import uuid
 import zipfile
 
+from cachetools import LRUCache
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -26,8 +28,11 @@ from app.api.schemas import (
 
 router = APIRouter()
 
-_INFER_CACHE: dict = {}
-_INFER_CACHE_LOCK: dict = {}  # per-job threading.Lock acquired during model load
+# Bounded LRU of loaded inference models — each is GBs, so cap how many stay
+# resident; the least-recently-used is evicted when full. A single lock
+# serializes loads and evictions across requests.
+_INFER_CACHE: LRUCache = LRUCache(maxsize=3)
+_INFER_CACHE_LOCK = threading.Lock()
 
 
 def _resolve_job_dir(job_id: str) -> str:
@@ -40,11 +45,13 @@ def _resolve_job_dir(job_id: str) -> str:
 
 
 @router.get("/jobs", response_model=list[JobStatus])
-async def list_jobs():
-    """Return all runs from the durable SQLite store, most-recent first."""
+async def list_jobs(limit: int = 50, offset: int = 0):
+    """Return runs from the durable SQLite store, most-recent first (paginated)."""
     from app.state.experiments_db import list_runs
 
-    return [JobStatus(**row) for row in list_runs()]
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    return [JobStatus(**row) for row in list_runs(limit=limit, offset=offset)]
 
 
 @router.post("/jobs", response_model=JobCreated, status_code=201)
@@ -374,14 +381,21 @@ async def get_eval(job_id: str):
     r = aioredis.from_url(REDIS_URL)
     try:
         raw = await r.get(f"job:{job_id}:eval")
-        if not raw:
-            return {"status": "not_ready", "perplexity": None, "bleu": None}
-        data = json.loads(raw)
-        return {"status": "done", **data}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if raw:
+            return {"status": "done", **json.loads(raw)}
+    except Exception:
+        # Redis unavailable — fall through to the durable SQLite store.
+        pass
     finally:
         await r.aclose()
+
+    # Fallback: metrics persisted to SQLite survive a Redis restart / TTL expiry.
+    from app.state.experiments_db import get_final_metrics
+
+    persisted = get_final_metrics(job_id)
+    if persisted:
+        return {"status": "done", **persisted}
+    return {"status": "not_ready", "perplexity": None, "bleu": None}
 
 
 @router.post("/jobs/{job_id}/infer")
@@ -396,40 +410,32 @@ async def infer(job_id: str, req: InferRequest):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter directory not found")
 
-    import threading
+    with _INFER_CACHE_LOCK:
+        if job_id not in _INFER_CACHE:
+            config_path = os.path.join(adapter_dir, "adapter_config.json")
+            if not os.path.exists(config_path):
+                raise HTTPException(status_code=404, detail="adapter_config.json not found")
+            with open(config_path) as f:
+                adapter_cfg = json.load(f)
+            base_model_name = adapter_cfg.get("base_model_name_or_path", "")
+            if not base_model_name:
+                raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
 
-    global _INFER_CACHE, _INFER_CACHE_LOCK
-    if job_id not in _INFER_CACHE:
-        lock = _INFER_CACHE_LOCK.setdefault(job_id, threading.Lock())
-        with lock:
-            # Double-checked: another thread may have loaded it while we waited
-            if job_id not in _INFER_CACHE:
-                config_path = os.path.join(adapter_dir, "adapter_config.json")
-                if not os.path.exists(config_path):
-                    raise HTTPException(status_code=404, detail="adapter_config.json not found")
-                with open(config_path) as f:
-                    adapter_cfg = json.load(f)
-                base_model_name = adapter_cfg.get("base_model_name_or_path", "")
-                if not base_model_name:
-                    raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
+            try:
+                from peft import PeftModel
+                from transformers import AutoModelForCausalLM, AutoTokenizer
 
-                try:
-                    from peft import PeftModel
-                    from transformers import AutoModelForCausalLM, AutoTokenizer
+                base_model = AutoModelForCausalLM.from_pretrained(
+                    base_model_name, device_map="auto", torch_dtype=torch.float16
+                )
+                tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+                model = PeftModel.from_pretrained(base_model, adapter_dir)
+                model.eval()
+                _INFER_CACHE[job_id] = (model, tokenizer)
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Failed to load model: {exc}") from exc
 
-                    base_model = AutoModelForCausalLM.from_pretrained(
-                        base_model_name, device_map="auto", torch_dtype=torch.float16
-                    )
-                    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-                    model = PeftModel.from_pretrained(base_model, adapter_dir)
-                    model.eval()
-                    _INFER_CACHE[job_id] = (model, tokenizer)
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=500, detail=f"Failed to load model: {exc}"
-                    ) from exc
-
-    model, tokenizer = _INFER_CACHE[job_id]
+        model, tokenizer = _INFER_CACHE[job_id]
     try:
         inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():

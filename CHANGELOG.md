@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Trainer flexibility (P4-A).** `TrainingConfig.report_to` makes the HF
+  experiment-tracker integration configurable (default `"none"`).
+  `ModelConfig.attn_implementation` (e.g. `flash_attention_2`/`sdpa`) and
+  `ModelConfig.rope_scaling` are now plumbed into model loading.
+  `LoraConfig.init_lora_weights` exposes PEFT's adapter-init strategy. More
+  architectures auto-detect LoRA targets (Qwen3, Phi-4, Cohere, OLMo, StableLM,
+  Mixtral, MPT, StarCoder2, GPT-BigCode). `prepare_qlora_model` now honors
+  `use_4bit` instead of forcing it on, and all `save_pretrained` calls use
+  `safe_serialization=True`. Minimum `trl` raised to `>=0.12.0`.
 - **Modal.com cloud-GPU training backend.** Jobs can now run on a free Modal T4
   GPU instead of the local device — useful when no local GPU is available. Step 4
   (Configure) has a new **Compute backend** selector (Local GPU / Modal / HF

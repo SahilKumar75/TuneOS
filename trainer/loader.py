@@ -38,6 +38,13 @@ def load_model_and_tokenizer(cfg: ModelConfig):
     elif cfg.use_8bit:
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
+    # Optional extras: only pass when set so we don't override model defaults.
+    extra: dict = {}
+    if cfg.attn_implementation:
+        extra["attn_implementation"] = cfg.attn_implementation
+    if cfg.rope_scaling:
+        extra["rope_scaling"] = cfg.rope_scaling
+
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         quantization_config=bnb_config,
@@ -46,6 +53,7 @@ def load_model_and_tokenizer(cfg: ModelConfig):
         torch_dtype=torch.float16,
         token=token,
         local_files_only=local_only,
+        **extra,
     )
     model.config.use_cache = False
     model.config.pretraining_tp = 1

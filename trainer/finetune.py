@@ -94,7 +94,7 @@ def finetune(
         lr_scheduler_type=train_cfg.lr_scheduler_type,
         optim=train_cfg.optim,
         max_grad_norm=train_cfg.max_grad_norm,
-        report_to="none",  # disable external experiment trackers by default
+        report_to=train_cfg.report_to,  # external tracker(s); "none" by default
         gradient_checkpointing=True,
         seed=train_cfg.seed,
         data_seed=train_cfg.seed,

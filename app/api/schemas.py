@@ -68,6 +68,8 @@ class JobConfig(BaseModel):
     # Prompt formatting + sample packing.
     prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
     packing: bool = False
+    # Multi-GPU FSDP option string (empty = off), e.g. "full_shard auto_wrap".
+    fsdp: str = ""
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""
@@ -100,6 +102,44 @@ class DPOJobConfig(BaseModel):
     bf16: bool = False
     seed: int = Field(default=42, ge=0)
     experiment_id: str = ""
+
+
+class DistillJobConfig(BaseModel):
+    """Config for a knowledge-distillation job — POST /api/jobs/distill."""
+
+    model_id: str  # student model
+    model_source: str = "hub"
+    local_model_path: str = ""
+    hf_token: str = ""
+    teacher_model: str  # required — the (larger) teacher, same tokenizer family
+    dataset_path: str = ""
+    hub_dataset_id: str = ""
+    hub_dataset_split: str = "train"
+    instruction_col: str = "instruction"
+    output_col: str = "output"
+    use_4bit: bool = True
+    lora_rank: int = Field(default=16, ge=1, le=256)
+    lora_alpha: int = Field(default=32, ge=1)
+    lora_dropout: float = Field(default=0.05, ge=0.0, le=0.5)
+    temperature: float = Field(default=2.0, gt=0.0, le=10.0)
+    alpha: float = Field(default=0.5, ge=0.0, le=1.0)
+    learning_rate: float = Field(default=2e-4, gt=0)
+    epochs: int = Field(default=3, ge=1, le=100)
+    batch_size: int = Field(default=4, ge=1)
+    gradient_accumulation_steps: int = Field(default=4, ge=1)
+    max_seq_length: int = Field(default=512, ge=64)
+    bf16: bool = False
+    seed: int = Field(default=42, ge=0)
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    experiment_id: str = ""
+
+
+class SweepRequest(BaseModel):
+    """Fan out a hyperparameter grid into multiple fine-tune jobs."""
+
+    base: JobConfig
+    # field name -> list of values to try; cartesian product is enqueued.
+    grid: dict[str, list] = {}
 
 
 class JobStatus(BaseModel):

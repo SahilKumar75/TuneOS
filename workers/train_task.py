@@ -134,18 +134,6 @@ def _run_finetune_impl(
             )
             r.set(f"job:{job_id}:eval", json.dumps(eval_results))
 
-        # Persist eval to SQLite as well, so GET /jobs/{id}/eval survives a Redis
-        # restart / TTL expiry (durable fallback alongside the Redis copy).
-        try:
-            from app.state.experiments_db import save_final_metrics
-
-            save_final_metrics(
-                job_id,
-                {k: v for k, v in eval_results.items() if isinstance(v, int | float)},
-            )
-        except Exception:
-            pass
-
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart
         write_job_status(job_id, "done", finished_at=finished_at, output_path=output_path)

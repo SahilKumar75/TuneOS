@@ -280,13 +280,6 @@ class FinetuneState(rx.State):
     eval_split_ratio: float = 0.1
     early_stopping_patience: int = 0
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
-    prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
-    packing: bool = False
-    # ── DPO (preference) options — used when selected_technique == "dpo" ──
-    dpo_prompt_col: str = "prompt"
-    dpo_chosen_col: str = "chosen"
-    dpo_rejected_col: str = "rejected"
-    dpo_beta: float = 0.1
 
     # ── Step 5: Training dashboard ────────────────────────────────
     job_id: str = ""
@@ -311,9 +304,6 @@ class FinetuneState(rx.State):
     eval_perplexity: float = 0.0
     eval_bleu: float = 0.0
     eval_rouge1: float = 0.0
-    eval_rouge2: float = 0.0
-    eval_rougeL: float = 0.0
-    eval_meteor: float = 0.0
     eval_status: str = "idle"  # idle | running | done | error | not_ready
     test_chat_history: list[ChatMessage] = []
     chat_input: str = ""
@@ -390,13 +380,7 @@ class FinetuneState(rx.State):
 
     @rx.var
     def technique_label(self) -> str:
-        return {"qlora": "QLoRA", "lora": "LoRA", "dpo": "DPO"}.get(
-            self.selected_technique, "QLoRA"
-        )
-
-    @rx.var
-    def is_dpo(self) -> bool:
-        return self.selected_technique == "dpo"
+        return "QLoRA" if self.selected_technique == "qlora" else "LoRA"
 
     @rx.var
     def elapsed_time_display(self) -> str:
@@ -1296,34 +1280,6 @@ intent_answers: {self.intent_answers}
             self.compute_backend = value
 
     @rx.event
-    def set_prompt_template(self, value: str):
-        if value in ("alpaca", "chatml", "llama3", "phi3", "zephyr"):
-            self.prompt_template = value
-
-    @rx.event
-    def set_packing(self, value: bool):
-        self.packing = value
-
-    @rx.event
-    def set_dpo_prompt_col(self, value: str):
-        self.dpo_prompt_col = value
-
-    @rx.event
-    def set_dpo_chosen_col(self, value: str):
-        self.dpo_chosen_col = value
-
-    @rx.event
-    def set_dpo_rejected_col(self, value: str):
-        self.dpo_rejected_col = value
-
-    @rx.event
-    def set_dpo_beta(self, value):
-        try:
-            self.dpo_beta = round(float(value[0] if isinstance(value, list) else value), 3)
-        except (TypeError, ValueError, IndexError):
-            pass
-
-    @rx.event
     def set_learning_rate(self, value: str):
         self.learning_rate = value
 
@@ -1400,78 +1356,41 @@ intent_answers: {self.intent_answers}
             self.ai_commentary = ""
             self.training_status = "idle"
 
-        _dataset_path = self.dataset_path if self.data_source not in ("hub_dataset", "skip") else ""
-        _hub_id = self.hub_dataset_id if self.data_source == "hub_dataset" else ""
-
-        try:
-            lr = float(self.learning_rate)
-        except (TypeError, ValueError):
-            lr = 2e-4
-
-        if self.selected_technique == "dpo":
-            # DPO (preference) jobs go to a dedicated endpoint/schema.
-            endpoint = f"{API_BASE}/api/jobs/dpo"
-            payload = {
-                "model_id": self.effective_model_id,
-                "model_source": self.model_source,
-                "local_model_path": self.local_model_path,
-                "hf_token": self.hf_token,
-                "dataset_path": _dataset_path,
-                "hub_dataset_id": _hub_id,
-                "hub_dataset_split": self.hub_dataset_split,
-                "prompt_col": self.dpo_prompt_col,
-                "chosen_col": self.dpo_chosen_col,
-                "rejected_col": self.dpo_rejected_col,
-                "use_4bit": True,
-                "lora_rank": self.lora_r,
-                "lora_alpha": self.lora_alpha,
-                "lora_dropout": self.lora_dropout,
-                "beta": self.dpo_beta,
-                "learning_rate": lr,
-                "epochs": self.epochs,
-                "batch_size": self.batch_size,
-                "gradient_accumulation_steps": self.gradient_accumulation_steps,
-                "max_length": self.max_seq_length,
-                "max_prompt_length": max(16, self.max_seq_length // 2),
-                "bf16": self.bf16,
-                "experiment_id": exp_id,
-            }
-        else:
-            endpoint = f"{API_BASE}/api/jobs"
-            payload = {
-                "model_id": self.effective_model_id,
-                "model_source": self.model_source,
-                "local_model_path": self.local_model_path,
-                "hf_token": self.hf_token,
-                "dataset_path": _dataset_path,
-                "hub_dataset_id": _hub_id,
-                "hub_dataset_split": self.hub_dataset_split,
-                "instruction_col": self.hub_dataset_instruction_col,
-                "output_col": self.hub_dataset_output_col,
-                "technique": self.selected_technique,
-                "use_4bit": self.selected_technique == "qlora",
-                "lora_rank": self.lora_r,
-                "lora_alpha": self.lora_alpha,
-                "lora_dropout": self.lora_dropout,
-                "learning_rate": lr,
-                "epochs": self.epochs,
-                "batch_size": self.batch_size,
-                "max_seq_length": self.max_seq_length,
-                "gradient_accumulation_steps": self.gradient_accumulation_steps,
-                "warmup_ratio": self.warmup_ratio,
-                "lr_scheduler_type": self.lr_scheduler,
-                "bf16": self.bf16,
-                "user_intent": self.user_intent,
-                "experiment_name": exp_name,
-                "experiment_id": exp_id,
-                "compute_backend": self.compute_backend,
-                "prompt_template": self.prompt_template,
-                "packing": self.packing,
-            }
+        use_4bit = self.selected_technique == "qlora"
+        payload = {
+            "model_id": self.effective_model_id,
+            "model_source": self.model_source,
+            "local_model_path": self.local_model_path,
+            "hf_token": self.hf_token,
+            "dataset_path": self.dataset_path
+            if self.data_source not in ("hub_dataset", "skip")
+            else "",
+            "hub_dataset_id": self.hub_dataset_id if self.data_source == "hub_dataset" else "",
+            "hub_dataset_split": self.hub_dataset_split,
+            "instruction_col": self.hub_dataset_instruction_col,
+            "output_col": self.hub_dataset_output_col,
+            "technique": self.selected_technique,
+            "use_4bit": use_4bit,
+            "lora_rank": self.lora_r,
+            "lora_alpha": self.lora_alpha,
+            "lora_dropout": self.lora_dropout,
+            "learning_rate": float(self.learning_rate),
+            "epochs": self.epochs,
+            "batch_size": self.batch_size,
+            "max_seq_length": self.max_seq_length,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            "warmup_ratio": self.warmup_ratio,
+            "lr_scheduler_type": self.lr_scheduler,
+            "bf16": self.bf16,
+            "user_intent": self.user_intent,
+            "experiment_name": exp_name,
+            "experiment_id": exp_id,
+            "compute_backend": self.compute_backend,
+        }
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(endpoint, json=payload)
+                resp = await client.post(f"{API_BASE}/api/jobs", json=payload)
             if resp.status_code in (200, 201):
                 job_id = resp.json()["job_id"]
                 async with self:
@@ -1613,12 +1532,6 @@ intent_answers: {self.intent_answers}
                         self.eval_rouge1 = float(rouge1) if rouge1 is not None else 0.0
                         bleu = data.get("bleu")
                         self.eval_bleu = float(bleu) if bleu is not None else 0.0
-                        rouge2 = data.get("rouge2")
-                        self.eval_rouge2 = float(rouge2) if rouge2 is not None else 0.0
-                        rougel = data.get("rougeL")
-                        self.eval_rougeL = float(rougel) if rougel is not None else 0.0
-                        meteor = data.get("meteor")
-                        self.eval_meteor = float(meteor) if meteor is not None else 0.0
                     return
             except Exception:
                 pass

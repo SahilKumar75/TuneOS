@@ -8,54 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **DPO in the wizard UI.** Direct Preference Optimization is now selectable as a
-  training technique (Step 1). Step 3 shows a preference-data card with
-  prompt/chosen/rejected column mapping, Step 4 exposes the DPO `beta`, and
-  `FinetuneState.start_training` routes DPO runs to `POST /api/jobs/dpo`. Surfaces
-  the DPO backend shipped earlier.
-- **Richer evaluation + live validation curve (P4-D).** `trainer/metrics.py` adds
-  `rouge2`, `rougeL`, and `meteor` (dependency-free); post-training eval now
-  reports all of perplexity/rouge1/rouge2/rougeL/bleu/meteor. `generate_predictions`
-  is batched (with an optional `generation_config`). `RedisLossCallback.on_evaluate`
-  publishes `eval_loss` at each eval, and `TrainingConfig.eval_steps` (exposed on
-  `JobConfig`) enables step-level evaluation for a denser validation curve.
-- **Live Modal training stream (P4-E).** The Modal cloud backend now streams
-  progress to the shared Redis broker during a remote run (the in-trainer callback
-  is pointed at `REDIS_URL`), so the loss chart updates live just like a local run.
-  The Modal image now includes `redis` (also fixing a latent import error in the
-  remote trainer).
-- **DPO preference training (P4-C).** A second recipe trains a LoRA adapter on
-  `(prompt, chosen, rejected)` preference triples via `trl.DPOTrainer`. New
-  `trainer/dpo.py` (`train_dpo`, reuses the SFT loader + LoRA injection),
-  `trainer.config.DPOConfig` (beta, max_length, max_prompt_length, …),
-  `trainer.dataset.load_preference_pairs` + `detect_dataset_type`, the
-  `workers/dpo_task.py` Celery task, and `POST /api/jobs/dpo` (`DPOJobConfig`).
-  Tests in `tests/test_dpo.py`. (The Step 3 three-column uploader UI is a
-  follow-up.)
-- **Prompt templates & sample packing (P4-B).** `trainer/dataset.py` now ships a
-  `PROMPT_TEMPLATES` registry (`alpaca`, `chatml`, `llama3`, `phi3`, `zephyr`);
-  `format_prompt(..., template=)` and `load_and_tokenize(..., template=)` honor
-  the choice, and a new `load_raw_text()` feeds SFTTrainer sample packing.
-  `TrainingConfig` gains `prompt_template` and `packing`, wired through
-  `JobConfig` / `POST /api/jobs` and exposed in Step 4 (a "Data formatting"
-  section with a template picker and a packing toggle).
-- **API hardening (P4-A).** `GET /api/jobs` now supports `limit`/`offset`
-  pagination (default 50, capped at 500). The inference model cache is a bounded
-  `cachetools.LRUCache(maxsize=3)` behind a single lock, so loaded models (GBs
-  each) are evicted LRU instead of growing unboundedly. `GET /api/gpu` reports
-  `device_count`, `vram_total_gb`, `vram_free_gb`, and `cuda_version`. Evaluation
-  metrics are persisted to SQLite (via `save_final_metrics`) and `GET
-  /jobs/{id}/eval` falls back to that durable store (`get_final_metrics`) when the
-  Redis copy has expired or Redis is unavailable.
-- **Trainer flexibility (P4-A).** `TrainingConfig.report_to` makes the HF
-  experiment-tracker integration configurable (default `"none"`).
-  `ModelConfig.attn_implementation` (e.g. `flash_attention_2`/`sdpa`) and
-  `ModelConfig.rope_scaling` are now plumbed into model loading.
-  `LoraConfig.init_lora_weights` exposes PEFT's adapter-init strategy. More
-  architectures auto-detect LoRA targets (Qwen3, Phi-4, Cohere, OLMo, StableLM,
-  Mixtral, MPT, StarCoder2, GPT-BigCode). `prepare_qlora_model` now honors
-  `use_4bit` instead of forcing it on, and all `save_pretrained` calls use
-  `safe_serialization=True`. Minimum `trl` raised to `>=0.12.0`.
 - **Modal.com cloud-GPU training backend.** Jobs can now run on a free Modal T4
   GPU instead of the local device — useful when no local GPU is available. Step 4
   (Configure) has a new **Compute backend** selector (Local GPU / Modal / HF
@@ -143,15 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issue and PR templates for standardized contribution tracking.
 - Contributor Covenant Code of Conduct and Security Policy.
 - Empty `tests` directory with initial pytest configuration.
-
-### Documentation
-- Refreshed docs to match the current product: quickstart now covers the
-  no-Docker Celery worker fallback, gated-model `HF_TOKEN`, and the Modal cloud
-  GPU option; `docs/api.md` documents `GET /api/health/workers` and
-  `compute_backend`; `docs/DEPLOY.md` gains an `.env` reference table;
-  `docs/supported-models.md` reflects auto `target_modules` detection (any HF
-  causal LM); `docs/lora-explained.md` adds a DPO preview; README notes the
-  Modal/local/ZeroGPU compute backends.
 
 ### Changed
 - State data models embedded in `rx.State` now use `pydantic.BaseModel`

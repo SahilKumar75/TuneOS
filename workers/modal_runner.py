@@ -42,19 +42,18 @@ def modal_available() -> bool:
 # The remote app + function are only defined when `modal` is importable, so that
 # importing this module never fails on a machine without the SDK.
 if modal is not None:
-    # Mirrors the trainer stack the remote run imports (trainer.finetune pulls in
-    # trainer.callbacks, which needs `redis` to stream live progress back to the
-    # shared broker). No celery needed.
+    # Mirrors the trainer stack the remote run imports (trainer.finetune +
+    # trainer.evaluate → trainer.dataset/metrics). No celery/redis needed: the
+    # remote side only touches the framework-light trainer layer.
     modal_image = modal.Image.debian_slim(python_version="3.10").pip_install(
         "torch",
         "transformers>=4.44.0",
         "peft>=0.11.0",
-        "trl>=0.12.0",
+        "trl>=0.8.0",
         "bitsandbytes>=0.43.0",
         "datasets>=2.19.0",
         "accelerate>=0.30.0",
         "pandas>=2.0.0",
-        "redis>=5.0.0",
     )
     modal_app = modal.App("tuneos-trainer")
 
@@ -69,25 +68,14 @@ if modal is not None:
         hub_split: str = "train",
         instruction_col: str = "instruction",
         output_col: str = "output",
-        redis_url: str = "",
     ) -> dict:
         """Run one fine-tune on a Modal T4 and return adapter + eval as a dict.
 
         Returns ``{"adapter_zip": bytes, "eval": {...}, "loss_history": [...]}``.
         The caller unpacks the zip into the local OUTPUT_DIR and reuses the
         existing status / metrics persistence.
-
-        When ``redis_url`` is set, the remote training callback streams live
-        progress to that broker (the shared Upstash instance), so the UI's loss
-        chart updates during a Modal run exactly as it does locally.
         """
-        import os
         import tempfile
-
-        # Point the in-trainer RedisLossCallback at the shared broker so progress
-        # streams live; it reads REDIS_URL at instantiation.
-        if redis_url:
-            os.environ["REDIS_URL"] = redis_url
 
         from trainer.config import LoraConfig, ModelConfig, TrainingConfig
         from trainer.finetune import finetune
@@ -197,7 +185,6 @@ def run_on_modal(
             hub_split=hub_split,
             instruction_col=instruction_col,
             output_col=output_col,
-            redis_url=os.getenv("REDIS_URL", ""),
         )
 
     _unzip_to(result["adapter_zip"], output_path)

@@ -8,14 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Multi-run compare page (P4-F).** A new `/compare` page (sidebar → Compare)
-  lets you select completed runs and overlay their training curves
-  (loss / eval_loss / learning_rate), built on the existing
-  `comparison_loss_chart` and a new `ExperimentState.load_comparison` that pivots
-  `get_run_metrics` into the chart shape.
-- **lm-eval benchmark wrapper (P4-F).** `trainer/benchmark_eval.py` runs the
-  EleutherAI lm-evaluation-harness (hellaswag/arc/winogrande/…) against a trained
-  model. lm-eval is an optional, lazily-imported dependency (`pip install lm-eval`).
 - **Results & training UI polish.** Step 6 (Results) now surfaces the full
   reference-metric set — ROUGE-1, ROUGE-2, ROUGE-L, BLEU, METEOR — alongside
   perplexity (parsed from `GET /jobs/{id}/eval` into new `FinetuneState` vars).

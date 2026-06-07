@@ -8,14 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **API hardening (P4-A).** `GET /api/jobs` now supports `limit`/`offset`
-  pagination (default 50, capped at 500). The inference model cache is a bounded
-  `cachetools.LRUCache(maxsize=3)` behind a single lock, so loaded models (GBs
-  each) are evicted LRU instead of growing unboundedly. `GET /api/gpu` reports
-  `device_count`, `vram_total_gb`, `vram_free_gb`, and `cuda_version`. Evaluation
-  metrics are persisted to SQLite (via `save_final_metrics`) and `GET
-  /jobs/{id}/eval` falls back to that durable store (`get_final_metrics`) when the
-  Redis copy has expired or Redis is unavailable.
 - **Trainer flexibility (P4-A).** `TrainingConfig.report_to` makes the HF
   experiment-tracker integration configurable (default `"none"`).
   `ModelConfig.attn_implementation` (e.g. `flash_attention_2`/`sdpa`) and

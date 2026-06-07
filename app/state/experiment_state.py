@@ -62,6 +62,10 @@ class ExperimentState(rx.State):
     runs: list[ExperimentRun] = []
     selected_run_ids: list[str] = []
     is_loading: bool = False
+    # ── Comparison view (overlaid loss curves) ────────────────────
+    compare_metric: str = "loss"  # loss | eval_loss | learning_rate
+    compare_data: list[dict] = []  # pivoted rows: {"step", "run0", "run1", ...}
+    compare_labels: list[str] = []
 
     @rx.var
     def selected_runs(self) -> list[ExperimentRun]:
@@ -108,6 +112,26 @@ class ExperimentState(rx.State):
             self.selected_run_ids = [i for i in self.selected_run_ids if i != run_id]
         else:
             self.selected_run_ids = [*self.selected_run_ids, run_id]
+
+    @rx.event
+    def set_compare_metric(self, metric: str):
+        self.compare_metric = metric
+
+    @rx.event
+    def load_comparison(self):
+        """Fetch step-level metrics for the selected runs and pivot them into
+        the wide shape the overlaid chart expects ({step, run0, run1, ...})."""
+        ids = self.selected_run_ids[:6]  # chart palette caps at 6 series
+        series = get_run_metrics(ids, self.compare_metric)
+        ordered = [rid for rid in ids if rid in series]
+        step_map: dict[int, dict] = {}
+        for i, rid in enumerate(ordered):
+            for pt in series[rid]:
+                row = step_map.setdefault(int(pt["step"]), {"step": int(pt["step"])})
+                row[f"run{i}"] = pt["value"]
+        self.compare_data = [step_map[s] for s in sorted(step_map)]
+        name_by_id = {r.id: (r.name or r.id[:8]) for r in self.runs}
+        self.compare_labels = [name_by_id.get(rid, rid[:8]) for rid in ordered]
 
     @rx.event
     def delete_run(self, run_id: str):

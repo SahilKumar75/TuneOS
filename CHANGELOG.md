@@ -8,24 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Advanced training (P4-F).** Completes the advanced backlog as working backends:
-  - **Knowledge distillation** — `trainer/kd.py` `distill()` trains a LoRA student to
-    match a frozen teacher (KL on temperature-softened logits + hard-label CE);
-    `DistillConfig`, `workers/kd_task.py`, and `POST /api/jobs/distill`.
-  - **Multi-GPU FSDP** — `TrainingConfig.fsdp` / `fsdp_config` (exposed on `JobConfig`)
-    thread PyTorch FSDP options into `TrainingArguments`.
-  - **Hyperparameter sweeps** — `trainer/sweep.py` `expand_grid()` + `POST /api/jobs/sweep`
-    fan a parameter grid into multiple jobs; visualize them on `/compare`.
-  - **INT8 quantization export** — `trainer/quantize.py` `dynamic_quantize_export()` for
-    lean CPU inference (QLoRA already provides the quantization-aware *training* path).
-- **Multi-run compare page (P4-F).** A new `/compare` page (sidebar → Compare)
-  lets you select completed runs and overlay their training curves
-  (loss / eval_loss / learning_rate), built on the existing
-  `comparison_loss_chart` and a new `ExperimentState.load_comparison` that pivots
-  `get_run_metrics` into the chart shape.
-- **lm-eval benchmark wrapper (P4-F).** `trainer/benchmark_eval.py` runs the
-  EleutherAI lm-evaluation-harness (hellaswag/arc/winogrande/…) against a trained
-  model. lm-eval is an optional, lazily-imported dependency (`pip install lm-eval`).
 - **Results & training UI polish.** Step 6 (Results) now surfaces the full
   reference-metric set — ROUGE-1, ROUGE-2, ROUGE-L, BLEU, METEOR — alongside
   perplexity (parsed from `GET /jobs/{id}/eval` into new `FinetuneState` vars).

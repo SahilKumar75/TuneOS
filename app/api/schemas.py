@@ -19,6 +19,10 @@ class GpuInfo(BaseModel):
     backend: str
     name: str
     detail: str = ""
+    device_count: int = 0
+    vram_total_gb: float = 0.0
+    vram_free_gb: float = 0.0
+    cuda_version: str = ""
 
 
 class ModelInfo(BaseModel):

@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **API hardening (P4-A).** `GET /api/jobs` now supports `limit`/`offset`
+  pagination (default 50, capped at 500). The inference model cache is a bounded
+  `cachetools.LRUCache(maxsize=3)` behind a single lock, so loaded models (GBs
+  each) are evicted LRU instead of growing unboundedly. `GET /api/gpu` reports
+  `device_count`, `vram_total_gb`, `vram_free_gb`, and `cuda_version`. Evaluation
+  metrics are persisted to SQLite (via `save_final_metrics`) and `GET
+  /jobs/{id}/eval` falls back to that durable store (`get_final_metrics`) when the
+  Redis copy has expired or Redis is unavailable.
+- **Trainer flexibility (P4-A).** `TrainingConfig.report_to` makes the HF
+  experiment-tracker integration configurable (default `"none"`).
+  `ModelConfig.attn_implementation` (e.g. `flash_attention_2`/`sdpa`) and
+  `ModelConfig.rope_scaling` are now plumbed into model loading.
+  `LoraConfig.init_lora_weights` exposes PEFT's adapter-init strategy. More
+  architectures auto-detect LoRA targets (Qwen3, Phi-4, Cohere, OLMo, StableLM,
+  Mixtral, MPT, StarCoder2, GPT-BigCode). `prepare_qlora_model` now honors
+  `use_4bit` instead of forcing it on, and all `save_pretrained` calls use
+  `safe_serialization=True`. Minimum `trl` raised to `>=0.12.0`.
 - **Modal.com cloud-GPU training backend.** Jobs can now run on a free Modal T4
   GPU instead of the local device — useful when no local GPU is available. Step 4
   (Configure) has a new **Compute backend** selector (Local GPU / Modal / HF
@@ -95,6 +112,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issue and PR templates for standardized contribution tracking.
 - Contributor Covenant Code of Conduct and Security Policy.
 - Empty `tests` directory with initial pytest configuration.
+
+### Documentation
+- Refreshed docs to match the current product: quickstart now covers the
+  no-Docker Celery worker fallback, gated-model `HF_TOKEN`, and the Modal cloud
+  GPU option; `docs/api.md` documents `GET /api/health/workers` and
+  `compute_backend`; `docs/DEPLOY.md` gains an `.env` reference table;
+  `docs/supported-models.md` reflects auto `target_modules` detection (any HF
+  causal LM); `docs/lora-explained.md` adds a DPO preview; README notes the
+  Modal/local/ZeroGPU compute backends.
 
 ### Changed
 - State data models embedded in `rx.State` now use `pydantic.BaseModel`

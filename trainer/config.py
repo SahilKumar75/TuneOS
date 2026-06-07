@@ -125,6 +125,33 @@ class TrainingConfig:
     # Sample packing: concatenate examples up to max_seq_length for higher GPU
     # efficiency. When True the trainer tokenizes raw text itself.
     packing: bool = False
+    # Multi-GPU sharded training via PyTorch FSDP. Empty disables it; otherwise a
+    # space-separated option string, e.g. "full_shard auto_wrap". Passed straight
+    # to TrainingArguments(fsdp=, fsdp_config=).
+    fsdp: str = ""
+    fsdp_config: dict | None = None
+
+
+@dataclass
+class DistillConfig:
+    """Knowledge-distillation config — trains a (LoRA) student to match a frozen
+    teacher's soft logits (KL) blended with the hard-label cross-entropy."""
+
+    output_dir: str = "./outputs"
+    teacher_model: str = ""  # HF id / path of the (larger) teacher
+    temperature: float = 2.0  # softens teacher/student logits
+    alpha: float = 0.5  # weight on distillation loss vs. hard-label CE (0..1)
+    num_train_epochs: int = 3
+    per_device_train_batch_size: int = 4
+    gradient_accumulation_steps: int = 4
+    learning_rate: float = 2e-4
+    max_seq_length: int = 512
+    warmup_ratio: float = 0.03
+    lr_scheduler_type: str = "cosine"
+    fp16: bool = True
+    bf16: bool = False
+    seed: int = 42
+    prompt_template: str = "alpaca"
 
 
 @dataclass

@@ -311,6 +311,9 @@ class FinetuneState(rx.State):
     eval_perplexity: float = 0.0
     eval_bleu: float = 0.0
     eval_rouge1: float = 0.0
+    eval_rouge2: float = 0.0
+    eval_rougeL: float = 0.0
+    eval_meteor: float = 0.0
     eval_status: str = "idle"  # idle | running | done | error | not_ready
     test_chat_history: list[ChatMessage] = []
     chat_input: str = ""
@@ -1610,6 +1613,12 @@ intent_answers: {self.intent_answers}
                         self.eval_rouge1 = float(rouge1) if rouge1 is not None else 0.0
                         bleu = data.get("bleu")
                         self.eval_bleu = float(bleu) if bleu is not None else 0.0
+                        rouge2 = data.get("rouge2")
+                        self.eval_rouge2 = float(rouge2) if rouge2 is not None else 0.0
+                        rougel = data.get("rougeL")
+                        self.eval_rougeL = float(rougel) if rougel is not None else 0.0
+                        meteor = data.get("meteor")
+                        self.eval_meteor = float(meteor) if meteor is not None else 0.0
                     return
             except Exception:
                 pass

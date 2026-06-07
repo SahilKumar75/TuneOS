@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Results & training UI polish.** Step 6 (Results) now surfaces the full
+  reference-metric set — ROUGE-1, ROUGE-2, ROUGE-L, BLEU, METEOR — alongside
+  perplexity (parsed from `GET /jobs/{id}/eval` into new `FinetuneState` vars).
+  Step 5 shows a "Modal T4" badge when the run uses the Modal compute backend.
 - **DPO in the wizard UI.** Direct Preference Optimization is now selectable as a
   training technique (Step 1). Step 3 shows a preference-data card with
   prompt/chosen/rejected column mapping, Step 4 exposes the DPO `beta`, and

@@ -102,6 +102,65 @@ def load_instruction_pairs(
     )
 
 
+def detect_dataset_type(columns: list[str]) -> str:
+    """Classify a dataset by its columns: ``preference`` (DPO) when
+    prompt/chosen/rejected are all present, else ``instruction`` (SFT)."""
+    cols = {c.lower() for c in columns}
+    if {"prompt", "chosen", "rejected"} <= cols:
+        return "preference"
+    return "instruction"
+
+
+def load_preference_pairs(
+    file_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    prompt_col: str = "prompt",
+    chosen_col: str = "chosen",
+    rejected_col: str = "rejected",
+) -> Dataset:
+    """Load a preference dataset for DPO, normalised to ``prompt``/``chosen``/
+    ``rejected`` text columns (the shape ``trl.DPOTrainer`` expects)."""
+    required = (prompt_col, chosen_col, rejected_col)
+
+    def _check(available: list[str]) -> None:
+        missing = [c for c in required if c not in available]
+        if missing:
+            raise ValueError(
+                f"Preference dataset missing column(s) {missing}. Available columns: {available}"
+            )
+
+    # Validate columns on the raw source before constructing a HF Dataset, so an
+    # invalid request fails fast (and without triggering dataset fingerprinting).
+    if hub_dataset_id:
+        raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=False)
+        _check(raw.column_names)
+    elif file_path.endswith(".csv"):
+        df = pd.read_csv(file_path)
+        _check(list(df.columns))
+        raw = Dataset.from_pandas(df)
+    elif file_path.endswith(".json") and not file_path.endswith(".jsonl"):
+        import json
+
+        with open(file_path) as f:
+            data = json.load(f)
+        records = data if isinstance(data, list) else [data]
+        _check(list(records[0].keys()) if records else [])
+        raw = Dataset.from_list(records)
+    else:
+        raw = load_dataset("json", data_files=file_path, split="train")
+        _check(raw.column_names)
+
+    for src, dst in ((prompt_col, "prompt"), (chosen_col, "chosen"), (rejected_col, "rejected")):
+        if src != dst and src in raw.column_names:
+            raw = raw.rename_column(src, dst)
+
+    drop = [c for c in raw.column_names if c not in ("prompt", "chosen", "rejected")]
+    if drop:
+        raw = raw.remove_columns(drop)
+    return raw
+
+
 def load_raw_text(
     file_path: str,
     hub_dataset_id: str = "",

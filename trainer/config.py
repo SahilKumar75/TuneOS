@@ -122,3 +122,26 @@ class TrainingConfig:
     # Sample packing: concatenate examples up to max_seq_length for higher GPU
     # efficiency. When True the trainer tokenizes raw text itself.
     packing: bool = False
+
+
+@dataclass
+class DPOConfig:
+    """Direct Preference Optimization config (trl.DPOTrainer).
+
+    Trains a LoRA adapter on (prompt, chosen, rejected) preference triples.
+    """
+
+    output_dir: str = "./outputs"
+    # KL penalty strength — higher keeps the policy closer to the reference.
+    beta: float = 0.1
+    max_length: int = 1024
+    max_prompt_length: int = 512
+    num_train_epochs: int = 1
+    per_device_train_batch_size: int = 2
+    gradient_accumulation_steps: int = 4
+    learning_rate: float = 5e-5
+    warmup_ratio: float = 0.1
+    lr_scheduler_type: str = "cosine"
+    fp16: bool = True
+    bf16: bool = False
+    seed: int = 42

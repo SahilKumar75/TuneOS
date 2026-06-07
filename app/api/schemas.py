@@ -64,6 +64,9 @@ class JobConfig(BaseModel):
     use_torch_compile: bool = False
     # Compute backend for training execution.
     compute_backend: Literal["local", "modal", "hf_spaces"] = "local"
+    # Prompt formatting + sample packing.
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    packing: bool = False
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

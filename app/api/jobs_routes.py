@@ -97,6 +97,8 @@ async def create_job(config: JobConfig):
         "seed": config.seed,
         "use_torch_compile": config.use_torch_compile,
         "compute_backend": config.compute_backend,
+        "prompt_template": config.prompt_template,
+        "packing": config.packing,
     }
 
     # Guard: refuse to queue if no worker is listening — job would silently sit forever.

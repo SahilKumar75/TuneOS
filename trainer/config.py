@@ -116,3 +116,9 @@ class TrainingConfig:
     # Experiment-tracker integration for HF Trainer, e.g. "none" (default),
     # "wandb", "tensorboard". Passed straight to TrainingArguments(report_to=).
     report_to: str = "none"
+    # Prompt template name from trainer.dataset.PROMPT_TEMPLATES
+    # (alpaca/chatml/llama3/phi3/zephyr).
+    prompt_template: str = "alpaca"
+    # Sample packing: concatenate examples up to max_seq_length for higher GPU
+    # efficiency. When True the trainer tokenizes raw text itself.
+    packing: bool = False

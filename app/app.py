@@ -6,6 +6,7 @@ Configures the Reflex app with theming, global styles, and routes.
 import reflex as rx
 
 from app.components.layout import two_panel_layout
+from app.pages.compare import compare_page
 from app.pages.configure import configure_page
 from app.pages.datasets import datasets_page
 from app.pages.finetune import finetune_page
@@ -60,6 +61,7 @@ app.add_page(training_page, route="/training", title="Training — TuneOS")
 app.add_page(results_page, route="/results", title="Results — TuneOS")
 app.add_page(datasets_page, route="/datasets", title="Datasets — TuneOS")
 app.add_page(finetune_page, route="/finetune", title="Fine-tune — TuneOS")
+app.add_page(compare_page, route="/compare", title="Compare — TuneOS")
 
 # Mount REST API endpoints. Imported here, after page registration, to avoid
 # a circular import between the Reflex app module and the API router.

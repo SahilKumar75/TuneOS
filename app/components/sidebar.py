@@ -243,6 +243,11 @@ def _expanded_sidebar() -> rx.Component:
                 active=AppState.current_view == "datasets",
                 on_click=AppState.set_view("datasets"),
             ),
+            _nav_item(
+                "chart-line",
+                "Compare",
+                on_click=rx.redirect("/compare"),
+            ),
             spacing="1",
             width="100%",
             padding_x="8px",

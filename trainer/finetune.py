@@ -129,6 +129,8 @@ def finetune(
         seed=train_cfg.seed,
         data_seed=train_cfg.seed,
         torch_compile=train_cfg.use_torch_compile,
+        fsdp=train_cfg.fsdp,
+        fsdp_config=train_cfg.fsdp_config,
         eval_strategy=eval_strategy,
         eval_steps=eval_steps,
         save_strategy=save_strategy,

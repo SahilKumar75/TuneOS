@@ -216,18 +216,24 @@ class FinetuneState(rx.State):
     user_intent: str = ""  # written by approve_intent() for API compat
 
     # Phase A – filter chips (all optional)
-    intent_use_for: str = ""  # "personal" | "company" | ""
-    intent_domain: str = ""  # "healthcare" | "finance" | "education" | "legal" | "creative" | ""
-    intent_task_type: str = ""  # "text" | "vision" | "audio" | "code" | ""
+    intent_use_for: str = ""  # "personal" | "company" | "research" | "education" | ""
+    intent_domain: str = ""  # "healthcare" | "finance" | "education" | "legal" | "creative" | "technology" | "ecommerce" | "customer_service" | ""
+    intent_task_type: str = ""  # "text" | "vision" | "audio" | "code" | "translation" | "summarization" | ""
+    
+    # New input fields for Phase A
+    intent_project_name: str = ""  # project name
+    intent_description: str = ""  # project description
+    intent_request_volume: str = ""  # expected request volume
+    intent_accuracy_req: str = ""  # accuracy requirements
 
     # Phase progression
     intent_phase: int = 1  # 1 = filter chips, 2 = questions, 3 = preview
 
-    # Phase B – questionnaire
-    intent_question_idx: int = 0  # 0-4
-    intent_answers: list[str] = ["", "", "", "", ""]
-    intent_custom_answers: list[str] = ["", "", "", "", ""]
-    intent_is_custom: list[bool] = [False, False, False, False, False]
+    # Phase B – questionnaire (expanded to 8 questions)
+    intent_question_idx: int = 0  # 0-7
+    intent_answers: list[str] = ["", "", "", "", "", "", "", ""]
+    intent_custom_answers: list[str] = ["", "", "", "", "", "", "", ""]
+    intent_is_custom: list[bool] = [False, False, False, False, False, False, False, False]
 
     # Phase C – markdown preview
     intent_md: str = ""
@@ -880,6 +886,22 @@ class FinetuneState(rx.State):
         self.intent_task_type = "" if self.intent_task_type == v else v
 
     @rx.event
+    def set_intent_project_name(self, v: str):
+        self.intent_project_name = v
+
+    @rx.event
+    def set_intent_description(self, v: str):
+        self.intent_description = v
+
+    @rx.event
+    def set_intent_request_volume(self, v: str):
+        self.intent_request_volume = v
+
+    @rx.event
+    def set_intent_accuracy_req(self, v: str):
+        self.intent_accuracy_req = v
+
+    @rx.event
     def intent_next_phase(self):
         if self.intent_phase == 2:
             self._generate_intent_md()
@@ -891,11 +913,11 @@ class FinetuneState(rx.State):
         if self.intent_phase > 1:
             self.intent_phase -= 1
             if self.intent_phase == 2:
-                self.intent_question_idx = 4
+                self.intent_question_idx = len(self.intent_answers) - 1
 
     @rx.event
     def intent_next_question(self):
-        if self.intent_question_idx < 4:
+        if self.intent_question_idx < len(self.intent_answers) - 1:
             self.intent_question_idx += 1
         else:
             self._generate_intent_md()
@@ -924,7 +946,7 @@ class FinetuneState(rx.State):
         is_custom[idx] = False
         self.intent_is_custom = is_custom
         # Auto-advance focus and scroll to next question
-        if self.intent_question_idx == idx and idx < 4:
+        if self.intent_question_idx == idx and idx < len(self.intent_answers) - 1:
             self.intent_question_idx = idx + 1
             next_id = f"intent-q-{idx + 1}"
             yield rx.call_script(

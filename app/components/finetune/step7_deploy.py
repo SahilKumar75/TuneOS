@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from app.components.finetune.shared import _card, _label, _section_heading
+from app.state.deploy_state import DeployState
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
@@ -21,7 +22,7 @@ def _deploy_target_row(
     return rx.hstack(
         rx.checkbox(
             checked=is_checked,
-            on_change=lambda _: FinetuneState.toggle_deploy_target(target_key),
+            on_change=lambda _: DeployState.toggle_deploy_target(target_key),
             size="2",
         ),
         rx.vstack(
@@ -55,42 +56,42 @@ def _deploy_body() -> rx.Component:
                     "Download adapter",
                     "Zip the LoRA adapter files (~100 MB) — works with PEFT/Transformers",
                     "download",
-                    FinetuneState.deploy_adapter,
+                    DeployState.deploy_adapter,
                 ),
                 _deploy_target_row(
                     "merged",
                     "Download merged model",
                     "Merge adapter into base model → full standalone safetensors (~14 GB for 7B)",
                     "layers",
-                    FinetuneState.deploy_merged,
+                    DeployState.deploy_merged,
                 ),
                 _deploy_target_row(
                     "hub",
                     "Push to Hugging Face Hub",
                     "Upload adapter to a public or private HF repository",
                     "globe",
-                    FinetuneState.deploy_hub,
+                    DeployState.deploy_hub,
                 ),
                 _deploy_target_row(
                     "gguf",
                     "Export as GGUF",
                     "Convert to GGUF format for use with Ollama or llama.cpp (CPU inference)",
                     "cpu",
-                    FinetuneState.deploy_gguf,
+                    DeployState.deploy_gguf,
                 ),
                 _deploy_target_row(
                     "github",
                     "Push to GitHub",
                     "Commit adapter files to a GitHub repository using Git LFS",
                     "github",
-                    FinetuneState.deploy_github,
+                    DeployState.deploy_github,
                 ),
                 spacing="0",
             )
         ),
         # HF Hub fields
         rx.cond(
-            FinetuneState.deploy_hub,
+            DeployState.deploy_hub,
             _card(
                 rx.vstack(
                     rx.text(
@@ -105,8 +106,8 @@ def _deploy_body() -> rx.Component:
                             rx.input(
                                 type="password",
                                 placeholder="hf_xxxxxxxxxxxxx",
-                                value=FinetuneState.hf_token_input,
-                                on_change=FinetuneState.set_hf_token_input,
+                                value=DeployState.hf_token_input,
+                                on_change=DeployState.set_hf_token_input,
                                 width="100%",
                             ),
                             spacing="1",
@@ -115,8 +116,8 @@ def _deploy_body() -> rx.Component:
                             _label("Repository name (e.g. myuser/my-chatbot-lora)"),
                             rx.input(
                                 placeholder="username/repo-name",
-                                value=FinetuneState.hf_repo_name,
-                                on_change=FinetuneState.set_hf_repo_name,
+                                value=DeployState.hf_repo_name,
+                                on_change=DeployState.set_hf_repo_name,
                                 width="100%",
                             ),
                             spacing="1",
@@ -127,21 +128,21 @@ def _deploy_body() -> rx.Component:
                     ),
                     rx.button(
                         rx.cond(
-                            FinetuneState.push_status == "pushing",
+                            DeployState.push_status == "pushing",
                             rx.hstack(rx.spinner(size="2"), rx.text("Pushing..."), spacing="2"),
                             rx.text("Push to Hub"),
                         ),
-                        on_click=FinetuneState.push_to_hub,
-                        disabled=FinetuneState.push_status == "pushing",
+                        on_click=DeployState.push_to_hub,
+                        disabled=DeployState.push_status == "pushing",
                         color_scheme="blue",
                         size="2",
                     ),
                     rx.cond(
-                        FinetuneState.push_status == "done",
+                        DeployState.push_status == "done",
                         rx.callout(
                             rx.hstack(
                                 rx.icon("circle-check", size=14),
-                                rx.text(f"Pushed to {FinetuneState.push_repo_url}"),
+                                rx.text(f"Pushed to {DeployState.push_repo_url}"),
                                 spacing="2",
                             ),
                             color_scheme="green",
@@ -150,8 +151,8 @@ def _deploy_body() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        FinetuneState.push_error != "",
-                        rx.callout(FinetuneState.push_error, color_scheme="red", size="1"),
+                        DeployState.push_error != "",
+                        rx.callout(DeployState.push_error, color_scheme="red", size="1"),
                         rx.fragment(),
                     ),
                     spacing="3",
@@ -161,7 +162,7 @@ def _deploy_body() -> rx.Component:
         ),
         # GGUF fields
         rx.cond(
-            FinetuneState.deploy_gguf,
+            DeployState.deploy_gguf,
             _card(
                 rx.vstack(
                     rx.text(
@@ -184,14 +185,14 @@ def _deploy_body() -> rx.Component:
                                 rx.select.content(
                                     *[rx.select.item(q, value=q) for q in _GGUF_QUANTS],
                                 ),
-                                value=FinetuneState.gguf_quantization,
-                                on_change=FinetuneState.set_gguf_quantization,
+                                value=DeployState.gguf_quantization,
+                                on_change=DeployState.set_gguf_quantization,
                             ),
                             spacing="1",
                         ),
                         rx.button(
                             rx.cond(
-                                FinetuneState.gguf_status == "exporting",
+                                DeployState.gguf_status == "exporting",
                                 rx.hstack(
                                     rx.spinner(size="2"),
                                     rx.text("Exporting..."),
@@ -199,8 +200,8 @@ def _deploy_body() -> rx.Component:
                                 ),
                                 rx.text("Export GGUF"),
                             ),
-                            on_click=FinetuneState.start_gguf_export,
-                            disabled=FinetuneState.gguf_status == "exporting",
+                            on_click=DeployState.start_gguf_export,
+                            disabled=DeployState.gguf_status == "exporting",
                             color_scheme="blue",
                             size="2",
                             align_self="flex-end",
@@ -215,7 +216,7 @@ def _deploy_body() -> rx.Component:
         ),
         # GitHub fields
         rx.cond(
-            FinetuneState.deploy_github,
+            DeployState.deploy_github,
             _card(
                 rx.vstack(
                     rx.text(
@@ -229,8 +230,8 @@ def _deploy_body() -> rx.Component:
                             _label("Repository URL (HTTPS)"),
                             rx.input(
                                 placeholder="https://github.com/user/repo",
-                                value=FinetuneState.github_repo_url,
-                                on_change=FinetuneState.set_github_repo_url,
+                                value=DeployState.github_repo_url,
+                                on_change=DeployState.set_github_repo_url,
                                 width="100%",
                             ),
                             spacing="1",
@@ -240,8 +241,8 @@ def _deploy_body() -> rx.Component:
                             rx.input(
                                 type="password",
                                 placeholder="ghp_xxxxxxxxxxxxx",
-                                value=FinetuneState.github_token,
-                                on_change=FinetuneState.set_github_token,
+                                value=DeployState.github_token,
+                                on_change=DeployState.set_github_token,
                                 width="100%",
                             ),
                             spacing="1",
@@ -252,19 +253,19 @@ def _deploy_body() -> rx.Component:
                     ),
                     rx.button(
                         rx.cond(
-                            FinetuneState.github_push_status == "pushing",
+                            DeployState.github_push_status == "pushing",
                             rx.hstack(rx.spinner(size="2"), rx.text("Pushing..."), spacing="2"),
                             rx.text("Push to GitHub"),
                         ),
-                        on_click=FinetuneState.push_to_github,
-                        disabled=FinetuneState.github_push_status == "pushing",
+                        on_click=DeployState.push_to_github,
+                        disabled=DeployState.github_push_status == "pushing",
                         color_scheme="blue",
                         size="2",
                     ),
                     rx.cond(
-                        FinetuneState.github_push_status == "done",
+                        DeployState.github_push_status == "done",
                         rx.callout(
-                            f"Pushed to {FinetuneState.github_repo_url}",
+                            f"Pushed to {DeployState.github_repo_url}",
                             color_scheme="green",
                             size="1",
                         ),
@@ -279,16 +280,16 @@ def _deploy_body() -> rx.Component:
         rx.hstack(
             rx.button(
                 rx.hstack(rx.icon("download", size=14), rx.text("Download adapter"), spacing="2"),
-                on_click=FinetuneState.download_adapter,
+                on_click=DeployState.download_adapter,
                 color_scheme="blue",
                 variant="soft",
                 size="2",
             ),
             rx.cond(
-                FinetuneState.deploy_merged,
+                DeployState.deploy_merged,
                 rx.button(
                     rx.cond(
-                        FinetuneState.merge_status == "merging",
+                        DeployState.merge_status == "merging",
                         rx.hstack(rx.spinner(size="2"), rx.text("Merging..."), spacing="2"),
                         rx.hstack(
                             rx.icon("layers", size=14),
@@ -296,8 +297,8 @@ def _deploy_body() -> rx.Component:
                             spacing="2",
                         ),
                     ),
-                    on_click=FinetuneState.start_merge,
-                    disabled=FinetuneState.merge_status == "merging",
+                    on_click=DeployState.start_merge,
+                    disabled=DeployState.merge_status == "merging",
                     color_scheme="blue",
                     variant="soft",
                     size="2",
@@ -309,7 +310,7 @@ def _deploy_body() -> rx.Component:
         ),
         # Deploy log
         rx.cond(
-            FinetuneState.deploy_log != "",
+            DeployState.deploy_log != "",
             _card(
                 rx.vstack(
                     rx.text(
@@ -320,7 +321,7 @@ def _deploy_body() -> rx.Component:
                     ),
                     rx.box(
                         rx.text(
-                            FinetuneState.deploy_log,
+                            DeployState.deploy_log,
                             font_size="0.76rem",
                             color=c("text_secondary"),
                             font_family="monospace",
@@ -381,7 +382,7 @@ def step7_workspace_panel() -> rx.Component:
                 margin_bottom="4px",
             ),
             rx.cond(
-                FinetuneState.training_status != "done",
+                DeployState.training_status != "done",
                 rx.callout(
                     "Training must complete before you can deploy. "
                     "Start training from the Configure panel.",

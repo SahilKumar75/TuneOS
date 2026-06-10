@@ -7,7 +7,7 @@ import reflex as rx
 from app.components.finetune.shared import _card, _nav_buttons
 from app.components.finetune.step5_train import _metric_tile
 from app.state.experiment_state import ExperimentState, ModelRegistryState
-from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 
@@ -33,25 +33,25 @@ def step6_results() -> rx.Component:
                     ),
                     rx.spacer(),
                     rx.cond(
-                        FinetuneState.eval_status == "idle",
+                        TrainingPollerState.eval_status == "idle",
                         rx.button(
                             "Run evaluation",
-                            on_click=FinetuneState.run_eval,
+                            on_click=TrainingPollerState.run_eval,
                             size="2",
                             color_scheme="blue",
                             variant="soft",
                         ),
-                        rx.badge(FinetuneState.eval_status, color_scheme="blue", size="1"),
+                        rx.badge(TrainingPollerState.eval_status, color_scheme="blue", size="1"),
                     ),
                     align="center",
                 ),
                 rx.cond(
-                    FinetuneState.eval_status == "done",
+                    TrainingPollerState.eval_status == "done",
                     rx.grid(
                         rx.vstack(
                             rx.text("Perplexity", font_size="0.72rem", color=c("text_muted")),
                             rx.text(
-                                FinetuneState.eval_perplexity.to_string(),
+                                TrainingPollerState.eval_perplexity.to_string(),
                                 font_size="1.8rem",
                                 font_weight="700",
                                 color=c("accent"),
@@ -62,7 +62,7 @@ def step6_results() -> rx.Component:
                         rx.vstack(
                             rx.text("ROUGE-1", font_size="0.72rem", color=c("text_muted")),
                             rx.text(
-                                FinetuneState.eval_rouge1.to_string(),
+                                TrainingPollerState.eval_rouge1.to_string(),
                                 font_size="1.8rem",
                                 font_weight="700",
                                 color=c("accent"),
@@ -73,7 +73,7 @@ def step6_results() -> rx.Component:
                         rx.vstack(
                             rx.text("BLEU", font_size="0.72rem", color=c("text_muted")),
                             rx.text(
-                                FinetuneState.eval_bleu.to_string(),
+                                TrainingPollerState.eval_bleu.to_string(),
                                 font_size="1.8rem",
                                 font_weight="700",
                                 color=c("accent"),
@@ -85,10 +85,10 @@ def step6_results() -> rx.Component:
                             rx.text("What it means", font_size="0.72rem", color=c("text_muted")),
                             rx.text(
                                 rx.cond(
-                                    FinetuneState.eval_perplexity < 10,
+                                    TrainingPollerState.eval_perplexity < 10,
                                     "Excellent — model learned the domain well",
                                     rx.cond(
-                                        FinetuneState.eval_perplexity < 30,
+                                        TrainingPollerState.eval_perplexity < 30,
                                         "Good — decent task alignment",
                                         "Try more epochs or a larger dataset",
                                     ),
@@ -117,9 +117,9 @@ def step6_results() -> rx.Component:
                     margin_bottom="8px",
                 ),
                 rx.cond(
-                    FinetuneState.user_intent != "",
+                    TrainingPollerState.user_intent != "",
                     rx.text(
-                        f"System context: {FinetuneState.user_intent}",
+                        f"System context: {TrainingPollerState.user_intent}",
                         font_size="0.76rem",
                         color=c("text_muted"),
                         font_style="italic",
@@ -127,10 +127,10 @@ def step6_results() -> rx.Component:
                     rx.fragment(),
                 ),
                 rx.cond(
-                    FinetuneState.test_chat_history.length() > 0,
+                    TrainingPollerState.test_chat_history.length() > 0,
                     rx.box(
                         rx.foreach(
-                            FinetuneState.test_chat_history,
+                            TrainingPollerState.test_chat_history,
                             lambda msg: rx.box(
                                 rx.text(
                                     msg.content,
@@ -171,27 +171,27 @@ def step6_results() -> rx.Component:
                 rx.hstack(
                     rx.input(
                         placeholder="Type a test message...",
-                        value=FinetuneState.chat_input,
-                        on_change=FinetuneState.set_chat_input,
-                        on_key_down=FinetuneState.handle_chat_key,
+                        value=TrainingPollerState.chat_input,
+                        on_change=TrainingPollerState.set_chat_input,
+                        on_key_down=TrainingPollerState.handle_chat_key,
                         flex="1",
                     ),
                     rx.button(
                         rx.cond(
-                            FinetuneState.chat_loading,
+                            TrainingPollerState.chat_loading,
                             rx.spinner(size="2"),
                             rx.icon("send", size=16),
                         ),
-                        on_click=FinetuneState.send_test_chat,
-                        disabled=FinetuneState.chat_loading,
+                        on_click=TrainingPollerState.send_test_chat,
+                        disabled=TrainingPollerState.chat_loading,
                         color_scheme="blue",
                         size="2",
                     ),
                     spacing="2",
                 ),
                 rx.cond(
-                    FinetuneState.chat_error != "",
-                    rx.callout(FinetuneState.chat_error, color_scheme="red", size="1"),
+                    TrainingPollerState.chat_error != "",
+                    rx.callout(TrainingPollerState.chat_error, color_scheme="red", size="1"),
                     rx.fragment(),
                 ),
                 spacing="3",
@@ -199,7 +199,7 @@ def step6_results() -> rx.Component:
         ),
         # Register to model registry
         rx.cond(
-            (FinetuneState.training_status == "done") & (FinetuneState.experiment_id != ""),
+            (TrainingPollerState.training_status == "done") & (TrainingPollerState.experiment_id != ""),
             _card(
                 rx.vstack(
                     rx.hstack(
@@ -220,7 +220,7 @@ def step6_results() -> rx.Component:
                         color=c("text_secondary"),
                     ),
                     rx.cond(
-                        FinetuneState.eval_status != "done",
+                        TrainingPollerState.eval_status != "done",
                         rx.callout(
                             "Run evaluation first so accurate metrics are captured in the registry.",
                             color_scheme="amber",
@@ -234,7 +234,7 @@ def step6_results() -> rx.Component:
                             value=ModelRegistryState.register_name,
                             on_change=ModelRegistryState.set_register_name,
                             flex="1",
-                            disabled=FinetuneState.eval_status != "done",
+                            disabled=TrainingPollerState.eval_status != "done",
                         ),
                         rx.button(
                             rx.cond(
@@ -243,12 +243,12 @@ def step6_results() -> rx.Component:
                                 rx.text("Register"),
                             ),
                             on_click=ModelRegistryState.do_register(
-                                FinetuneState.experiment_id,
-                                FinetuneState.eval_perplexity,
-                                FinetuneState.last_train_loss,
+                                TrainingPollerState.experiment_id,
+                                TrainingPollerState.eval_perplexity,
+                                TrainingPollerState.last_train_loss,
                             ),
                             disabled=ModelRegistryState.is_registering
-                            | (FinetuneState.eval_status != "done"),
+                            | (TrainingPollerState.eval_status != "done"),
                             color_scheme="blue",
                             size="2",
                         ),
@@ -261,7 +261,7 @@ def step6_results() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        ModelRegistryState.registered_run_id == FinetuneState.experiment_id,
+                        ModelRegistryState.registered_run_id == TrainingPollerState.experiment_id,
                         rx.callout(
                             rx.hstack(
                                 rx.icon("circle-check", size=14),
@@ -381,16 +381,16 @@ def step6_panel() -> rx.Component:
                                 ),
                                 rx.spacer(),
                                 rx.cond(
-                                    FinetuneState.eval_status == "idle",
+                                    TrainingPollerState.eval_status == "idle",
                                     rx.button(
                                         "Run evaluation",
-                                        on_click=FinetuneState.run_eval,
+                                        on_click=TrainingPollerState.run_eval,
                                         size="2",
                                         color_scheme="blue",
                                         variant="soft",
                                     ),
                                     rx.badge(
-                                        FinetuneState.eval_status,
+                                        TrainingPollerState.eval_status,
                                         color_scheme="blue",
                                         size="1",
                                     ),
@@ -398,7 +398,7 @@ def step6_panel() -> rx.Component:
                                 align="center",
                             ),
                             rx.cond(
-                                FinetuneState.eval_status == "done",
+                                TrainingPollerState.eval_status == "done",
                                 rx.grid(
                                     rx.vstack(
                                         rx.text(
@@ -407,7 +407,7 @@ def step6_panel() -> rx.Component:
                                             color=c("text_muted"),
                                         ),
                                         rx.text(
-                                            FinetuneState.eval_perplexity.to_string(),
+                                            TrainingPollerState.eval_perplexity.to_string(),
                                             font_size="1.8rem",
                                             font_weight="700",
                                             color=c("accent"),
@@ -427,10 +427,10 @@ def step6_panel() -> rx.Component:
                                         ),
                                         rx.text(
                                             rx.cond(
-                                                FinetuneState.eval_perplexity < 10,
+                                                TrainingPollerState.eval_perplexity < 10,
                                                 "Excellent — model learned the domain well",
                                                 rx.cond(
-                                                    FinetuneState.eval_perplexity < 30,
+                                                    TrainingPollerState.eval_perplexity < 30,
                                                     "Good — decent task alignment",
                                                     "Try more epochs or a larger dataset",
                                                 ),
@@ -446,13 +446,13 @@ def step6_panel() -> rx.Component:
                                 rx.fragment(),
                             ),
                             rx.cond(
-                                FinetuneState.eval_status == "done",
+                                TrainingPollerState.eval_status == "done",
                                 rx.grid(
-                                    _metric_tile("ROUGE-1", FinetuneState.eval_rouge1.to_string()),
-                                    _metric_tile("ROUGE-2", FinetuneState.eval_rouge2.to_string()),
-                                    _metric_tile("ROUGE-L", FinetuneState.eval_rougeL.to_string()),
-                                    _metric_tile("BLEU", FinetuneState.eval_bleu.to_string()),
-                                    _metric_tile("METEOR", FinetuneState.eval_meteor.to_string()),
+                                    _metric_tile("ROUGE-1", TrainingPollerState.eval_rouge1.to_string()),
+                                    _metric_tile("ROUGE-2", TrainingPollerState.eval_rouge2.to_string()),
+                                    _metric_tile("ROUGE-L", TrainingPollerState.eval_rougeL.to_string()),
+                                    _metric_tile("BLEU", TrainingPollerState.eval_bleu.to_string()),
+                                    _metric_tile("METEOR", TrainingPollerState.eval_meteor.to_string()),
                                     columns="3",
                                     spacing="3",
                                     width="100%",
@@ -472,9 +472,9 @@ def step6_panel() -> rx.Component:
                                 margin_bottom="8px",
                             ),
                             rx.cond(
-                                FinetuneState.user_intent != "",
+                                TrainingPollerState.user_intent != "",
                                 rx.text(
-                                    f"System context: {FinetuneState.user_intent}",
+                                    f"System context: {TrainingPollerState.user_intent}",
                                     font_size="0.76rem",
                                     color=c("text_muted"),
                                     font_style="italic",
@@ -482,10 +482,10 @@ def step6_panel() -> rx.Component:
                                 rx.fragment(),
                             ),
                             rx.cond(
-                                FinetuneState.test_chat_history.length() > 0,
+                                TrainingPollerState.test_chat_history.length() > 0,
                                 rx.box(
                                     rx.foreach(
-                                        FinetuneState.test_chat_history,
+                                        TrainingPollerState.test_chat_history,
                                         lambda msg: rx.box(
                                             rx.text(
                                                 msg.content,
@@ -530,27 +530,27 @@ def step6_panel() -> rx.Component:
                             rx.hstack(
                                 rx.input(
                                     placeholder="Type a test message...",
-                                    value=FinetuneState.chat_input,
-                                    on_change=FinetuneState.set_chat_input,
-                                    on_key_down=FinetuneState.handle_chat_key,
+                                    value=TrainingPollerState.chat_input,
+                                    on_change=TrainingPollerState.set_chat_input,
+                                    on_key_down=TrainingPollerState.handle_chat_key,
                                     flex="1",
                                 ),
                                 rx.button(
                                     rx.cond(
-                                        FinetuneState.chat_loading,
+                                        TrainingPollerState.chat_loading,
                                         rx.spinner(size="2"),
                                         rx.icon("send", size=16),
                                     ),
-                                    on_click=FinetuneState.send_test_chat,
-                                    disabled=FinetuneState.chat_loading,
+                                    on_click=TrainingPollerState.send_test_chat,
+                                    disabled=TrainingPollerState.chat_loading,
                                     color_scheme="blue",
                                     size="2",
                                 ),
                                 spacing="2",
                             ),
                             rx.cond(
-                                FinetuneState.chat_error != "",
-                                rx.callout(FinetuneState.chat_error, color_scheme="red", size="1"),
+                                TrainingPollerState.chat_error != "",
+                                rx.callout(TrainingPollerState.chat_error, color_scheme="red", size="1"),
                                 rx.fragment(),
                             ),
                             spacing="3",
@@ -563,8 +563,8 @@ def step6_panel() -> rx.Component:
                 # Right col: register + past runs
                 rx.vstack(
                     rx.cond(
-                        (FinetuneState.training_status == "done")
-                        & (FinetuneState.experiment_id != ""),
+                        (TrainingPollerState.training_status == "done")
+                        & (TrainingPollerState.experiment_id != ""),
                         _card(
                             rx.vstack(
                                 rx.hstack(
@@ -584,7 +584,7 @@ def step6_panel() -> rx.Component:
                                     color=c("text_secondary"),
                                 ),
                                 rx.cond(
-                                    FinetuneState.eval_status != "done",
+                                    TrainingPollerState.eval_status != "done",
                                     rx.callout(
                                         "Run evaluation first for accurate metrics.",
                                         color_scheme="amber",
@@ -598,7 +598,7 @@ def step6_panel() -> rx.Component:
                                         value=ModelRegistryState.register_name,
                                         on_change=ModelRegistryState.set_register_name,
                                         flex="1",
-                                        disabled=FinetuneState.eval_status != "done",
+                                        disabled=TrainingPollerState.eval_status != "done",
                                     ),
                                     rx.button(
                                         rx.cond(
@@ -611,12 +611,12 @@ def step6_panel() -> rx.Component:
                                             rx.text("Register"),
                                         ),
                                         on_click=ModelRegistryState.do_register(
-                                            FinetuneState.experiment_id,
-                                            FinetuneState.eval_perplexity,
-                                            FinetuneState.last_train_loss,
+                                            TrainingPollerState.experiment_id,
+                                            TrainingPollerState.eval_perplexity,
+                                            TrainingPollerState.last_train_loss,
                                         ),
                                         disabled=ModelRegistryState.is_registering
-                                        | (FinetuneState.eval_status != "done"),
+                                        | (TrainingPollerState.eval_status != "done"),
                                         color_scheme="blue",
                                         size="2",
                                     ),
@@ -634,7 +634,7 @@ def step6_panel() -> rx.Component:
                                 ),
                                 rx.cond(
                                     ModelRegistryState.registered_run_id
-                                    == FinetuneState.experiment_id,
+                                    == TrainingPollerState.experiment_id,
                                     rx.callout(
                                         rx.hstack(
                                             rx.icon("circle-check", size=14),

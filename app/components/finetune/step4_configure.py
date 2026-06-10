@@ -6,6 +6,7 @@ import reflex as rx
 
 from app.components.finetune.shared import _card, _label, _nav_buttons, _section_heading
 from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 _LR_PRESETS = [
@@ -533,7 +534,7 @@ def _step4() -> rx.Component:
         _nav_buttons(
             next_label="Start Training →",
             next_disabled=~FinetuneState.can_start_training,
-            next_event=FinetuneState.start_training,
+            next_event=TrainingPollerState.start_training,
         ),
         spacing="4",
         width="100%",

@@ -3,22 +3,7 @@ TuneOS — Main application entry point.
 Configures the Reflex app with theming, global styles, and routes.
 """
 
-import logging
-
 import reflex as rx
-
-# #22 — structured JSON logging for the app process
-try:
-    from pythonjsonlogger import jsonlogger  # type: ignore[import]
-
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(
-        jsonlogger.JsonFormatter(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
-    )
-    logging.root.handlers = [_handler]
-    logging.root.setLevel(logging.INFO)
-except ImportError:
-    logging.basicConfig(level=logging.INFO)
 
 from app.components.layout import two_panel_layout
 from app.pages.compare import compare_page
@@ -28,8 +13,8 @@ from app.pages.finetune import finetune_page
 from app.pages.results import results_page
 from app.pages.training import training_page
 from app.pages.upload import upload_page
-from app.state.finetune_state import FinetuneState
 from app.state.theme_state import ThemeState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import GLOBAL_STYLES, STYLESHEETS
 
 
@@ -80,7 +65,7 @@ app.add_page(
     finetune_page,
     route="/finetune",
     title="Fine-tune — TuneOS",
-    on_load=FinetuneState.resume_in_progress_job,  # #14 — restore poll loop after HF Spaces restart
+    on_load=TrainingPollerState.rehydrate_from_api,
 )
 app.add_page(compare_page, route="/compare", title="Compare — TuneOS")
 

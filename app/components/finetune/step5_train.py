@@ -6,7 +6,7 @@ import reflex as rx
 
 from app.components.finetune.shared import _badge_status, _card
 from app.components.loss_chart import loss_chart
-from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 
@@ -64,24 +64,24 @@ def step5_train() -> rx.Component:
             rx.vstack(
                 rx.text("Training", font_size="1.1rem", font_weight="700", color=c("text_primary")),
                 rx.text(
-                    FinetuneState.effective_model_name, font_size="0.82rem", color=c("text_muted")
+                    TrainingPollerState.effective_model_name, font_size="0.82rem", color=c("text_muted")
                 ),
                 spacing="0",
             ),
             rx.spacer(),
-            _badge_status(FinetuneState.training_status),
+            _badge_status(TrainingPollerState.training_status),
             align="center",
         ),
         rx.cond(
-            FinetuneState.start_error != "",
-            rx.callout(FinetuneState.start_error, color_scheme="red"),
+            TrainingPollerState.start_error != "",
+            rx.callout(TrainingPollerState.start_error, color_scheme="red"),
             rx.fragment(),
         ),
         rx.grid(
-            _metric_tile("Epoch", FinetuneState.current_epoch_display),
-            _metric_tile("Steps", FinetuneState.current_total_steps_display),
-            _metric_tile("Elapsed", FinetuneState.elapsed_time_display),
-            _metric_tile("GPU Memory", FinetuneState.gpu_memory_display),
+            _metric_tile("Epoch", TrainingPollerState.current_epoch_display),
+            _metric_tile("Steps", TrainingPollerState.current_total_steps_display),
+            _metric_tile("Elapsed", TrainingPollerState.elapsed_time_display),
+            _metric_tile("GPU Memory", TrainingPollerState.gpu_memory_display),
             columns="4",
             spacing="3",
             width="100%",
@@ -91,25 +91,25 @@ def step5_train() -> rx.Component:
                 rx.text("Epoch progress", font_size="0.76rem", color=c("text_muted")),
                 rx.spacer(),
                 rx.text(
-                    FinetuneState.epoch_progress_pct.to_string() + "%",
+                    TrainingPollerState.epoch_progress_pct.to_string() + "%",
                     font_size="0.76rem",
                     color=c("text_secondary"),
                 ),
             ),
             rx.progress(
-                value=FinetuneState.epoch_progress_pct, max=100, width="100%", color_scheme="blue"
+                value=TrainingPollerState.epoch_progress_pct, max=100, width="100%", color_scheme="blue"
             ),
             width="100%",
             spacing="1",
         ),
         _card(loss_chart()),
         rx.cond(
-            FinetuneState.ai_commentary != "",
+            TrainingPollerState.ai_commentary != "",
             _card(
                 rx.hstack(
                     rx.icon("sparkles", size=16, color=c("accent")),
                     rx.text(
-                        FinetuneState.ai_commentary, font_size="0.86rem", color=c("text_primary")
+                        TrainingPollerState.ai_commentary, font_size="0.86rem", color=c("text_primary")
                     ),
                     spacing="2",
                     align="start",
@@ -118,7 +118,7 @@ def step5_train() -> rx.Component:
             rx.fragment(),
         ),
         rx.cond(
-            FinetuneState.epoch_log.length() > 0,
+            TrainingPollerState.epoch_log.length() > 0,
             _card(
                 rx.vstack(
                     rx.text(
@@ -128,14 +128,14 @@ def step5_train() -> rx.Component:
                         color=c("text_secondary"),
                         margin_bottom="8px",
                     ),
-                    rx.foreach(FinetuneState.epoch_log, _epoch_log_row),
+                    rx.foreach(TrainingPollerState.epoch_log, _epoch_log_row),
                     spacing="2",
                 )
             ),
             rx.fragment(),
         ),
         rx.cond(
-            FinetuneState.training_status == "done",
+            TrainingPollerState.training_status == "done",
             rx.vstack(
                 rx.callout(
                     rx.hstack(
@@ -147,7 +147,7 @@ def step5_train() -> rx.Component:
                 ),
                 rx.button(
                     "View Results →",
-                    on_click=FinetuneState.go_to_step(6),
+                    on_click=TrainingPollerState.go_to_step(6),
                     color_scheme="green",
                     size="3",
                 ),
@@ -156,11 +156,11 @@ def step5_train() -> rx.Component:
             rx.fragment(),
         ),
         rx.cond(
-            FinetuneState.training_status == "failed",
+            TrainingPollerState.training_status == "failed",
             rx.callout(
                 rx.vstack(
                     rx.text("Training failed", font_weight="600"),
-                    rx.text(FinetuneState.error_msg, font_size="0.82rem"),
+                    rx.text(TrainingPollerState.error_msg, font_size="0.82rem"),
                 ),
                 color_scheme="red",
             ),
@@ -186,7 +186,7 @@ def step5_panel() -> rx.Component:
                         color=c("text_primary"),
                     ),
                     rx.text(
-                        FinetuneState.effective_model_name,
+                        TrainingPollerState.effective_model_name,
                         font_size="0.76rem",
                         color=c("text_muted"),
                     ),
@@ -195,7 +195,7 @@ def step5_panel() -> rx.Component:
                 ),
                 rx.spacer(),
                 rx.cond(
-                    FinetuneState.compute_backend == "modal",
+                    TrainingPollerState.compute_backend == "modal",
                     rx.badge(
                         rx.hstack(
                             rx.icon("cloud", size=12),
@@ -209,14 +209,14 @@ def step5_panel() -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
-                _badge_status(FinetuneState.training_status),
+                _badge_status(TrainingPollerState.training_status),
                 width="100%",
                 align="center",
                 margin_bottom="14px",
             ),
             # Idle waiting state
             rx.cond(
-                (FinetuneState.training_status == "idle") & ~FinetuneState.is_starting,
+                (TrainingPollerState.training_status == "idle") & ~TrainingPollerState.is_starting,
                 rx.vstack(
                     rx.box(
                         rx.box(
@@ -260,7 +260,7 @@ def step5_panel() -> rx.Component:
             ),
             # Initializing state
             rx.cond(
-                FinetuneState.is_starting,
+                TrainingPollerState.is_starting,
                 rx.vstack(
                     rx.spinner(size="3"),
                     rx.text(
@@ -276,21 +276,21 @@ def step5_panel() -> rx.Component:
             ),
             # Start error
             rx.cond(
-                FinetuneState.start_error != "",
-                rx.callout(FinetuneState.start_error, color_scheme="red"),
+                TrainingPollerState.start_error != "",
+                rx.callout(TrainingPollerState.start_error, color_scheme="red"),
                 rx.fragment(),
             ),
             # Active / done / failed training content
             rx.cond(
-                (FinetuneState.training_status == "running")
-                | (FinetuneState.training_status == "done")
-                | (FinetuneState.training_status == "failed"),
+                (TrainingPollerState.training_status == "running")
+                | (TrainingPollerState.training_status == "done")
+                | (TrainingPollerState.training_status == "failed"),
                 rx.vstack(
                     rx.grid(
-                        _metric_tile("Epoch", FinetuneState.current_epoch_display),
-                        _metric_tile("Steps", FinetuneState.current_total_steps_display),
-                        _metric_tile("Elapsed", FinetuneState.elapsed_time_display),
-                        _metric_tile("GPU Mem", FinetuneState.gpu_memory_display),
+                        _metric_tile("Epoch", TrainingPollerState.current_epoch_display),
+                        _metric_tile("Steps", TrainingPollerState.current_total_steps_display),
+                        _metric_tile("Elapsed", TrainingPollerState.elapsed_time_display),
+                        _metric_tile("GPU Mem", TrainingPollerState.gpu_memory_display),
                         columns="2",
                         spacing="3",
                         width="100%",
@@ -300,13 +300,13 @@ def step5_panel() -> rx.Component:
                             rx.text("Epoch progress", font_size="0.76rem", color=c("text_muted")),
                             rx.spacer(),
                             rx.text(
-                                FinetuneState.epoch_progress_pct.to_string() + "%",
+                                TrainingPollerState.epoch_progress_pct.to_string() + "%",
                                 font_size="0.76rem",
                                 color=c("text_secondary"),
                             ),
                         ),
                         rx.progress(
-                            value=FinetuneState.epoch_progress_pct,
+                            value=TrainingPollerState.epoch_progress_pct,
                             max=100,
                             width="100%",
                             color_scheme="blue",
@@ -316,12 +316,12 @@ def step5_panel() -> rx.Component:
                     ),
                     _card(loss_chart()),
                     rx.cond(
-                        FinetuneState.ai_commentary != "",
+                        TrainingPollerState.ai_commentary != "",
                         _card(
                             rx.hstack(
                                 rx.icon("sparkles", size=16, color=c("accent")),
                                 rx.text(
-                                    FinetuneState.ai_commentary,
+                                    TrainingPollerState.ai_commentary,
                                     font_size="0.86rem",
                                     color=c("text_primary"),
                                 ),
@@ -332,7 +332,7 @@ def step5_panel() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        FinetuneState.epoch_log.length() > 0,
+                        TrainingPollerState.epoch_log.length() > 0,
                         _card(
                             rx.vstack(
                                 rx.text(
@@ -342,14 +342,14 @@ def step5_panel() -> rx.Component:
                                     color=c("text_secondary"),
                                     margin_bottom="8px",
                                 ),
-                                rx.foreach(FinetuneState.epoch_log, _epoch_log_row),
+                                rx.foreach(TrainingPollerState.epoch_log, _epoch_log_row),
                                 spacing="2",
                             )
                         ),
                         rx.fragment(),
                     ),
                     rx.cond(
-                        FinetuneState.training_status == "done",
+                        TrainingPollerState.training_status == "done",
                         rx.callout(
                             rx.hstack(
                                 rx.icon("circle-check", size=16),
@@ -361,11 +361,11 @@ def step5_panel() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
-                        FinetuneState.training_status == "failed",
+                        TrainingPollerState.training_status == "failed",
                         rx.callout(
                             rx.vstack(
                                 rx.text("Training failed", font_weight="600"),
-                                rx.text(FinetuneState.error_msg, font_size="0.82rem"),
+                                rx.text(TrainingPollerState.error_msg, font_size="0.82rem"),
                             ),
                             color_scheme="red",
                         ),

@@ -12,6 +12,7 @@ from app.components.finetune.step6_results import step6_panel
 from app.components.finetune.step7_deploy import step7_workspace_panel
 from app.state.experiment_state import ExperimentState, ModelRegistryState
 from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 _STEP_LABELS = ["Model", "Intent", "Data", "Configure", "Train", "Results", "Deploy"]
@@ -225,12 +226,12 @@ def _workspace_header() -> rx.Component:
                     align="center",
                 ),
                 on_click=FinetuneState.go_to_step(7),
-                disabled=FinetuneState.training_status != "done",
+                disabled=TrainingPollerState.training_status != "done",
                 color_scheme="blue",
-                variant=rx.cond(FinetuneState.training_status == "done", "solid", "soft"),
+                variant=rx.cond(TrainingPollerState.training_status == "done", "solid", "soft"),
                 size="2",
-                opacity=rx.cond(FinetuneState.training_status == "done", "1", "0.45"),
-                cursor=rx.cond(FinetuneState.training_status == "done", "pointer", "not-allowed"),
+                opacity=rx.cond(TrainingPollerState.training_status == "done", "1", "0.45"),
+                cursor=rx.cond(TrainingPollerState.training_status == "done", "pointer", "not-allowed"),
             ),
             width="100%",
             align="center",
@@ -295,7 +296,7 @@ def _sidebar_icon(step_num: int, icon_name: str, tooltip: str, gated: bool = Fal
 
 
 def _workspace_sidebar() -> rx.Component:
-    training_done = FinetuneState.training_status == "done"
+    training_done = TrainingPollerState.training_status == "done"
     return rx.vstack(
         _sidebar_icon(4, "settings-2", "Configure"),
         _sidebar_icon(5, "activity", "Training"),
@@ -629,10 +630,10 @@ def _step4_panel() -> rx.Component:
                             spacing="2",
                         ),
                     ),
-                    on_click=FinetuneState.start_training,
+                    on_click=TrainingPollerState.start_training,
                     disabled=~FinetuneState.can_start_training
                     | FinetuneState.is_starting
-                    | (FinetuneState.training_status == "running"),
+                    | (TrainingPollerState.training_status == "running"),
                     size="3",
                     color_scheme="blue",
                 ),
@@ -675,7 +676,7 @@ def _workspace_layout() -> rx.Component:
                         overflow="hidden",
                     ),
                     rx.cond(
-                        FinetuneState.training_status == "done",
+                        TrainingPollerState.training_status == "done",
                         step6_panel(),
                         rx.fragment(),
                     ),

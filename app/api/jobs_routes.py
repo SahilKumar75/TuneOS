@@ -117,7 +117,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "save_steps": 100,
         "warmup_ratio": config.warmup_ratio,
         "lr_scheduler_type": config.lr_scheduler_type,
-        "optim": "paged_adamw_32bit",
+        "optim": config.optim,
         "max_grad_norm": 0.3,
         "eval_split_ratio": config.eval_split_ratio,
         "early_stopping_patience": config.early_stopping_patience,

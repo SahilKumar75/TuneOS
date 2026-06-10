@@ -44,6 +44,8 @@ def _run_finetune_impl(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
+    compose_adapters: bool = False,
+    overlay_technique: str = "lora",
 ):
     """Core logic, separated so it can be unit-tested without a live Celery broker."""
     from db.experiments_db import save_run_metrics, write_job_status
@@ -143,6 +145,19 @@ def _run_finetune_impl(
                 output_col=output_col,
                 technique=train_cfg.get("technique", "qlora"),
             )
+
+            if compose_adapters and overlay_technique:
+                from trainer.adapters import stack_adapter
+
+                mixed = stack_adapter(
+                    model,
+                    technique=overlay_technique,
+                    r=lora_cfg.get("r", 8),
+                    lora_alpha=lora_cfg.get("lora_alpha", 16),
+                    lora_dropout=lora_cfg.get("lora_dropout", 0.05),
+                )
+                mixed.save_pretrained(output_path)
+
             if train_cfg.get("eval_split_ratio", 0.1) == 0.0:
                 eval_results = {"perplexity": None, "rouge1": None, "bleu": None}
             else:
@@ -231,6 +246,8 @@ def run_finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
+    compose_adapters: bool = False,
+    overlay_technique: str = "lora",
 ):
     return _run_finetune_impl(
         self,
@@ -243,4 +260,6 @@ def run_finetune(
         hub_split=hub_split,
         instruction_col=instruction_col,
         output_col=output_col,
+        compose_adapters=compose_adapters,
+        overlay_technique=overlay_technique,
     )

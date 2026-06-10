@@ -138,6 +138,8 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "hub_split": config.hub_dataset_split,
         "instruction_col": config.instruction_col,
         "output_col": config.output_col,
+        "compose_adapters": config.compose_adapters,
+        "overlay_technique": config.overlay_technique,
     }
 
 

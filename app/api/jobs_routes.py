@@ -29,6 +29,7 @@ from app.api.schemas import (
     MergeRequest,
     PushHubRequest,
     SweepRequest,
+    VisionJobConfig,
 )
 
 router = APIRouter()
@@ -309,6 +310,69 @@ async def create_distill_job(config: DistillJobConfig):
     except Exception as exc:
         raise HTTPException(
             status_code=503, detail=f"Could not enqueue distillation job: {exc}"
+        ) from exc
+
+    return JobCreated(job_id=job_id)
+
+
+@router.post("/jobs/vision", response_model=JobCreated, status_code=201)
+async def create_vision_job(config: VisionJobConfig):
+    """Create and enqueue a VLM (vision-language model) fine-tuning job."""
+    job_id = config.experiment_id or str(uuid.uuid4())
+
+    model_cfg = {
+        "model_name": config.model_id,
+        "use_4bit": config.use_4bit,
+        "use_8bit": False,
+        "trust_remote_code": False,
+        "max_seq_length": config.max_seq_length,
+        "hf_token": config.hf_token,
+        "local_model_path": config.local_model_path,
+        "model_source": config.model_source,
+        "modality": "vision",
+    }
+    lora_cfg = {
+        "r": config.lora_rank,
+        "lora_alpha": config.lora_alpha,
+        "lora_dropout": config.lora_dropout,
+        "bias": "none",
+        "task_type": "CAUSAL_LM",
+        "target_modules": None,
+    }
+    vision_cfg = {
+        "output_dir": OUTPUT_DIR,
+        "num_train_epochs": config.epochs,
+        "per_device_train_batch_size": config.batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "learning_rate": config.learning_rate,
+        "max_seq_length": config.max_seq_length,
+        "fp16": not config.bf16,
+        "bf16": config.bf16,
+        "seed": config.seed,
+    }
+
+    _ensure_worker_alive()
+    try:
+        from workers.vision_task import run_vision_finetune
+
+        run_vision_finetune.apply_async(
+            kwargs={
+                "job_id": job_id,
+                "model_cfg": model_cfg,
+                "lora_cfg": lora_cfg,
+                "vision_cfg": vision_cfg,
+                "dataset_path": config.dataset_path,
+                "hub_dataset_id": config.hub_dataset_id,
+                "hub_split": config.hub_dataset_split,
+                "instruction_col": config.instruction_col,
+                "output_col": config.output_col,
+                "image_col": config.image_col,
+            },
+            task_id=job_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503, detail=f"Could not enqueue vision job: {exc}"
         ) from exc
 
     return JobCreated(job_id=job_id)

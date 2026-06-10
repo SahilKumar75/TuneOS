@@ -136,6 +136,33 @@ class DistillJobConfig(BaseModel):
     experiment_id: str = ""
 
 
+class VisionJobConfig(BaseModel):
+    """Config for a VLM (vision-language model) fine-tuning job — POST /api/jobs/vision."""
+
+    model_id: str
+    model_source: str = "hub"
+    local_model_path: str = ""
+    hf_token: str = ""
+    dataset_path: str = ""
+    hub_dataset_id: str = ""
+    hub_dataset_split: str = "train"
+    instruction_col: str = "instruction"
+    output_col: str = "output"
+    image_col: str = "image"
+    use_4bit: bool = True
+    lora_rank: int = Field(default=16, ge=1, le=256)
+    lora_alpha: int = Field(default=32, ge=1)
+    lora_dropout: float = Field(default=0.05, ge=0.0, le=0.5)
+    learning_rate: float = Field(default=2e-4, gt=0)
+    epochs: int = Field(default=3, ge=1, le=100)
+    batch_size: int = Field(default=2, ge=1)
+    max_seq_length: int = Field(default=512, ge=64)
+    gradient_accumulation_steps: int = Field(default=4, ge=1)
+    bf16: bool = False
+    seed: int = Field(default=42, ge=0)
+    experiment_id: str = ""
+
+
 class SweepRequest(BaseModel):
     """Fan out a hyperparameter grid into multiple fine-tune jobs."""
 

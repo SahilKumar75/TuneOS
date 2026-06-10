@@ -31,7 +31,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
         lora_alpha=lora_cfg.lora_alpha,
         lora_dropout=lora_cfg.lora_dropout,
         bias=lora_cfg.bias,
-        task_type=TaskType.CAUSAL_LM,
+        task_type=getattr(TaskType, lora_cfg.task_type),
         target_modules=target_modules,
         init_lora_weights=lora_cfg.init_lora_weights,
     )

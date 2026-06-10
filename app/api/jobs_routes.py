@@ -31,6 +31,17 @@ from app.api.schemas import (
 
 router = APIRouter()
 
+_T5_FAMILIES = ("t5", "mt5")
+
+
+def _detect_task_type(model_id: str) -> str:
+    """Return PEFT TaskType string based on model ID. T5/mT5 need SEQ_2_SEQ_LM."""
+    name = model_id.lower()
+    if any(f in name for f in _T5_FAMILIES):
+        return "SEQ_2_SEQ_LM"
+    return "CAUSAL_LM"
+
+
 # Bounded LRU of loaded inference models — each is GBs, so cap how many stay
 # resident; the least-recently-used is evicted when full. A single lock
 # serializes loads and evictions across requests.
@@ -75,7 +86,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "lora_alpha": config.lora_alpha,
         "lora_dropout": config.lora_dropout,
         "bias": "none",
-        "task_type": "CAUSAL_LM",
+        "task_type": _detect_task_type(config.model_id),
         "target_modules": None,  # auto-detected from model architecture in trainer/lora.py
     }
     train_cfg = {
@@ -176,7 +187,7 @@ async def create_dpo_job(config: DPOJobConfig):
         "lora_alpha": config.lora_alpha,
         "lora_dropout": config.lora_dropout,
         "bias": "none",
-        "task_type": "CAUSAL_LM",
+        "task_type": _detect_task_type(config.model_id),
         "target_modules": None,
     }
     dpo_cfg = {
@@ -239,7 +250,7 @@ async def create_distill_job(config: DistillJobConfig):
         "lora_alpha": config.lora_alpha,
         "lora_dropout": config.lora_dropout,
         "bias": "none",
-        "task_type": "CAUSAL_LM",
+        "task_type": _detect_task_type(config.model_id),
         "target_modules": None,
     }
     distill_cfg = {

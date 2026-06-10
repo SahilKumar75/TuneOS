@@ -268,6 +268,22 @@ class FinetuneState(rx.State):
     dataset_avg_tokens: float = 0.0
     dataset_template_preview: list[str] = []
 
+    # DPO column mapping (used when training_mode == "dpo")
+    dpo_prompt_col: str = "prompt"
+    dpo_chosen_col: str = "chosen"
+    dpo_rejected_col: str = "rejected"
+
+    # ── Training mode & DPO / KD hyperparams ─────────────────────
+    training_mode: str = "sft"  # "sft" | "dpo" | "kd"
+    # DPO
+    dpo_beta: float = 0.1
+    dpo_max_length: int = 1024
+    dpo_max_prompt_length: int = 512
+    # Knowledge Distillation
+    kd_teacher_model: str = ""
+    kd_temperature: float = 2.0
+    kd_alpha: float = 0.5
+
     # ── Step 4: Configure ─────────────────────────────────────────
     ui_mode: str = "simple"  # "simple" | "advanced"
     lora_r: int = 16
@@ -364,8 +380,24 @@ class FinetuneState(rx.State):
             "ia3": "IA³",
             "prefix": "Prefix Tuning",
             "prompt": "Prompt Tuning",
+            "dpo": "DPO",
         }
         return _labels.get(self.selected_technique, self.selected_technique.upper())
+
+    @rx.var
+    def is_dpo(self) -> bool:
+        """True when the wizard is running a DPO preference-alignment job."""
+        return self.selected_technique == "dpo" or self.training_mode == "dpo"
+
+    @rx.var
+    def is_kd(self) -> bool:
+        """True when the wizard is running a knowledge-distillation job."""
+        return self.training_mode == "kd"
+
+    @rx.var
+    def is_sft(self) -> bool:
+        """True for the standard supervised fine-tuning path (not DPO or KD)."""
+        return not self.is_dpo and not self.is_kd
 
     @rx.var
     def dataset_name(self) -> str:
@@ -574,6 +606,71 @@ class FinetuneState(rx.State):
     @rx.event
     def select_technique(self, technique: str):
         self.selected_technique = technique
+
+    @rx.event
+    def set_training_mode(self, mode: str):
+        """Switch between sft / dpo / kd wizard paths."""
+        self.training_mode = mode
+        if mode == "dpo":
+            # DPO uses its own backend; mirror into technique so the label renders
+            self.selected_technique = "dpo"
+        elif mode == "sft" and self.selected_technique == "dpo":
+            # Reset to default PEFT technique when switching back to SFT
+            self.selected_technique = "qlora"
+
+    # DPO column setters
+    @rx.event
+    def set_dpo_prompt_col(self, v: str):
+        self.dpo_prompt_col = v
+
+    @rx.event
+    def set_dpo_chosen_col(self, v: str):
+        self.dpo_chosen_col = v
+
+    @rx.event
+    def set_dpo_rejected_col(self, v: str):
+        self.dpo_rejected_col = v
+
+    # DPO hyperparam setters
+    @rx.event
+    def set_dpo_beta(self, v: str):
+        try:
+            self.dpo_beta = float(v)
+        except ValueError:
+            pass
+
+    @rx.event
+    def set_dpo_max_length(self, v: str):
+        try:
+            self.dpo_max_length = int(v)
+        except ValueError:
+            pass
+
+    @rx.event
+    def set_dpo_max_prompt_length(self, v: str):
+        try:
+            self.dpo_max_prompt_length = int(v)
+        except ValueError:
+            pass
+
+    # KD setters
+    @rx.event
+    def set_kd_teacher_model(self, v: str):
+        self.kd_teacher_model = v
+
+    @rx.event
+    def set_kd_temperature(self, v: str):
+        try:
+            self.kd_temperature = float(v)
+        except ValueError:
+            pass
+
+    @rx.event
+    def set_kd_alpha(self, v: str):
+        try:
+            self.kd_alpha = float(v)
+        except ValueError:
+            pass
 
     @rx.event
     def set_model_source(self, source: str):
@@ -1604,3 +1701,4 @@ Write ONLY the summary, no other text."""
             self.early_stopping_patience = max(0, int(value))
         except (ValueError, TypeError):
             pass
+

@@ -68,6 +68,140 @@ def _compute_section() -> rx.Component:
     )
 
 
+def _dpo_params_card() -> rx.Component:
+    """DPO-specific hyperparameters shown instead of the LoRA advanced panel."""
+    return _card(
+        rx.vstack(
+            rx.text(
+                "DPO hyperparameters",
+                font_size="0.88rem",
+                font_weight="600",
+                color=c("text_primary"),
+                margin_bottom="12px",
+            ),
+            rx.grid(
+                rx.vstack(
+                    _label("Beta (regularisation)"),
+                    rx.input(
+                        value=FinetuneState.dpo_beta.to_string(),
+                        on_change=FinetuneState.set_dpo_beta,
+                        type="number",
+                        width="100%",
+                    ),
+                    rx.text(
+                        "Lower β → more aggressive alignment. Default 0.1",
+                        font_size="0.72rem",
+                        color=c("text_muted"),
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Max sequence length"),
+                    rx.select.root(
+                        rx.select.trigger(width="100%"),
+                        rx.select.content(
+                            *[rx.select.item(str(v), value=str(v)) for v in [512, 1024, 2048, 4096]],
+                        ),
+                        value=FinetuneState.dpo_max_length.to_string(),
+                        on_change=FinetuneState.set_dpo_max_length,
+                    ),
+                    rx.text("Prompt + completion combined", font_size="0.72rem", color=c("text_muted")),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Max prompt length"),
+                    rx.select.root(
+                        rx.select.trigger(width="100%"),
+                        rx.select.content(
+                            *[rx.select.item(str(v), value=str(v)) for v in [128, 256, 512, 1024]],
+                        ),
+                        value=FinetuneState.dpo_max_prompt_length.to_string(),
+                        on_change=FinetuneState.set_dpo_max_prompt_length,
+                    ),
+                    rx.text("Tokens reserved for the prompt", font_size="0.72rem", color=c("text_muted")),
+                    spacing="1",
+                ),
+                columns="3",
+                spacing="4",
+                width="100%",
+            ),
+            rx.callout(
+                "DPO doesn't use a generative loss — it directly optimises the preference margin. "
+                "Dataset must have prompt / chosen / rejected columns (set in Step 3).",
+                color_scheme="blue",
+                icon="info",
+                size="1",
+            ),
+            spacing="3",
+        )
+    )
+
+
+def _kd_params_card() -> rx.Component:
+    """Knowledge-Distillation specific params."""
+    return _card(
+        rx.vstack(
+            rx.text(
+                "Knowledge Distillation",
+                font_size="0.88rem",
+                font_weight="600",
+                color=c("text_primary"),
+                margin_bottom="12px",
+            ),
+            rx.vstack(
+                _label("Teacher model (Hub ID)"),
+                rx.input(
+                    placeholder="e.g. meta-llama/Meta-Llama-3-70B",
+                    value=FinetuneState.kd_teacher_model,
+                    on_change=FinetuneState.set_kd_teacher_model,
+                    width="100%",
+                ),
+                rx.text(
+                    "The larger model whose knowledge is distilled into the student selected in Step 1",
+                    font_size="0.72rem",
+                    color=c("text_muted"),
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            rx.grid(
+                rx.vstack(
+                    _label("Temperature"),
+                    rx.input(
+                        value=FinetuneState.kd_temperature.to_string(),
+                        on_change=FinetuneState.set_kd_temperature,
+                        type="number",
+                        width="100%",
+                    ),
+                    rx.text("Higher T → softer probability distributions", font_size="0.72rem", color=c("text_muted")),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Alpha (KD weight)"),
+                    rx.slider(
+                        min=0.0,
+                        max=1.0,
+                        step=0.1,
+                        default_value=[FinetuneState.kd_alpha],
+                        on_value_commit=FinetuneState.set_kd_alpha,
+                    ),
+                    rx.text(
+                        FinetuneState.kd_alpha.to_string(),
+                        font_size="0.82rem",
+                        color=c("text_secondary"),
+                    ),
+                    rx.text("1.0 = pure KD loss, 0.0 = pure CE loss", font_size="0.72rem", color=c("text_muted")),
+                    spacing="1",
+                ),
+                columns="2",
+                spacing="4",
+                width="100%",
+            ),
+            spacing="3",
+        )
+    )
+
+
 def _step4() -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -203,9 +337,14 @@ def _step4() -> rx.Component:
                 spacing="0",
             )
         ),
-        # Advanced mode
+        # DPO / KD param cards (replace LoRA advanced panel when not SFT)
+        rx.cond(FinetuneState.is_dpo, _dpo_params_card(), rx.fragment()),
+        rx.cond(FinetuneState.is_kd, _kd_params_card(), rx.fragment()),
+        # Advanced LoRA card — SFT only
         rx.cond(
-            FinetuneState.ui_mode == "advanced",
+            FinetuneState.is_sft,
+            rx.cond(
+                FinetuneState.ui_mode == "advanced",
             _card(
                 rx.vstack(
                     rx.text(
@@ -513,7 +652,9 @@ def _step4() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # VRAM warning — high batch × seq
+        rx.fragment(),  # is_sft else-branch
+        ),
+        # VRAM warning
         rx.cond(
             (FinetuneState.batch_size * FinetuneState.max_seq_length) > 4096,
             rx.callout(

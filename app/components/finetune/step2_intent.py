@@ -646,6 +646,89 @@ def _phase_c() -> rx.Component:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 
+def _mode_card(mode: str, icon: str, title: str, subtitle: str) -> rx.Component:
+    """One clickable card in the training-goal selector."""
+    selected = FinetuneState.training_mode == mode
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.icon(icon, size=18, color=rx.cond(selected, "white", "var(--blue-11)")),
+                rx.text(
+                    title,
+                    font_size="0.9rem",
+                    font_weight="600",
+                    color=rx.cond(selected, "white", "var(--gray-12)"),
+                ),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                subtitle,
+                font_size="0.78rem",
+                color=rx.cond(selected, "rgba(255,255,255,0.85)", "var(--gray-10)"),
+            ),
+            spacing="2",
+            align_items="flex-start",
+        ),
+        on_click=FinetuneState.set_training_mode(mode),
+        cursor="pointer",
+        padding="14px 16px",
+        border_radius="12px",
+        background=rx.cond(selected, "var(--blue-9)", "var(--blue-2)"),
+        border=rx.cond(selected, "2px solid var(--blue-9)", "2px solid var(--blue-6)"),
+        flex="1",
+        min_width="160px",
+        style={"transition": "all 0.18s ease"},
+    )
+
+
+def _training_goal_card() -> rx.Component:
+    """Top-of-step-2 card: pick SFT / DPO / KD before answering intent questions."""
+    return rx.vstack(
+        rx.text(
+            "Training goal",
+            font_size="0.9rem",
+            font_weight="700",
+            color="var(--gray-12)",
+        ),
+        rx.text(
+            "Pick the right paradigm — this gates which backend API and data format is used.",
+            font_size="0.8rem",
+            color="var(--gray-10)",
+        ),
+        rx.flex(
+            _mode_card(
+                "sft",
+                "zap",
+                "Supervised Fine-Tuning",
+                "Teach the model new tasks with instruction/output pairs",
+            ),
+            _mode_card(
+                "dpo",
+                "thumbs-up",
+                "Preference Alignment (DPO)",
+                "Align model to human preferences via chosen/rejected pairs",
+            ),
+            _mode_card(
+                "kd",
+                "layers",
+                "Knowledge Distillation",
+                "Compress a large teacher into a smaller student model",
+            ),
+            gap="12px",
+            wrap="wrap",
+            width="100%",
+        ),
+        spacing="3",
+        width="100%",
+        padding="16px",
+        background="var(--gray-2)",
+        border_radius="14px",
+        border="1px solid var(--gray-6)",
+        margin_bottom="16px",
+    )
+
+
 def _step2() -> rx.Component:
     return rx.vstack(
         _section_heading("Tell us about your use case"),
@@ -661,6 +744,8 @@ def _step2() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        # Training goal selector — always visible in phase 1
+        rx.cond(FinetuneState.intent_phase == 1, _training_goal_card(), rx.fragment()),
         rx.cond(
             FinetuneState.intent_phase == 1,
             _phase_a(),

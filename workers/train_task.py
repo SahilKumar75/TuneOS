@@ -52,10 +52,15 @@ def _run_finetune_impl(
     status_key = f"job:{job_id}:status"
     started_at = datetime.now(timezone.utc).isoformat()
 
+    # Retrieve the short-TTL token stored by the API before enqueue; never travels in task kwargs.
+    _stored_token = r.getdel(f"job:{job_id}:hf_token")
+    if _stored_token:
+        os.environ["HF_TOKEN"] = _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+
     try:
         # Early-fail for gated models with no token — avoids a silent hang during download.
         _model_name = model_cfg.get("model_name", "")
-        _hf_token = model_cfg.get("hf_token", "") or os.getenv("HF_TOKEN", "")
+        _hf_token = os.getenv("HF_TOKEN", "")
         if not _hf_token and any(_model_name.startswith(p) for p in _GATED_MODEL_PREFIXES):
             _msg = (
                 f"Model '{_model_name}' requires a Hugging Face token. "

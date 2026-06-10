@@ -10,6 +10,8 @@ import threading
 import uuid
 import zipfile
 
+import redis as _redis
+
 from cachetools import LRUCache
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -92,7 +94,6 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
@@ -147,6 +148,10 @@ def _enqueue_finetune(config: JobConfig) -> str:
     """Enqueue one SFT job (worker-alive guarded); returns its job_id."""
     kwargs = _build_finetune_kwargs(config)
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(
+            f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60
+        )
     try:
         from workers.train_task import run_finetune
 
@@ -195,7 +200,6 @@ async def create_dpo_job(config: DPOJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
@@ -222,6 +226,8 @@ async def create_dpo_job(config: DPOJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
 
     try:
         from workers.dpo_task import run_dpo
@@ -259,7 +265,6 @@ async def create_distill_job(config: DistillJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
@@ -288,6 +293,8 @@ async def create_distill_job(config: DistillJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
     try:
         from workers.kd_task import run_distill
 

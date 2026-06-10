@@ -319,6 +319,7 @@ class FinetuneState(rx.State):
     eval_rouge1: float = 0.0
     eval_rouge2: float = 0.0
     eval_rougeL: float = 0.0
+    eval_metrics_skipped: bool = False
     eval_meteor: float = 0.0
     eval_status: str = "idle"  # idle | running | done | error | not_ready
     test_chat_history: list[ChatMessage] = []
@@ -531,6 +532,14 @@ class FinetuneState(rx.State):
         if self.loss_history:
             return self.loss_history[-1].loss
         return 0.0
+
+    @rx.var
+    def eval_show_metrics(self) -> bool:
+        return self.eval_status == "done" and not self.eval_metrics_skipped
+
+    @rx.var
+    def eval_show_skipped(self) -> bool:
+        return self.eval_status == "done" and self.eval_metrics_skipped
 
     # ── Step 1 events ─────────────────────────────────────────────
     @rx.event
@@ -1802,6 +1811,7 @@ Write ONLY the summary, no other text."""
                     async with self:
                         self.eval_status = "done"
                         ppl = data.get("perplexity")
+                        self.eval_metrics_skipped = ppl is None
                         self.eval_perplexity = float(ppl) if ppl is not None else 0.0
                         rouge1 = data.get("rouge1")
                         self.eval_rouge1 = float(rouge1) if rouge1 is not None else 0.0

@@ -2714,7 +2714,16 @@ def _step6() -> rx.Component:
                     align="center",
                 ),
                 rx.cond(
-                    FinetuneState.eval_status == "done",
+                    FinetuneState.eval_show_skipped,
+                    rx.callout(
+                        "No holdout metrics — set eval_split_ratio > 0 in Step 4 to compute perplexity, ROUGE, and BLEU.",
+                        color_scheme="amber",
+                        size="1",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    FinetuneState.eval_show_metrics,
                     rx.grid(
                         rx.vstack(
                             rx.text("Perplexity", font_size="0.72rem", color=c("text_muted")),
@@ -4115,7 +4124,16 @@ def _step6_panel() -> rx.Component:
                                 align="center",
                             ),
                             rx.cond(
-                                FinetuneState.eval_status == "done",
+                                FinetuneState.eval_show_skipped,
+                                rx.callout(
+                                    "No holdout metrics — set eval_split_ratio > 0 in Step 4 to compute perplexity, ROUGE, and BLEU.",
+                                    color_scheme="amber",
+                                    size="1",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.eval_show_metrics,
                                 rx.grid(
                                     rx.vstack(
                                         rx.text(

@@ -48,6 +48,13 @@ def _run_finetune_impl(
     """Core logic, separated so it can be unit-tested without a live Celery broker."""
     from app.state.experiments_db import save_run_metrics, write_job_status
 
+    try:
+        from app.logging_config import new_trace_id, set_trace_id
+
+        set_trace_id(new_trace_id())
+    except Exception:
+        pass
+
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"
     started_at = datetime.now(timezone.utc).isoformat()
@@ -68,6 +75,7 @@ def _run_finetune_impl(
         # Durable record so GET /jobs works even if Redis is unavailable
         write_job_status(job_id, "running", started_at=started_at)
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))
+        r.expire(status_key, 21600)  # 6h safety TTL; overwritten to 48h on completion
 
         backend = train_cfg.get("compute_backend", "local")
         output_path = os.path.join(train_cfg["output_dir"], job_id)
@@ -82,9 +90,19 @@ def _run_finetune_impl(
             )
 
         if backend == "modal":
-            # Train on a Modal T4 GPU. The remote run produces the adapter and
-            # eval metrics; we write the adapter to local disk and persist
-            # metrics through the same path as a local run.
+            # Signal UI that we're waiting for GPU provisioning (30-120s cold start)
+            r.set(
+                status_key,
+                json.dumps(
+                    {
+                        "status": "provisioning",
+                        "job_id": job_id,
+                        "message": "Provisioning GPU on Modal…",
+                    }
+                ),
+            )
+            r.expire(status_key, 21600)
+
             from workers.modal_runner import run_on_modal
 
             result = run_on_modal(
@@ -121,6 +139,14 @@ def _run_finetune_impl(
                 instruction_col=instruction_col,
                 output_col=output_col,
             )
+            # Free VRAM before eval inference — prevents OOM on 16GB GPUs with QLoRA.
+            try:
+                import torch as _torch
+
+                _torch.cuda.empty_cache()
+                model.cpu()
+            except Exception:
+                pass
             eval_results = _compute_eval(
                 model,
                 tokenizer,
@@ -189,9 +215,16 @@ def _run_finetune_impl(
                 r.delete(key)
         except Exception:
             pass
+        # TTLs — prevent Upstash key eviction (256 MB free tier).
+        try:
+            r.expire(status_key, 172800)  # 48 h
+            r.expire(f"job:{job_id}:eval", 172800)  # 48 h
+            r.expire(f"job:{job_id}:loss_history", 86400)  # 24 h (SQLite durable copy)
+        except Exception:
+            pass
 
 
-@celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200)
+@celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200, acks_late=True)
 def run_finetune(
     self,
     job_id: str,

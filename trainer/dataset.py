@@ -222,3 +222,26 @@ def load_and_tokenize(
     )
     tokenized = tokenized.map(lambda x: {"labels": x["input_ids"].copy()})
     return tokenized
+
+
+def tokenize_dataset(
+    raw: Dataset,
+    tokenizer: PreTrainedTokenizer,
+    max_seq_length: int = 512,
+) -> Dataset:
+    """Tokenize a pre-formatted dataset that already has a ``text`` column.
+
+    Separated from loading so callers can split the raw dataset *before*
+    tokenization (avoiding any data leakage between train and eval sets).
+    """
+    tokenized = raw.map(
+        lambda x: tokenizer(
+            x["text"],
+            truncation=True,
+            max_length=max_seq_length,
+            padding="max_length",
+        ),
+        batched=True,
+        remove_columns=raw.column_names,
+    )
+    return tokenized.map(lambda x: {"labels": x["input_ids"].copy()})

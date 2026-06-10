@@ -15,11 +15,14 @@ class RedisLossCallback(TrainerCallback):
     after every logging step so the frontend can stream live metrics.
     """
 
+    _FLUSH_EVERY = 10  # batch rpush every N steps; publish fires every step
+
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.redis = redis.from_url(REDIS_URL)
         self.channel = f"job:{job_id}:progress"
         self._start_time: float = 0.0
+        self._batch: list[str] = []  # buffered loss_history entries
 
     def on_train_begin(self, args, state, control, **kwargs):
         self._start_time = time.time()
@@ -46,9 +49,16 @@ class RedisLossCallback(TrainerCallback):
             "gpu_memory_used_gb": gpu_mem,
             "status": "running",
         }
-        self.redis.publish(self.channel, json.dumps(payload))
-        # Also accumulate in a list key so the worker can persist to run_metrics
-        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
+        serialised = json.dumps(payload)
+        self.redis.publish(self.channel, serialised)   # fire-and-forget, real-time UI
+        self._batch.append(serialised)
+        if len(self._batch) >= self._FLUSH_EVERY:
+            self._flush_batch()
+
+    def _flush_batch(self):
+        if self._batch:
+            self.redis.rpush(f"job:{self.job_id}:loss_history", *self._batch)
+            self._batch = []
 
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         """Publish the validation loss at each eval step so the live chart can
@@ -62,10 +72,13 @@ class RedisLossCallback(TrainerCallback):
             "elapsed_seconds": int(time.time() - self._start_time),
             "status": "running",
         }
-        self.redis.publish(self.channel, json.dumps(payload))
-        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
+        serialised = json.dumps(payload)
+        self.redis.publish(self.channel, serialised)
+        self._batch.append(serialised)
+        self._flush_batch()  # eval is infrequent — flush immediately
 
     def on_train_end(self, args, state, control, **kwargs):
+        self._flush_batch()  # drain any remaining buffered steps
         payload = {
             "status": "done",
             "step": state.global_step,

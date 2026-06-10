@@ -5,7 +5,7 @@ from trl import SFTTrainer
 
 from trainer.callbacks import RedisLossCallback
 from trainer.config import LoraConfig, ModelConfig, TrainingConfig
-from trainer.dataset import load_and_tokenize
+from trainer.dataset import load_raw_text, tokenize_dataset
 from trainer.lora import save_adapter
 from trainer.qlora import prepare_qlora_model
 
@@ -58,35 +58,38 @@ def finetune(
     # 2. Load dataset (optionally splitting off a validation set below). With
     # packing the trainer tokenizes raw text itself; otherwise we pre-tokenize.
     # Both honor the selected prompt template.
-    if train_cfg.packing:
-        from trainer.dataset import load_raw_text
-
-        dataset = load_raw_text(
-            dataset_path,
-            hub_dataset_id=hub_dataset_id,
-            hub_split=hub_split,
-            instruction_col=instruction_col,
-            output_col=output_col,
-            template=train_cfg.prompt_template,
-        )
-    else:
-        dataset = load_and_tokenize(
-            dataset_path,
-            tokenizer,
-            model_cfg.max_seq_length,
-            hub_dataset_id=hub_dataset_id,
-            hub_split=hub_split,
-            instruction_col=instruction_col,
-            output_col=output_col,
-            template=train_cfg.prompt_template,
-        )
+    # Load the raw (un-tokenized) formatted text for both packing and non-packing
+    # paths so we can split on raw examples first, then tokenize each split
+    # independently — preventing any data leakage between train and eval sets.
+    raw_dataset = load_raw_text(
+        dataset_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
+        template=train_cfg.prompt_template,
+    )
 
     eval_dataset = None
     ratio = train_cfg.eval_split_ratio
-    # Only split if a meaningful validation set (>=1 example) can be carved out.
-    if ratio and 0.0 < ratio < 1.0 and len(dataset) >= 2 and int(len(dataset) * ratio) >= 1:
-        split = dataset.train_test_split(test_size=ratio, seed=train_cfg.seed)
-        dataset, eval_dataset = split["train"], split["test"]
+    # Split the *raw* dataset before tokenization to prevent leakage.
+    if ratio and 0.0 < ratio < 1.0 and len(raw_dataset) >= 2 and int(len(raw_dataset) * ratio) >= 1:
+        raw_split = raw_dataset.train_test_split(test_size=ratio, seed=train_cfg.seed)
+        raw_train, raw_eval = raw_split["train"], raw_split["test"]
+    else:
+        raw_train, raw_eval = raw_dataset, None
+
+    if train_cfg.packing:
+        # SFTTrainer handles its own tokenization when packing; pass raw text.
+        dataset = raw_train
+        eval_dataset = raw_eval
+    else:
+        dataset = tokenize_dataset(raw_train, tokenizer, model_cfg.max_seq_length)
+        eval_dataset = (
+            tokenize_dataset(raw_eval, tokenizer, model_cfg.max_seq_length)
+            if raw_eval is not None
+            else None
+        )
 
     use_early_stopping = bool(train_cfg.early_stopping_patience) and eval_dataset is not None
     # Step-level eval (denser eval_loss curve) when eval_steps>0 and a split exists.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from app.api.deps import _detect_gpu
 from app.api.schemas import GpuInfo, HealthResponse
@@ -10,9 +11,21 @@ from app.api.schemas import GpuInfo, HealthResponse
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthResponse)
+def _celery_alive() -> bool:
+    """Return True if at least one Celery worker responds within 1 s."""
+    try:
+        from workers.celery_app import celery_app
+        return bool(celery_app.control.inspect(timeout=1.0).active())
+    except Exception:
+        return False
+
+
+@router.get("/health")
 async def health():
-    return HealthResponse()
+    """Return 200 ok when healthy, 503 degraded when no Celery worker is up."""
+    alive = _celery_alive()
+    body = {"status": "ok" if alive else "degraded", "celery_alive": alive}
+    return JSONResponse(content=body, status_code=200 if alive else 503)
 
 
 @router.get("/health/workers")

@@ -120,6 +120,9 @@ def _init_db():
                 loss_history TEXT
             )
         """)
+        # Index for sorting/filtering runs by creation time and status
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs (started_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_status ON runs (status)")
         # Step-level metrics table for queryable run history
         conn.execute("""
             CREATE TABLE IF NOT EXISTS run_metrics (

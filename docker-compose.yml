@@ -5,9 +5,9 @@ services:
     ports:
       - "6379:6379"
 
-  worker:
+  worker-sft:
     build: .
-    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1 -Q sft -n sft@%h
     volumes:
       - .:/app
       - ./models_cache:/app/models_cache
@@ -19,9 +19,77 @@ services:
       - redis
     deploy:
       resources:
+        limits:
+          cpus: "4"
+          memory: 14g
         reservations:
+          memory: 4g
           devices:
             - capabilities: [gpu]   # remove if no GPU
+
+  worker-dpo:
+    build: .
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1 -Q dpo -n dpo@%h
+    volumes:
+      - .:/app
+      - ./models_cache:/app/models_cache
+      - ./outputs:/app/outputs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - HF_HOME=/app/models_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 14g
+        reservations:
+          memory: 4g
+          devices:
+            - capabilities: [gpu]   # remove if no GPU
+
+  worker-kd:
+    build: .
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1 -Q kd -n kd@%h
+    volumes:
+      - .:/app
+      - ./models_cache:/app/models_cache
+      - ./outputs:/app/outputs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - HF_HOME=/app/models_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 14g
+        reservations:
+          memory: 4g
+          devices:
+            - capabilities: [gpu]   # remove if no GPU
+
+  worker-default:
+    build: .
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=2 -Q default -n default@%h
+    volumes:
+      - .:/app
+      - ./models_cache:/app/models_cache
+      - ./outputs:/app/outputs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - HF_HOME=/app/models_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4g
+        reservations:
+          memory: 512m
 
   app:
     build: .
@@ -35,4 +103,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
-      - worker
+      - worker-sft
+      - worker-dpo
+      - worker-kd
+      - worker-default

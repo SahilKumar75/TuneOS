@@ -123,7 +123,7 @@ def _enqueue_finetune(config: JobConfig) -> str:
     try:
         from workers.train_task import run_finetune
 
-        run_finetune.apply_async(kwargs=kwargs, task_id=kwargs["job_id"])
+        run_finetune.apply_async(kwargs=kwargs, task_id=kwargs["job_id"], queue="sft")
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}") from exc
     return kwargs["job_id"]
@@ -212,6 +212,7 @@ async def create_dpo_job(config: DPOJobConfig):
                 "rejected_col": config.rejected_col,
             },
             task_id=job_id,
+            queue="dpo",
         )
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Could not enqueue DPO job: {exc}") from exc
@@ -275,6 +276,7 @@ async def create_distill_job(config: DistillJobConfig):
                 "output_col": config.output_col,
             },
             task_id=job_id,
+            queue="kd",
         )
     except Exception as exc:
         raise HTTPException(
@@ -557,7 +559,7 @@ async def get_eval(job_id: str):
 
 @router.post("/jobs/{job_id}/infer")
 async def infer(job_id: str, req: InferRequest):
-    import torch
+    from starlette.concurrency import run_in_threadpool
 
     state = _get_job_status_from_redis(job_id)
     if state.get("status") != "done":
@@ -567,33 +569,37 @@ async def infer(job_id: str, req: InferRequest):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter directory not found")
 
-    with _INFER_CACHE_LOCK:
-        if job_id not in _INFER_CACHE:
-            config_path = os.path.join(adapter_dir, "adapter_config.json")
-            if not os.path.exists(config_path):
-                raise HTTPException(status_code=404, detail="adapter_config.json not found")
-            with open(config_path) as f:
-                adapter_cfg = json.load(f)
-            base_model_name = adapter_cfg.get("base_model_name_or_path", "")
-            if not base_model_name:
-                raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
+    def _do_inference() -> str:
+        import torch
 
-            try:
-                from peft import PeftModel
-                from transformers import AutoModelForCausalLM, AutoTokenizer
+        with _INFER_CACHE_LOCK:
+            if job_id not in _INFER_CACHE:
+                config_path = os.path.join(adapter_dir, "adapter_config.json")
+                if not os.path.exists(config_path):
+                    raise HTTPException(status_code=404, detail="adapter_config.json not found")
+                with open(config_path) as f:
+                    adapter_cfg = json.load(f)
+                base_model_name = adapter_cfg.get("base_model_name_or_path", "")
+                if not base_model_name:
+                    raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
+                try:
+                    from peft import PeftModel
+                    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-                base_model = AutoModelForCausalLM.from_pretrained(
-                    base_model_name, device_map="auto", torch_dtype=torch.float16
-                )
-                tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-                model = PeftModel.from_pretrained(base_model, adapter_dir)
-                model.eval()
-                _INFER_CACHE[job_id] = (model, tokenizer)
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"Failed to load model: {exc}") from exc
+                    base_model = AutoModelForCausalLM.from_pretrained(
+                        base_model_name, device_map="auto", torch_dtype=torch.float16
+                    )
+                    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+                    model = PeftModel.from_pretrained(base_model, adapter_dir)
+                    model.eval()
+                    _INFER_CACHE[job_id] = (model, tokenizer)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500, detail=f"Failed to load model: {exc}"
+                    ) from exc
 
-        model, tokenizer = _INFER_CACHE[job_id]
-    try:
+            model, tokenizer = _INFER_CACHE[job_id]
+
         inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
             out = model.generate(
@@ -603,9 +609,12 @@ async def infer(job_id: str, req: InferRequest):
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        response = tokenizer.decode(
-            out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
-        )
+        return tokenizer.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
+
+    try:
+        response = await run_in_threadpool(_do_inference)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
 

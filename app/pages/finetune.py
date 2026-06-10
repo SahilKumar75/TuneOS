@@ -57,7 +57,12 @@ _MODELS = [
 
 _STEP_LABELS = ["Model", "Intent", "Data", "Configure", "Train", "Results", "Deploy"]
 
-_FILTER_USE_FOR = [("personal", "Personal"), ("company", "Company product"), ("research", "Research"), ("education", "Education")]
+_FILTER_USE_FOR = [
+    ("personal", "Personal"),
+    ("company", "Company product"),
+    ("research", "Research"),
+    ("education", "Education"),
+]
 _FILTER_DOMAIN = [
     ("healthcare", "Healthcare"),
     ("finance", "Finance"),
@@ -1360,7 +1365,6 @@ def _intent_phase_a() -> rx.Component:
             line_height="1.6",
             margin_bottom="8px",
         ),
-
         # Use Case section
         _ios_section_card(
             _ios_section_header("Use Case", "What will you use this model for?"),
@@ -1376,7 +1380,6 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-
         # Domain section
         _ios_section_card(
             _ios_section_header("Domain", "Select the industry or field this model will serve"),
@@ -1392,7 +1395,6 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-
         # Task Type section
         _ios_section_card(
             _ios_section_header("Task Type", "What kind of tasks will the model handle?"),
@@ -1411,10 +1413,11 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-
         # Project Name section
         _ios_section_card(
-            _ios_section_header("Project Details", "Give your model a name and description (optional)"),
+            _ios_section_header(
+                "Project Details", "Give your model a name and description (optional)"
+            ),
             rx.vstack(
                 rx.vstack(
                     rx.text(
@@ -1458,10 +1461,11 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-
         # Expected Performance section
         _ios_section_card(
-            _ios_section_header("Expected Performance", "What are your quality and performance expectations?"),
+            _ios_section_header(
+                "Expected Performance", "What are your quality and performance expectations?"
+            ),
             rx.vstack(
                 rx.vstack(
                     rx.text(
@@ -1505,7 +1509,6 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-
         # Continue button
         rx.box(
             rx.button(
@@ -1524,7 +1527,6 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_top="8px",
         ),
-
         spacing="0",
         width="100%",
         align_items="flex-start",
@@ -1755,7 +1757,6 @@ def _intent_phase_b() -> rx.Component:
             line_height="1.6",
             margin_bottom="24px",
         ),
-
         # Timeline card
         _ios_section_card(
             rx.vstack(
@@ -1764,7 +1765,6 @@ def _intent_phase_b() -> rx.Component:
                 width="100%",
             ),
         ),
-
         # Generate button
         rx.cond(
             FinetuneState.intent_all_answered,

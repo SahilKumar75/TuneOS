@@ -135,7 +135,6 @@ def _phase_a() -> rx.Component:
             align="start",
             margin_bottom="16px",
         ),
-
         _card(
             rx.vstack(
                 # Project basics
@@ -163,7 +162,6 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-
                 rx.vstack(
                     rx.text(
                         "Description",
@@ -188,9 +186,7 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-
                 rx.divider(margin="8px 0"),
-
                 # Context filters
                 _filter_row(
                     "Use Case",
@@ -206,9 +202,7 @@ def _phase_a() -> rx.Component:
                     ],
                     "Who will use this model?",
                 ),
-
                 rx.divider(margin="8px 0"),
-
                 _filter_row(
                     "Domain",
                     [
@@ -223,9 +217,7 @@ def _phase_a() -> rx.Component:
                     ],
                     "What industry or field?",
                 ),
-
                 rx.divider(margin="8px 0"),
-
                 _filter_row(
                     "Task Type",
                     [
@@ -240,7 +232,6 @@ def _phase_a() -> rx.Component:
                     ],
                     "What kind of output?",
                 ),
-
                 spacing="5",
                 width="100%",
             ),
@@ -249,7 +240,6 @@ def _phase_a() -> rx.Component:
                 "box-shadow": "0 2px 8px rgba(0,0,0,0.04)",
             },
         ),
-
         rx.button(
             rx.hstack(
                 rx.text("Continue to Questions"),
@@ -273,7 +263,6 @@ def _phase_a() -> rx.Component:
                 "transition": "all 0.2s ease",
             },
         ),
-
         spacing="4",
         width="100%",
     )
@@ -452,7 +441,6 @@ def _phase_b_question(q_idx: int) -> rx.Component:
                 align="center",
             ),
             rx.box(height="8px"),
-
             # Question heading
             rx.text(
                 q["heading"],
@@ -462,16 +450,13 @@ def _phase_b_question(q_idx: int) -> rx.Component:
                 line_height="1.4",
             ),
             rx.box(height="12px"),
-
             # Options with dynamic rendering
             rx.foreach(
                 q["options"],
                 lambda opt: _question_option_btn(q_idx, opt),
             ),
-
             _question_other_input(q_idx),
             rx.box(height="12px"),
-
             # Navigation buttons
             rx.hstack(
                 rx.button(
@@ -580,7 +565,6 @@ def _phase_b() -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-
             # Current question
             rx.foreach(
                 FinetuneState.intent_questions,

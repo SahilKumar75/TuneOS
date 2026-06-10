@@ -194,8 +194,11 @@ async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: 
             json={
                 "model": "deepseek/deepseek-v4-flash:free",
                 "messages": [
-                    {"role": "system", "content": "You generate JSON datasets only. Never use markdown formatting."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You generate JSON datasets only. Never use markdown formatting.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 "max_tokens": min(8000, n * 150),
                 "temperature": 0.8,
@@ -210,9 +213,10 @@ async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: 
 
         # Extract JSON from response
         import re
+
         # Remove markdown code blocks if present
-        content = re.sub(r'```json\s*|\s*```', '', content)
-        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+        content = re.sub(r"```json\s*|\s*```", "", content)
+        json_match = re.search(r"\[.*?\]", content, re.DOTALL)
         if json_match:
             samples = json.loads(json_match.group())
             # Validate structure

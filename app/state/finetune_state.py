@@ -218,7 +218,9 @@ class FinetuneState(rx.State):
     # Phase A – filter chips (all optional)
     intent_use_for: str = ""  # "personal" | "company" | "research" | "education" | ""
     intent_domain: str = ""  # "healthcare" | "finance" | "education" | "legal" | "creative" | "technology" | "ecommerce" | "customer_service" | ""
-    intent_task_type: str = ""  # "text" | "vision" | "audio" | "code" | "translation" | "summarization" | ""
+    intent_task_type: str = (
+        ""  # "text" | "vision" | "audio" | "code" | "translation" | "summarization" | ""
+    )
 
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
@@ -1016,7 +1018,7 @@ class FinetuneState(rx.State):
                 summary = "Intent not fully specified — all fields can be updated before training."
 
         q_lines = "\n".join(
-            f"{i + 1}. **{self.intent_questions[i]['heading'] if i < len(self.intent_questions) else f'Question {i+1}'}:** {self.intent_answers[i] or 'Not specified'}"
+            f"{i + 1}. **{self.intent_questions[i]['heading'] if i < len(self.intent_questions) else f'Question {i + 1}'}:** {self.intent_answers[i] or 'Not specified'}"
             for i in range(len(self.intent_answers))
         )
 
@@ -1142,8 +1144,11 @@ Return ONLY valid JSON in this exact format, no other text:
                     json={
                         "model": "deepseek/deepseek-v4-flash:free",
                         "messages": [
-                            {"role": "system", "content": "You are a helpful AI that generates JSON only. Never include explanations, just pure JSON."},
-                            {"role": "user", "content": context}
+                            {
+                                "role": "system",
+                                "content": "You are a helpful AI that generates JSON only. Never include explanations, just pure JSON.",
+                            },
+                            {"role": "user", "content": context},
                         ],
                         "max_tokens": 1500,
                         "temperature": 0.7,
@@ -1156,7 +1161,8 @@ Return ONLY valid JSON in this exact format, no other text:
 
                     # Extract JSON from response (in case model adds extra text)
                     import re
-                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+
+                    json_match = re.search(r"\{.*\}", content, re.DOTALL)
                     if json_match:
                         parsed = json.loads(json_match.group())
                         self.intent_questions = parsed.get("questions", [])[:5]
@@ -1250,8 +1256,11 @@ Write ONLY the summary, no other text."""
                     json={
                         "model": "deepseek/deepseek-v4-flash:free",
                         "messages": [
-                            {"role": "system", "content": "You write concise, clear summaries. Never use markdown or formatting."},
-                            {"role": "user", "content": context}
+                            {
+                                "role": "system",
+                                "content": "You write concise, clear summaries. Never use markdown or formatting.",
+                            },
+                            {"role": "user", "content": context},
                         ],
                         "max_tokens": 200,
                         "temperature": 0.5,

@@ -120,6 +120,7 @@ def _run_finetune_impl(
                 hub_split=hub_split,
                 instruction_col=instruction_col,
                 output_col=output_col,
+                technique=train_cfg.get("technique", "qlora"),
             )
             eval_results = _compute_eval(
                 model,

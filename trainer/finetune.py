@@ -38,6 +38,7 @@ def finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
+    technique: str = "qlora",
 ):
     """
     Full fine-tuning pipeline:
@@ -52,7 +53,7 @@ def finetune(
     # Seed every source of randomness up front so the run is reproducible.
     set_seed(train_cfg.seed)
 
-    # 1. Prepare model
+    # 1. Prepare model — technique routing expanded in P3 (adapters.py strategy registry)
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
     # 2. Load dataset (optionally splitting off a validation set below). With

@@ -113,6 +113,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "prompt_template": config.prompt_template,
         "packing": config.packing,
         "fsdp": config.fsdp,
+        "technique": config.technique,
     }
     return {
         "job_id": job_id,

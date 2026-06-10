@@ -1683,6 +1683,58 @@ Write ONLY the summary, no other text."""
                 self.start_error = str(exc)
                 self.is_starting = False
 
+    @rx.event(background=True)
+    async def rehydrate_from_api(self):
+        """Re-attach to an in-flight job after an HF Spaces app restart.
+
+        On HF Spaces the App Space can restart independently of the Worker Space.
+        When that happens Reflex resets all state to defaults, so ``job_id`` and
+        ``training_status`` go back to "idle" even if the job is still running.
+        This event fires on page load: it queries the REST API for the most-recent
+        job, and if it is still running it restores state and re-subscribes to the
+        Redis progress channel so the live training dashboard reconnects.
+        """
+        # Skip if we already have a job tracked in this session (not a restart).
+        async with self:
+            if self.job_id:
+                return
+
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{API_BASE}/api/jobs?limit=5")
+            if resp.status_code != 200:
+                return
+            jobs = resp.json()
+        except Exception:
+            return  # API unreachable — silently skip rehydration
+
+        if not jobs:
+            return
+
+        # Pick the most-recent job that is still active or recently finished.
+        latest = jobs[0]
+        status = latest.get("status", "")
+        job_id = latest.get("id") or latest.get("job_id", "")
+        if not job_id:
+            return
+
+        if status in ("running", "provisioning"):
+            async with self:
+                self.job_id = job_id
+                self.training_status = "running"
+                self.current_step = 5  # jump to training dashboard
+            # Re-attach to the progress stream — this call blocks until the job ends.
+            await self._poll_job_loop(job_id)
+
+        elif status == "done":
+            async with self:
+                self.job_id = job_id
+                self.training_status = "done"
+                self.output_path = latest.get("output_path", "")
+                # Don't advance the step — let the user resume from wherever they are.
+
     async def _poll_job_loop(self, job_id: str):
         import redis.asyncio as aioredis
 

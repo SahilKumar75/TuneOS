@@ -318,6 +318,24 @@ class FinetuneState(rx.State):
         return self.can_go_to_configure and bool(self.effective_model_id)
 
     @rx.var
+    def step_can_advance(self) -> bool:
+        """True when the wizard is allowed to move forward from current_step.
+
+        Used by next_step() to enforce guards server-side so no client-side
+        trick (e.g. a stray keyboard event) can skip a locked step.
+        """
+        if self.current_step == 1:
+            return self.can_go_to_intent
+        if self.current_step == 2:
+            # Step 2 uses approve_intent which sets intent_approved; block raw
+            # next_step() calls when intent hasn't been approved yet.
+            return self.can_go_to_data
+        if self.current_step == 3:
+            return self.can_go_to_configure
+        # Steps 4–7: always allow backward/forward within the workspace
+        return True
+
+    @rx.var
     def effective_model_id(self) -> str:
         if self.model_source == "hub" and self.selected_model_id:
             return self.selected_model_id
@@ -1396,6 +1414,8 @@ Write ONLY the summary, no other text."""
 
     @rx.event
     def next_step(self):
+        if not self.step_can_advance:
+            return
         self.current_step = min(7, self.current_step + 1)
 
     @rx.event

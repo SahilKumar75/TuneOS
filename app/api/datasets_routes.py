@@ -68,20 +68,39 @@ async def generate_dataset(req: DatasetGenRequest):
     """Generate synthetic training data from a plain-English use-case description."""
     import asyncio
 
-    def _generate():
+    async def _generate():
         hf_token = req.hf_token or os.getenv("HF_TOKEN", "")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
         samples = []
+        generation_method = "none"
+        error_log = []
 
-        if hf_token and req.method in ("self_instruct", "few_shot"):
+        # Try OpenRouter first (preferred method)
+        if openrouter_key and req.method in ("self_instruct", "few_shot", "auto"):
+            try:
+                samples = await _openrouter_generate(
+                    req.user_intent, req.n_samples, req.seed_examples, openrouter_key
+                )
+                generation_method = "openrouter"
+            except Exception as e:
+                error_log.append(f"OpenRouter failed: {str(e)}")
+                samples = []
+
+        # Fallback to HuggingFace if OpenRouter failed or not available
+        if not samples and hf_token and req.method in ("self_instruct", "few_shot"):
             try:
                 samples = _self_instruct_generate(
                     req.user_intent, req.n_samples, req.seed_examples, hf_token
                 )
-            except Exception:
+                generation_method = "huggingface"
+            except Exception as e:
+                error_log.append(f"HuggingFace failed: {str(e)}")
                 samples = []
 
+        # Final fallback to template generation
         if not samples:
             samples = _template_generate(req.user_intent, req.n_samples)
+            generation_method = "template"
 
         # Dedup by instruction (approximate)
         seen = set()
@@ -96,6 +115,8 @@ async def generate_dataset(req: DatasetGenRequest):
             "total_generated": len(samples),
             "final_count": len(unique),
             "diversity_score": _diversity_score(unique),
+            "generation_method": generation_method,
+            "errors": error_log if error_log else None,
         }
 
         # Save to disk
@@ -107,6 +128,10 @@ async def generate_dataset(req: DatasetGenRequest):
                 f.write(json.dumps(row) + "\n")
 
         return {"samples": unique, "dataset_path": fpath, "stats": stats}
+
+    # Run the async generation
+    result = await _generate()
+    return result
 
     result = await asyncio.get_event_loop().run_in_executor(None, _generate)
     return result
@@ -137,6 +162,71 @@ def _self_instruct_generate(intent: str, n: int, seeds: list[dict], hf_token: st
     if match:
         return json.loads(match.group())
     return []
+
+
+async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: str) -> list[dict]:
+    """Generate synthetic data using OpenRouter API."""
+    import httpx
+
+    seed_str = "\n".join(
+        f"- Instruction: {s['instruction']}\n  Output: {s['output']}"
+        for s in (seeds or _default_seeds(intent))[:5]
+    )
+
+    prompt = (
+        f"You are a dataset creator. Generate {n} diverse, high-quality instruction/output pairs for fine-tuning a language model.\n\n"
+        f"User Intent: {intent}\n\n"
+        f"Example pairs:\n{seed_str}\n\n"
+        f"Generate {n} NEW examples (not repeating the seeds) in this JSON format:\n"
+        f'[{{"instruction": "...", "output": "..."}}, ...]\n\n'
+        f"Make the instructions diverse, covering different aspects of the intent.\n"
+        f"Return ONLY the JSON array, no markdown, no explanations."
+    )
+
+    async with httpx.AsyncClient(timeout=60.0) as http:
+        resp = await http.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "X-Title": "TuneOS Dataset Generation",
+            },
+            json={
+                "model": "deepseek/deepseek-v4-flash:free",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You generate JSON datasets only. Never use markdown formatting.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": min(8000, n * 150),
+                "temperature": 0.8,
+            },
+        )
+
+        if resp.status_code != 200:
+            raise Exception(f"OpenRouter API returned {resp.status_code}: {resp.text}")
+
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+
+        # Extract JSON from response
+        import re
+
+        # Remove markdown code blocks if present
+        content = re.sub(r"```json\s*|\s*```", "", content)
+        json_match = re.search(r"\[.*?\]", content, re.DOTALL)
+        if json_match:
+            samples = json.loads(json_match.group())
+            # Validate structure
+            valid_samples = []
+            for s in samples:
+                if isinstance(s, dict) and "instruction" in s and "output" in s:
+                    valid_samples.append(s)
+            return valid_samples
+
+        raise ValueError("No valid JSON array found in response")
 
 
 def _default_seeds(intent: str) -> list[dict]:

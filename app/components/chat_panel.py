@@ -89,8 +89,30 @@ def _action_icon_btn(icon_name: str, on_click=None) -> rx.Component:
     )
 
 
+def _streaming_cursor() -> rx.Component:
+    """Animated streaming cursor for AI responses."""
+    return rx.box(
+        class_name="streaming-cursor",
+        width="2px",
+        height="1em",
+        background=c("text_primary"),
+        display="inline-block",
+        margin_left="2px",
+        vertical_align="text-bottom",
+        style={
+            "@keyframes blink": {
+                "0%, 50%": {"opacity": "1"},
+                "51%, 100%": {"opacity": "0"},
+            },
+            "animation": "blink 1s ease-in-out infinite",
+        },
+    )
+
+
 def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
     is_user = msg["role"] == "user"
+    is_streaming = (msg["role"] == "assistant") & (AppState.is_chat_loading)
+
     return rx.cond(
         is_user,
         # User message — right-aligned subtle pill (original neutral look).
@@ -108,9 +130,24 @@ def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
             width="100%",
             align="start",
         ),
-        # Assistant message — plain text left, copy action below.
+        # Assistant message — plain text left, copy action below, with streaming effect.
         rx.vstack(
-            rx.markdown(msg["text"], font_size="0.9rem", color=c("text_primary")),
+            rx.box(
+                rx.markdown(
+                    msg["text"],
+                    font_size="0.9rem",
+                    color=c("text_primary"),
+                    class_name=rx.cond(is_streaming, "streaming-text", ""),
+                ),
+                rx.cond(
+                    is_streaming,
+                    _streaming_cursor(),
+                    rx.fragment(),
+                ),
+                display="flex",
+                align_items="flex-end",
+                width="100%",
+            ),
             rx.hstack(
                 _action_icon_btn("copy", on_click=rx.set_clipboard(msg["text"])),
                 spacing="0",

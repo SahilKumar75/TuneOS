@@ -22,6 +22,7 @@ config:
   MD046: false  # code block style
   MD047: false  # file should end with newline
   MD049: false  # emphasis marker style
+  MD050: false  # strong marker style — allow both ** and __
   MD060: false  # table formatting
 globs:
   - "**/*.md"
@@ -29,3 +30,4 @@ ignores:
   - ".web/**"
   - "node_modules/**"
   - ".agents/**"
+  - "graphify-out/**"

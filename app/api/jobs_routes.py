@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import threading
 import uuid
 import zipfile
@@ -32,6 +33,19 @@ from app.api.schemas import (
 router = APIRouter()
 
 _T5_FAMILIES = ("t5", "mt5")
+_MODEL_ID_RE = re.compile(r"^[a-zA-Z0-9_.'\-/]+$")
+_MODEL_ID_MAX_LEN = 200
+
+
+def _validate_model_id(model_id: str) -> None:
+    """Raise HTTP 400 if model_id contains unsafe characters or is too long."""
+    if not model_id or len(model_id) > _MODEL_ID_MAX_LEN:
+        raise HTTPException(status_code=400, detail="model_id must be 1–200 characters")
+    if not _MODEL_ID_RE.match(model_id):
+        raise HTTPException(
+            status_code=400,
+            detail="model_id may only contain letters, digits, dots, dashes, underscores, and slashes",
+        )
 
 
 def _detect_task_type(model_id: str) -> str:
@@ -70,6 +84,7 @@ async def list_jobs(limit: int = 50, offset: int = 0):
 
 def _build_finetune_kwargs(config: JobConfig) -> dict:
     """Translate a JobConfig into the run_finetune task kwargs."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
     model_cfg = {
         "model_name": config.model_id,
@@ -171,6 +186,7 @@ def _ensure_worker_alive() -> None:
 @router.post("/jobs/dpo", response_model=JobCreated, status_code=201)
 async def create_dpo_job(config: DPOJobConfig):
     """Create and enqueue a DPO (preference) fine-tuning job."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
 
     model_cfg = {
@@ -234,6 +250,7 @@ async def create_dpo_job(config: DPOJobConfig):
 @router.post("/jobs/distill", response_model=JobCreated, status_code=201)
 async def create_distill_job(config: DistillJobConfig):
     """Create and enqueue a knowledge-distillation job (teacher → LoRA student)."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
 
     model_cfg = {

@@ -97,15 +97,11 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
-    lora_cfg = {
-        "r": config.lora_rank,
-        "lora_alpha": config.lora_alpha,
-        "lora_dropout": config.lora_dropout,
-        "bias": "none",
-        "task_type": _detect_task_type(config.model_id),
-        "target_modules": None,  # auto-detected from model architecture in trainer/lora.py
-        "use_all_linear": config.use_all_linear,
-    }
+    from trainer.adapter_config import AdapterConfig
+
+    _adapter = AdapterConfig.from_job_config(config)
+    _adapter.task_type = _detect_task_type(config.model_id)
+    lora_cfg = _adapter.to_lora_cfg_dict()
     train_cfg = {
         "output_dir": OUTPUT_DIR,
         "num_train_epochs": config.epochs,

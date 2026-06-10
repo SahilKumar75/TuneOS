@@ -127,6 +127,7 @@ def finetune(
         max_grad_norm=train_cfg.max_grad_norm,
         report_to=train_cfg.report_to,  # external tracker(s); "none" by default
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         seed=train_cfg.seed,
         data_seed=train_cfg.seed,
         torch_compile=train_cfg.use_torch_compile,

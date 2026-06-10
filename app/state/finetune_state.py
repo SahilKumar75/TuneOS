@@ -156,6 +156,7 @@ class LossPoint(BaseModel):
     epoch: float = 0.0
     learning_rate: float = 0.0
     eval_loss: float | None = None
+    grad_norm: float | None = None
 
 
 class EpochLogEntry(BaseModel):
@@ -265,6 +266,7 @@ class FinetuneState(rx.State):
     # ── Step 3: Data stats ────────────────────────────────────────
     dataset_row_count: int = 0
     dataset_avg_tokens: float = 0.0
+    dataset_template_preview: list[str] = []
 
     # ── Step 4: Configure ─────────────────────────────────────────
     ui_mode: str = "simple"  # "simple" | "advanced"
@@ -395,6 +397,26 @@ class FinetuneState(rx.State):
     @rx.var
     def selected_model_arch(self) -> str:
         return _PRESET_META.get(self.selected_model_id, {}).get("arch", "")
+
+    @rx.var
+    def needs_vram_warning(self) -> bool:
+        """True when a non-QLoRA technique is used with a model larger than 3B params."""
+        if self.selected_technique == "qlora":
+            return False
+        size_str = self.selected_model_size.lower()
+        if not size_str:
+            return False
+        token = size_str.split()[0]  # e.g. "7b", "3.8b", "410m"
+        try:
+            if token.endswith("b"):
+                val = float(token[:-1])
+            elif token.endswith("m"):
+                val = float(token[:-1]) / 1000.0
+            else:
+                val = 0.0
+        except (ValueError, AttributeError):
+            return False
+        return val > 3.0
 
     @rx.var
     def selected_model_source_label(self) -> str:
@@ -1363,6 +1385,59 @@ Write ONLY the summary, no other text."""
             self.generation_n = int(value)
         except ValueError:
             pass
+
+    @rx.event
+    async def preview_dataset_sample(self):
+        """Read the first two rows from the current dataset and render them
+        through the selected prompt_template so the user can see exactly what
+        the trainer will receive before starting a run."""
+        import csv as _csv
+        import json as _json
+
+        from trainer.dataset import PROMPT_TEMPLATES
+
+        path = self.dataset_path
+        if not path or not os.path.exists(path):
+            self.dataset_template_preview = []
+            return
+
+        rows: list[dict] = []
+        try:
+            if path.endswith(".jsonl"):
+                with open(path, encoding="utf-8") as fh:
+                    for raw in fh:
+                        raw = raw.strip()
+                        if raw:
+                            rows.append(_json.loads(raw))
+                        if len(rows) >= 2:
+                            break
+            elif path.endswith(".json"):
+                with open(path, encoding="utf-8") as fh:
+                    data = _json.load(fh)
+                rows = data[:2] if isinstance(data, list) else []
+            else:  # CSV
+                with open(path, encoding="utf-8", newline="") as fh:
+                    reader = _csv.DictReader(fh)
+                    for row in reader:
+                        rows.append(dict(row))
+                        if len(rows) >= 2:
+                            break
+        except Exception:
+            self.dataset_template_preview = []
+            return
+
+        tmpl = PROMPT_TEMPLATES.get(self.prompt_template, PROMPT_TEMPLATES["alpaca"])
+        previews: list[str] = []
+        for row in rows:
+            keys = list(row.keys())
+            inst = row.get("instruction", row[keys[0]] if keys else "")
+            out = row.get("output", row[keys[1]] if len(keys) > 1 else "")
+            try:
+                formatted = tmpl.format(instruction=inst, output=out)
+            except Exception:
+                formatted = str(inst)
+            previews.append(formatted)
+        self.dataset_template_preview = previews
 
     @rx.event(background=True)
     async def generate_starter_dataset(self):

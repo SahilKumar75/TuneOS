@@ -53,7 +53,9 @@ class RedisLossCallback(TrainerCallback):
             "epoch": round(state.epoch, 2) if state.epoch else 0,
             "learning_rate": logs.get("learning_rate", 0),
             "eval_loss": logs.get("eval_loss"),
-            "grad_norm": logs.get("grad_norm"),
+            "grad_norm": (
+                round(float(logs["grad_norm"]), 4) if "grad_norm" in logs else None
+            ),
             "total_steps": state.max_steps or 0,
             "elapsed_seconds": int(time.time() - self._start_time),
             "gpu_memory_used_gb": gpu_mem,

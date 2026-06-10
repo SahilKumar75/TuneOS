@@ -46,6 +46,7 @@ class TrainingPollerState(FinetuneState):
     error_msg: str = ""
     loss_history: list[LossPoint] = []
     epoch_log: list[EpochLogEntry] = []  # one entry per completed epoch
+    show_grad_norm: bool = False  # toggle grad-norm series on the live chart
 
     # Experiment tracking
     experiment_id: str = ""

@@ -122,17 +122,20 @@ def _run_finetune_impl(
                 output_col=output_col,
                 technique=train_cfg.get("technique", "qlora"),
             )
-            eval_results = _compute_eval(
-                model,
-                tokenizer,
-                model_cfg,
-                train_cfg,
-                dataset_path,
-                hub_dataset_id,
-                hub_split,
-                instruction_col,
-                output_col,
-            )
+            if train_cfg.get("eval_split_ratio", 0.1) == 0.0:
+                eval_results = {"perplexity": None, "rouge1": None, "bleu": None}
+            else:
+                eval_results = _compute_eval(
+                    model,
+                    tokenizer,
+                    model_cfg,
+                    train_cfg,
+                    dataset_path,
+                    hub_dataset_id,
+                    hub_split,
+                    instruction_col,
+                    output_col,
+                )
             r.set(f"job:{job_id}:eval", json.dumps(eval_results))
 
         # Persist eval to SQLite as well, so GET /jobs/{id}/eval survives a Redis

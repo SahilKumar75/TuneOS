@@ -19,7 +19,9 @@ def inject_lora(model, lora_cfg: LoraConfig):
     """
     model = prepare_model_for_kbit_training(model)
 
-    if lora_cfg.target_modules is None:
+    if lora_cfg.use_all_linear:
+        target_modules = "all-linear"
+    elif lora_cfg.target_modules is None:
         # Coerce to str — custom configs may carry a non-string model_type.
         model_type = str(getattr(getattr(model, "config", None), "model_type", "") or "")
         target_modules = get_target_modules(model_type)

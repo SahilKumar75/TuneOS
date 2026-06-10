@@ -104,6 +104,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "bias": "none",
         "task_type": _detect_task_type(config.model_id),
         "target_modules": None,  # auto-detected from model architecture in trainer/lora.py
+        "use_all_linear": config.use_all_linear,
     }
     train_cfg = {
         "output_dir": OUTPUT_DIR,

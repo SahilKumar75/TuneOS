@@ -71,6 +71,7 @@ class JobConfig(BaseModel):
     # Multi-GPU FSDP option string (empty = off), e.g. "full_shard auto_wrap".
     fsdp: str = ""
     optim: str = "paged_adamw_32bit"
+    use_all_linear: bool = False
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""

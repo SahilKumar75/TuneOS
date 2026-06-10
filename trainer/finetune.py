@@ -3,11 +3,11 @@ import os
 from transformers import EarlyStoppingCallback, TrainingArguments, set_seed
 from trl import SFTTrainer
 
+from trainer.adapters import get_strategy
 from trainer.callbacks import RedisLossCallback
 from trainer.config import LoraConfig, ModelConfig, TrainingConfig
 from trainer.dataset import load_and_tokenize
 from trainer.lora import save_adapter
-from trainer.qlora import prepare_qlora_model
 
 
 class OutOfMemoryError(RuntimeError):
@@ -53,8 +53,8 @@ def finetune(
     # Seed every source of randomness up front so the run is reproducible.
     set_seed(train_cfg.seed)
 
-    # 1. Prepare model — technique routing expanded in P3 (adapters.py strategy registry)
-    model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
+    # 1. Prepare model via the adapter strategy registry
+    model, tokenizer = get_strategy(train_cfg.technique).prepare(model_cfg, lora_cfg)
 
     # 2. Load dataset. #23 — when a validation split is requested and we're NOT
     # packing, split the raw dataset first so we only tokenize what we train on.

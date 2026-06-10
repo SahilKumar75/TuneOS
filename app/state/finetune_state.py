@@ -189,7 +189,7 @@ class FinetuneState(rx.State):
     model_url_error: str = ""
     is_validating_model: bool = False
     hf_token: str = ""  # for gated models
-    selected_technique: str = "qlora"  # "qlora" | "lora"
+    selected_technique: str = "qlora"  # "qlora" | "lora" | "adalora" | "ia3" | "prefix" | "prompt"
     step1_show_picker: bool = False  # True = full grid picker (advanced)
     # Extended preview info fetched live from HF Hub API
     model_downloads: str = ""
@@ -355,7 +355,15 @@ class FinetuneState(rx.State):
 
     @rx.var
     def technique_label(self) -> str:
-        return "QLoRA" if self.selected_technique == "qlora" else "LoRA"
+        _labels = {
+            "qlora": "QLoRA",
+            "lora": "LoRA",
+            "adalora": "AdaLoRA",
+            "ia3": "IA³",
+            "prefix": "Prefix Tuning",
+            "prompt": "Prompt Tuning",
+        }
+        return _labels.get(self.selected_technique, self.selected_technique.upper())
 
     @rx.var
     def dataset_name(self) -> str:

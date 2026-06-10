@@ -293,6 +293,7 @@ class FinetuneState(rx.State):
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
     prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
     packing: bool = False
+    use_all_linear: bool = False
 
     # ── Step 5: Training dashboard ────────────────────────────────
     job_id: str = ""
@@ -1562,6 +1563,10 @@ Write ONLY the summary, no other text."""
         self.packing = value
 
     @rx.event
+    def set_use_all_linear(self, value: bool):
+        self.use_all_linear = value
+
+    @rx.event
     def set_learning_rate(self, value: str):
         self.learning_rate = value
 
@@ -1670,6 +1675,7 @@ Write ONLY the summary, no other text."""
             "compute_backend": self.compute_backend,
             "prompt_template": self.prompt_template,
             "packing": self.packing,
+            "use_all_linear": self.use_all_linear,
         }
 
         try:

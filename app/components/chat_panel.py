@@ -112,7 +112,7 @@ def _streaming_cursor() -> rx.Component:
 def _chat_message(msg: rx.Var[dict[str, str]]) -> rx.Component:
     is_user = msg["role"] == "user"
     is_streaming = (msg["role"] == "assistant") & (AppState.is_chat_loading)
-    
+
     return rx.cond(
         is_user,
         # User message — right-aligned subtle pill (original neutral look).

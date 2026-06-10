@@ -1,10 +1,10 @@
-#  Deployment Checklist
+# Deployment Checklist
 
 Use this checklist before deploying the intent flow improvements.
 
 ## Pre-Deployment
 
-###  Code Review
+### Code Review
 
 - [ ] All files compile without errors
   ```bash
@@ -22,7 +22,7 @@ Use this checklist before deploying the intent flow improvements.
 - [ ] No unused imports
 - [ ] Proper error handling in all async methods
 
-###  Environment Setup
+### Environment Setup
 
 - [ ] `.env` file exists
 - [ ] `OPENROUTER_API_KEY` documented (even if optional)
@@ -38,7 +38,7 @@ Use this checklist before deploying the intent flow improvements.
 
 - [ ] No new dependencies that aren't documented
 
-###  Documentation
+### Documentation
 
 - [ ] All documentation files created:
   - [ ] IMPROVEMENTS_SUMMARY.md
@@ -54,7 +54,7 @@ Use this checklist before deploying the intent flow improvements.
 - [ ] Code examples are accurate
 - [ ] Screenshots or ASCII art match current UI
 
-###  Backward Compatibility
+### Backward Compatibility
 
 - [ ] Old state fields still present (for migration)
 - [ ] `user_intent` field still populated
@@ -63,7 +63,7 @@ Use this checklist before deploying the intent flow improvements.
 
 ## Testing
 
-###  Unit Testing
+### Unit Testing
 
 - [ ] Test with OpenRouter API key
   - [ ] Questions generate successfully
@@ -80,7 +80,7 @@ Use this checklist before deploying the intent flow improvements.
   - [ ] No crashes
   - [ ] Fallback works
 
-###  Integration Testing
+### Integration Testing
 
 - [ ] Complete flow (Phase A  B  C)
   - [ ] Phase A: All inputs work
@@ -104,7 +104,7 @@ Use this checklist before deploying the intent flow improvements.
   - [ ] Rapid clicking
   - [ ] Browser back/forward
 
-###  UI/UX Testing
+### UI/UX Testing
 
 - [ ] Desktop browsers
   - [ ] Chrome
@@ -128,7 +128,7 @@ Use this checklist before deploying the intent flow improvements.
   - [ ] Focus indicators visible
   - [ ] Screen reader compatible (basic)
 
-###  Performance Testing
+### Performance Testing
 
 - [ ] Question generation < 10 seconds
 - [ ] Plan updates < 5 seconds
@@ -137,7 +137,7 @@ Use this checklist before deploying the intent flow improvements.
 - [ ] Network requests complete
 - [ ] Animations smooth (60fps)
 
-###  Error Handling Testing
+### Error Handling Testing
 
 - [ ] Network offline
   - [ ] Graceful error messages
@@ -158,7 +158,7 @@ Use this checklist before deploying the intent flow improvements.
 
 ## Deployment
 
-###  Pre-Deploy Steps
+### Pre-Deploy Steps
 
 - [ ] Merge to main branch
   ```bash
@@ -197,7 +197,7 @@ Use this checklist before deploying the intent flow improvements.
   # or your build command
   ```
 
-###  Deploy Steps
+### Deploy Steps
 
 - [ ] Deploy to staging first
 - [ ] Smoke test on staging
@@ -213,7 +213,7 @@ Use this checklist before deploying the intent flow improvements.
 - [ ] Deploy to production
 - [ ] Monitor for 24 hours
 
-###  Post-Deploy Verification
+### Post-Deploy Verification
 
 - [ ] Production smoke test
   - [ ] Load fine-tune wizard
@@ -234,7 +234,7 @@ Use this checklist before deploying the intent flow improvements.
   - [ ] API calls logging correctly
   - [ ] Fallbacks trigger appropriately
 
-###  User Communication
+### User Communication
 
 - [ ] Release notes published
 - [ ] Users notified of new features
@@ -270,7 +270,7 @@ Roll back if:
 
 ## Monitoring
 
-###  What to Monitor
+### What to Monitor
 
 - [ ] API call volumes
   - OpenRouter: /chat/completions
@@ -291,14 +291,14 @@ Roll back if:
   - Drop-off points
   - Feature usage
 
-###  Alerts to Set Up
+### Alerts to Set Up
 
 - [ ] Error rate > 5% (alert immediately)
 - [ ] API failure rate > 10% (alert)
 - [ ] Response time > 30s (alert)
 - [ ] OpenRouter rate limit hit (notify)
 
-###  Logging
+### Logging
 
 - [ ] Question generation attempts
 - [ ] Plan update attempts
@@ -307,7 +307,7 @@ Roll back if:
 
 ## Security
 
-###  Security Checklist
+### Security Checklist
 
 - [ ] API keys never exposed to frontend
 - [ ] API keys not logged
@@ -317,7 +317,7 @@ Roll back if:
 - [ ] Rate limiting on endpoints
 - [ ] No sensitive data in error messages
 
-###  Data Privacy
+### Data Privacy
 
 - [ ] User project descriptions not logged
 - [ ] API calls don't include PII
@@ -326,7 +326,7 @@ Roll back if:
 
 ## Cost Management
 
-###  Cost Monitoring
+### Cost Monitoring
 
 - [ ] OpenRouter usage dashboard checked
 - [ ] Free tier limits understood
@@ -338,7 +338,7 @@ Roll back if:
 - [ ] Cost alerts set (if using paid tier)
 - [ ] Fallback methods ready (always free)
 
-###  Optimization
+### Optimization
 
 - [ ] Unnecessary API calls removed
 - [ ] Caching considered (future)
@@ -347,14 +347,14 @@ Roll back if:
 
 ## Documentation
 
-###  Internal Docs
+### Internal Docs
 
 - [ ] Team trained on new flow
 - [ ] Support docs updated
 - [ ] Architecture diagrams shared
 - [ ] API docs accessible
 
-###  External Docs
+### External Docs
 
 - [ ] User guide updated
 - [ ] API reference published
@@ -363,7 +363,7 @@ Roll back if:
 
 ## Success Metrics
 
-###  Define Success
+### Define Success
 
 Track these for 30 days:
 
@@ -374,7 +374,7 @@ Track these for 30 days:
 - [ ] API success rate (target: > 95%)
 - [ ] Feature adoption (% using new features)
 
-###  Review Schedule
+### Review Schedule
 
 - [ ] Day 1: Immediate issues check
 - [ ] Day 7: First week review
@@ -383,7 +383,7 @@ Track these for 30 days:
 
 ## Final Checks
 
-###  Before Going Live
+### Before Going Live
 
 - [ ] All tests pass
 - [ ] Documentation complete
@@ -394,21 +394,21 @@ Track these for 30 days:
 - [ ] Backup created
 - [ ] Announcement ready
 
-###  Go/No-Go Decision
+### Go/No-Go Decision
 
 **GO if:**
--  All critical tests pass
--  No blocking bugs
--  Performance acceptable
--  Rollback plan ready
--  Team ready
+- All critical tests pass
+- No blocking bugs
+- Performance acceptable
+- Rollback plan ready
+- Team ready
 
 **NO-GO if:**
--  Critical bugs exist
--  Performance issues
--  Security concerns
--  Team not ready
--  Documentation incomplete
+- Critical bugs exist
+- Performance issues
+- Security concerns
+- Team not ready
+- Documentation incomplete
 
 ---
 

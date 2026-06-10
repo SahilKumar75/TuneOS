@@ -167,12 +167,12 @@ def _self_instruct_generate(intent: str, n: int, seeds: list[dict], hf_token: st
 async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: str) -> list[dict]:
     """Generate synthetic data using OpenRouter API."""
     import httpx
-    
+
     seed_str = "\n".join(
         f"- Instruction: {s['instruction']}\n  Output: {s['output']}"
         for s in (seeds or _default_seeds(intent))[:5]
     )
-    
+
     prompt = (
         f"You are a dataset creator. Generate {n} diverse, high-quality instruction/output pairs for fine-tuning a language model.\n\n"
         f"User Intent: {intent}\n\n"
@@ -182,7 +182,7 @@ async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: 
         f"Make the instructions diverse, covering different aspects of the intent.\n"
         f"Return ONLY the JSON array, no markdown, no explanations."
     )
-    
+
     async with httpx.AsyncClient(timeout=60.0) as http:
         resp = await http.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -201,13 +201,13 @@ async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: 
                 "temperature": 0.8,
             },
         )
-        
+
         if resp.status_code != 200:
             raise Exception(f"OpenRouter API returned {resp.status_code}: {resp.text}")
-        
+
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
-        
+
         # Extract JSON from response
         import re
         # Remove markdown code blocks if present
@@ -221,7 +221,7 @@ async def _openrouter_generate(intent: str, n: int, seeds: list[dict], api_key: 
                 if isinstance(s, dict) and "instruction" in s and "output" in s:
                     valid_samples.append(s)
             return valid_samples
-        
+
         raise ValueError("No valid JSON array found in response")
 
 

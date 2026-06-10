@@ -27,7 +27,7 @@ Go to the Fine-tune section and start a new project.
 
 ## Test Scenarios
 
-###  Test 1: Full Flow with OpenRouter
+### Test 1: Full Flow with OpenRouter
 
 **Goal:** Verify personalized questions are generated
 
@@ -68,7 +68,7 @@ Go to the Fine-tune section and start a new project.
    - All answers displayed
    - Project details shown
 
-###  Test 2: Fallback (No API Key)
+### Test 2: Fallback (No API Key)
 
 **Goal:** Verify graceful degradation
 
@@ -87,7 +87,7 @@ Go to the Fine-tune section and start a new project.
 - No live plan updates (amber card doesn't appear)
 - Flow still works end-to-end
 
-###  Test 3: Different Domains
+### Test 3: Different Domains
 
 **Goal:** Verify questions adapt to different domains
 
@@ -113,7 +113,7 @@ Go to the Fine-tune section and start a new project.
 - Task Type: Code
 - Expected questions about: programming languages, code style, review depth
 
-###  Test 4: UI/UX Testing
+### Test 4: UI/UX Testing
 
 **Goal:** Verify iOS-style design works
 
@@ -138,7 +138,7 @@ Go to the Fine-tune section and start a new project.
 - [ ] Edit button works
 - [ ] Approve button proceeds to next step
 
-###  Test 5: Edge Cases
+### Test 5: Edge Cases
 
 **Empty Fields:**
 - Leave all Phase A fields blank
@@ -162,7 +162,7 @@ Go to the Fine-tune section and start a new project.
 - Click through questions very fast
 - Expected: No duplicate plan updates, smooth navigation
 
-###  Test 6: Synthetic Data Generation
+### Test 6: Synthetic Data Generation
 
 **Goal:** Verify data generation uses OpenRouter
 
@@ -238,13 +238,13 @@ OpenRouter API calls should show:
 ## Success Criteria
 
 All tests should pass with:
--  No Python errors
--  No JavaScript console errors
--  Smooth animations (60fps)
--  Questions relevant to context
--  Plan updates accurately
--  Graceful fallbacks work
--  UI matches iOS design patterns
+- No Python errors
+- No JavaScript console errors
+- Smooth animations (60fps)
+- Questions relevant to context
+- Plan updates accurately
+- Graceful fallbacks work
+- UI matches iOS design patterns
 
 ## Report Issues
 

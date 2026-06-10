@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import reflex as rx
 
-from app.components.finetune.shared import _card, _label, _section_heading
+from app.components.finetune.shared import _card, _section_heading
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
@@ -107,6 +107,7 @@ def _phase_a() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             rx.box(
+                rx.text("1", color="white", font_weight="600", font_size="0.95rem"),
                 width="32px",
                 height="32px",
                 border_radius="50%",
@@ -114,7 +115,6 @@ def _phase_a() -> rx.Component:
                 display="flex",
                 align_items="center",
                 justify_content="center",
-                rx.text("1", color="white", font_weight="600", font_size="0.95rem"),
             ),
             rx.vstack(
                 rx.text(
@@ -135,7 +135,7 @@ def _phase_a() -> rx.Component:
             align="start",
             margin_bottom="16px",
         ),
-        
+
         _card(
             rx.vstack(
                 # Project basics
@@ -163,7 +163,7 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                
+
                 rx.vstack(
                     rx.text(
                         "Description",
@@ -188,9 +188,9 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                
+
                 rx.divider(margin="8px 0"),
-                
+
                 # Context filters
                 _filter_row(
                     "Use Case",
@@ -206,9 +206,9 @@ def _phase_a() -> rx.Component:
                     ],
                     "Who will use this model?",
                 ),
-                
+
                 rx.divider(margin="8px 0"),
-                
+
                 _filter_row(
                     "Domain",
                     [
@@ -223,9 +223,9 @@ def _phase_a() -> rx.Component:
                     ],
                     "What industry or field?",
                 ),
-                
+
                 rx.divider(margin="8px 0"),
-                
+
                 _filter_row(
                     "Task Type",
                     [
@@ -240,7 +240,7 @@ def _phase_a() -> rx.Component:
                     ],
                     "What kind of output?",
                 ),
-                
+
                 spacing="5",
                 width="100%",
             ),
@@ -249,7 +249,7 @@ def _phase_a() -> rx.Component:
                 "box-shadow": "0 2px 8px rgba(0,0,0,0.04)",
             },
         ),
-        
+
         rx.button(
             rx.hstack(
                 rx.text("Continue to Questions"),
@@ -273,7 +273,7 @@ def _phase_a() -> rx.Component:
                 "transition": "all 0.2s ease",
             },
         ),
-        
+
         spacing="4",
         width="100%",
     )
@@ -435,7 +435,7 @@ def _phase_b_question(q_idx: int) -> rx.Component:
     ]
     total_q = FinetuneState.intent_questions.length()
     is_last = q_idx >= (total_q - 1)
-    
+
     return _card(
         rx.vstack(
             # Header with progress
@@ -452,7 +452,7 @@ def _phase_b_question(q_idx: int) -> rx.Component:
                 align="center",
             ),
             rx.box(height="8px"),
-            
+
             # Question heading
             rx.text(
                 q["heading"],
@@ -462,16 +462,16 @@ def _phase_b_question(q_idx: int) -> rx.Component:
                 line_height="1.4",
             ),
             rx.box(height="12px"),
-            
+
             # Options with dynamic rendering
             rx.foreach(
                 q["options"],
                 lambda opt: _question_option_btn(q_idx, opt),
             ),
-            
+
             _question_other_input(q_idx),
             rx.box(height="12px"),
-            
+
             # Navigation buttons
             rx.hstack(
                 rx.button(
@@ -580,7 +580,7 @@ def _phase_b() -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-            
+
             # Current question
             rx.foreach(
                 FinetuneState.intent_questions,

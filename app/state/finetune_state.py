@@ -219,7 +219,7 @@ class FinetuneState(rx.State):
     intent_use_for: str = ""  # "personal" | "company" | "research" | "education" | ""
     intent_domain: str = ""  # "healthcare" | "finance" | "education" | "legal" | "creative" | "technology" | "ecommerce" | "customer_service" | ""
     intent_task_type: str = ""  # "text" | "vision" | "audio" | "code" | "translation" | "summarization" | ""
-    
+
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
     intent_description: str = ""  # project description
@@ -952,10 +952,10 @@ class FinetuneState(rx.State):
         is_custom = list(self.intent_is_custom)
         is_custom[idx] = False
         self.intent_is_custom = is_custom
-        
+
         # Update live plan immediately
         await self._update_live_plan()
-        
+
         # Auto-advance focus and scroll to next question
         if self.intent_question_idx == idx and idx < len(self.intent_answers) - 1:
             self.intent_question_idx = idx + 1
@@ -1016,7 +1016,7 @@ class FinetuneState(rx.State):
                 summary = "Intent not fully specified — all fields can be updated before training."
 
         q_lines = "\n".join(
-            f"{i + 1}. **{q['heading'] if i < len(self.intent_questions) else f'Question {i+1}'}:** {self.intent_answers[i] or 'Not specified'}"
+            f"{i + 1}. **{self.intent_questions[i]['heading'] if i < len(self.intent_questions) else f'Question {i+1}'}:** {self.intent_answers[i] or 'Not specified'}"
             for i in range(len(self.intent_answers))
         )
 
@@ -1050,6 +1050,7 @@ intent_answers: {self.intent_answers}
         """Generate personalized questions using OpenRouter API based on Phase A inputs."""
         import json
         import os
+
         import httpx
 
         self.intent_is_generating_questions = True
@@ -1152,14 +1153,14 @@ Return ONLY valid JSON in this exact format, no other text:
                 if resp.status_code == 200:
                     data = resp.json()
                     content = data["choices"][0]["message"]["content"]
-                    
+
                     # Extract JSON from response (in case model adds extra text)
                     import re
                     json_match = re.search(r'\{.*\}', content, re.DOTALL)
                     if json_match:
                         parsed = json.loads(json_match.group())
                         self.intent_questions = parsed.get("questions", [])[:5]
-                        
+
                         # Initialize answer arrays
                         self.intent_answers = [""] * len(self.intent_questions)
                         self.intent_custom_answers = [""] * len(self.intent_questions)
@@ -1208,6 +1209,7 @@ Return ONLY valid JSON in this exact format, no other text:
     async def _update_live_plan(self):
         """Update the live plan based on current answers using OpenRouter API."""
         import os
+
         import httpx
 
         api_key = os.environ.get("OPENROUTER_API_KEY", "")

@@ -1,10 +1,10 @@
-#  TuneOS Intent Flow - Major Update
+# TuneOS Intent Flow - Major Update
 
 ## What's New?
 
 Your TuneOS fine-tuning wizard just got a massive upgrade! Say goodbye to generic questions and hello to a personalized, intelligent experience powered by AI.
 
-###  Key Improvements
+### Key Improvements
 
 1. ** AI-Generated Personalized Questions**
    - Questions adapt to YOUR project (healthcare, finance, education, etc.)
@@ -33,7 +33,7 @@ Your TuneOS fine-tuning wizard just got a massive upgrade! Say goodbye to generi
 
 ---
 
-##  Documentation
+## Documentation
 
 Comprehensive documentation has been added:
 
@@ -46,7 +46,7 @@ Comprehensive documentation has been added:
 
 ---
 
-##  Quick Start
+## Quick Start
 
 ### 1. Get Your API Key (2 minutes)
 
@@ -80,7 +80,7 @@ Navigate to the Fine-tune wizard and:
 
 ---
 
-##  Before & After Example
+## Before & After Example
 
 ### Before 
 ```
@@ -115,7 +115,7 @@ For a healthcare diabetes project:
 
 ---
 
-##  Technical Changes
+## Technical Changes
 
 ### Modified Files
 
@@ -158,7 +158,7 @@ async _openrouter_generate()
 
 ---
 
-##  Configuration
+## Configuration
 
 ### Required Environment Variable
 
@@ -175,20 +175,20 @@ HF_TOKEN=hf_your_huggingface_token
 ### Graceful Degradation
 
 **Without API key:**
--  Flow still works
--  Uses default questions
--  Data generation uses templates
--  Less personalized experience
+- Flow still works
+- Uses default questions
+- Data generation uses templates
+- Less personalized experience
 
 **With API key:**
--  Personalized questions
--  Live plan updates
--  High-quality data generation
--  Best experience
+- Personalized questions
+- Live plan updates
+- High-quality data generation
+- Best experience
 
 ---
 
-##  UI Improvements
+## UI Improvements
 
 ### Phase A: Context Collection
 - Added project name input field
@@ -211,7 +211,7 @@ HF_TOKEN=hf_your_huggingface_token
 
 ---
 
-##  Testing
+## Testing
 
 ### Quick Test
 
@@ -241,7 +241,7 @@ See **[TESTING_GUIDE.md](./TESTING_GUIDE.md)** for comprehensive tests.
 
 ---
 
-##  Performance
+## Performance
 
 ### Question Generation
 - **Time:** 2-5 seconds
@@ -262,7 +262,7 @@ See **[TESTING_GUIDE.md](./TESTING_GUIDE.md)** for comprehensive tests.
 
 ---
 
-##  Known Issues & Solutions
+## Known Issues & Solutions
 
 ### Issue: Questions not personalized
 
@@ -299,7 +299,7 @@ echo "OPENROUTER_API_KEY=your-key" >> .env
 
 ---
 
-##  Future Enhancements
+## Future Enhancements
 
 ### Potential Features
 
@@ -329,7 +329,7 @@ echo "OPENROUTER_API_KEY=your-key" >> .env
 
 ---
 
-##  Contributing
+## Contributing
 
 ### Reporting Issues
 
@@ -349,13 +349,13 @@ We'd love to hear:
 
 ---
 
-##  License
+## License
 
 Same as parent TuneOS project.
 
 ---
 
-##  Credits
+## Credits
 
 Built with:
 - [OpenRouter](https://openrouter.ai/) - AI API gateway
@@ -365,7 +365,7 @@ Built with:
 
 ---
 
-##  Support
+## Support
 
 - **Documentation:** See files in this directory
 - **API Issues:** Check [API_REFERENCE.md](./API_REFERENCE.md)
@@ -374,14 +374,14 @@ Built with:
 
 ---
 
-##  Summary
+## Summary
 
 You now have:
--  Personalized AI-generated questions
--  Real-time plan updates
--  Modern iOS-style UI
--  Reliable data generation
--  Comprehensive documentation
--  Graceful fallbacks
+- Personalized AI-generated questions
+- Real-time plan updates
+- Modern iOS-style UI
+- Reliable data generation
+- Comprehensive documentation
+- Graceful fallbacks
 
 **Ready to create better fine-tuned models? Start using the new wizard now!** 

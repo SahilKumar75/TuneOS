@@ -1360,7 +1360,7 @@ def _intent_phase_a() -> rx.Component:
             line_height="1.6",
             margin_bottom="8px",
         ),
-        
+
         # Use Case section
         _ios_section_card(
             _ios_section_header("Use Case", "What will you use this model for?"),
@@ -1376,7 +1376,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-        
+
         # Domain section
         _ios_section_card(
             _ios_section_header("Domain", "Select the industry or field this model will serve"),
@@ -1392,7 +1392,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-        
+
         # Task Type section
         _ios_section_card(
             _ios_section_header("Task Type", "What kind of tasks will the model handle?"),
@@ -1411,7 +1411,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-        
+
         # Project Name section
         _ios_section_card(
             _ios_section_header("Project Details", "Give your model a name and description (optional)"),
@@ -1458,7 +1458,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-        
+
         # Expected Performance section
         _ios_section_card(
             _ios_section_header("Expected Performance", "What are your quality and performance expectations?"),
@@ -1505,7 +1505,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_bottom="16px",
         ),
-        
+
         # Continue button
         rx.box(
             rx.button(
@@ -1524,7 +1524,7 @@ def _intent_phase_a() -> rx.Component:
             ),
             margin_top="8px",
         ),
-        
+
         spacing="0",
         width="100%",
         align_items="flex-start",
@@ -1710,8 +1710,8 @@ def _intent_timeline_row(q_idx: int) -> rx.Component:
     )
 
     future_view = rx.text(
-        q["heading"], 
-        font_size="0.88rem", 
+        q["heading"],
+        font_size="0.88rem",
         font_weight="500",
         color=c("text_muted"),
     )
@@ -1755,7 +1755,7 @@ def _intent_phase_b() -> rx.Component:
             line_height="1.6",
             margin_bottom="24px",
         ),
-        
+
         # Timeline card
         _ios_section_card(
             rx.vstack(
@@ -1764,7 +1764,7 @@ def _intent_phase_b() -> rx.Component:
                 width="100%",
             ),
         ),
-        
+
         # Generate button
         rx.cond(
             FinetuneState.intent_all_answered,

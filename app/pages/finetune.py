@@ -624,7 +624,7 @@ def _step4_panel() -> rx.Component:
                 rx.spacer(),
                 rx.button(
                     rx.cond(
-                        FinetuneState.is_starting,
+                        TrainingPollerState.is_starting,
                         rx.hstack(rx.spinner(size="2"), rx.text("Starting…"), spacing="2"),
                         rx.hstack(
                             rx.icon("zap", size=14),
@@ -634,7 +634,7 @@ def _step4_panel() -> rx.Component:
                     ),
                     on_click=TrainingPollerState.start_training,
                     disabled=~FinetuneState.can_start_training
-                    | FinetuneState.is_starting
+                    | TrainingPollerState.is_starting
                     | (TrainingPollerState.training_status == "running"),
                     size="3",
                     color_scheme="blue",

@@ -443,7 +443,7 @@ def _phase_b_question(q_idx: int) -> rx.Component:
             rx.box(height="8px"),
             # Question heading
             rx.text(
-                q["heading"],
+                q.heading,
                 font_size="1.1rem",
                 font_weight="600",
                 color="var(--gray-12)",
@@ -452,7 +452,7 @@ def _phase_b_question(q_idx: int) -> rx.Component:
             rx.box(height="12px"),
             # Options with dynamic rendering
             rx.foreach(
-                q["options"],
+                q.options,
                 lambda opt: _question_option_btn(q_idx, opt),
             ),
             _question_other_input(q_idx),

@@ -14,6 +14,19 @@ echo "[tuneos] Redis is up."
 echo "[tuneos] Starting Celery worker..."
 celery -A workers.celery_app worker --loglevel=info --concurrency=1 -Q celery &
 
+echo "[tuneos] Waiting for Celery worker to be ready..."
+_celery_retries=0
+until celery -A workers.celery_app inspect ping --timeout=5 > /dev/null 2>&1; do
+    _celery_retries=$((_celery_retries + 1))
+    if [ "$_celery_retries" -ge 30 ]; then
+        echo "[tuneos] ERROR: Celery worker did not become ready in time."
+        exit 1
+    fi
+    echo "[tuneos] Waiting for Celery... (${_celery_retries}/30)"
+    sleep 2
+done
+echo "[tuneos] Celery worker is up."
+
 echo "[tuneos] Starting Reflex app (UI + API)..."
 reflex run --env prod --backend-port 8000 &
 

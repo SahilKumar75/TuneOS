@@ -1,26 +1,46 @@
 version: "3.9"
+
+volumes:
+  models_cache:
+  outputs:
+  storage:
+
 services:
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   worker:
     build: .
     # #20 — consume all three queues; KD runs isolated from SFT so an OOM doesn't kill SFT jobs
     command: celery -A workers.celery_app worker --loglevel=info --concurrency=1 --queues sft,dpo,kd
     volumes:
-      - .:/app
-      - ./models_cache:/app/models_cache
-      - ./outputs:/app/outputs
+      - models_cache:/app/models_cache
+      - outputs:/app/outputs
+      - storage:/app/storage
     environment:
       - REDIS_URL=redis://redis:6379/0
       - HF_HOME=/app/models_cache
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     # #21 — cap memory so a runaway rank-256 LoRA job can't OOM-kill the container
     mem_limit: 20g
     memswap_limit: 20g
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "celery", "-A", "workers.celery_app", "inspect", "ping", "--timeout=5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         reservations:
@@ -34,9 +54,19 @@ services:
       - "3000:3000"
       - "8000:8000"
     volumes:
-      - .:/app
+      - outputs:/app/outputs
+      - storage:/app/storage
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
-      - worker
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

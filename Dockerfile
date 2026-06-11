@@ -3,7 +3,7 @@
 # For HF Spaces: nginx on 7860 proxies to Reflex on 3000.
 # For docker-compose: override CMD per service.
 
-FROM python:3.11-slim
+FROM python:3.11.9-slim
 
 # ── System deps ─────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,7 +22,7 @@ WORKDIR /app
 # BuildKit cache mounts keep the wheel download cache across builds so a small
 # dependency bump doesn't re-download the multi-GB torch wheel. In CI these are
 # persisted run-to-run by buildkit-cache-dance (see .github/workflows/ci.yml).
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
     poetry config virtualenvs.create false \
@@ -37,6 +37,10 @@ COPY hf_spaces/nginx.conf /etc/nginx/sites-available/default
 # ── Storage dirs ─────────────────────────────────────────────────
 RUN mkdir -p /app/models_cache /app/outputs /app/storage/datasets /app/uploaded_files
 
+# ── Non-root user (P6-2) ─────────────────────────────────────────
+RUN useradd -m appuser \
+    && chown -R appuser:appuser /app /entrypoint.sh 2>/dev/null || true
+
 # ── Environment defaults (override via Space secrets) ────────────
 ENV REDIS_URL=redis://localhost:6379/0 \
     HF_TOKEN="" \
@@ -46,6 +50,9 @@ ENV REDIS_URL=redis://localhost:6379/0 \
 EXPOSE 7860
 
 COPY hf_spaces/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh \
+    && chown appuser:appuser /entrypoint.sh
+
+USER appuser
 
 CMD ["/entrypoint.sh"]

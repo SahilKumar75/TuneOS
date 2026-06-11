@@ -709,7 +709,7 @@ def _step4() -> rx.Component:
                         width="100%",
                     ),
                     spacing="0",
-                )
+                ),
             ),
             rx.fragment(),  # is_sft else-branch
         ),

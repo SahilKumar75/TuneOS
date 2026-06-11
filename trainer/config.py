@@ -63,6 +63,7 @@ class ModelConfig:
     # Attention kernel passed to from_pretrained, e.g. "flash_attention_2",
     # "sdpa", "eager". Empty lets Transformers pick its default.
     attn_implementation: str = ""
+    bf16: bool = False  # controls model load dtype; set from TrainingConfig before prepare()
     # Optional RoPE scaling to extend context, e.g. {"type": "linear", "factor": 2.0}.
     rope_scaling: dict | None = None
     modality: Literal["text", "vision"] = "text"

@@ -27,12 +27,14 @@ def load_model_and_tokenizer(cfg: ModelConfig):
     token = cfg.hf_token or os.getenv("HF_TOKEN") or None
     local_only = cfg.model_source == "local" and os.path.exists(model_path)
 
+    torch_dtype = torch.bfloat16 if cfg.bf16 else torch.float16
+
     bnb_config = None
     if cfg.use_4bit:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_compute_dtype=torch_dtype,
             bnb_4bit_use_double_quant=True,
         )
     elif cfg.use_8bit:
@@ -50,7 +52,7 @@ def load_model_and_tokenizer(cfg: ModelConfig):
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=cfg.trust_remote_code,
-        torch_dtype=torch.float16,
+        torch_dtype=torch_dtype,
         token=token,
         local_files_only=local_only,
         **extra,

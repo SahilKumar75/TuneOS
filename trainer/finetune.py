@@ -54,6 +54,10 @@ def finetune(
     # Seed every source of randomness up front so the run is reproducible.
     set_seed(train_cfg.seed)
 
+    # Mirror the training dtype into ModelConfig so loader uses the same dtype for
+    # weights and BnB compute — prevents float16/bfloat16 mismatches at runtime.
+    model_cfg.bf16 = train_cfg.bf16
+
     # 1. Prepare model via the adapter strategy registry
     model, tokenizer = get_strategy(train_cfg.technique).prepare(model_cfg, lora_cfg)
 

@@ -371,9 +371,7 @@ async def create_vision_job(config: VisionJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
-        raise HTTPException(
-            status_code=503, detail=f"Could not enqueue vision job: {exc}"
-        ) from exc
+        raise HTTPException(status_code=503, detail=f"Could not enqueue vision job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
 

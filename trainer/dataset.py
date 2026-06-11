@@ -256,7 +256,9 @@ def load_multimodal(
         )
         return {
             "input_ids": enc["input_ids"].tolist(),
-            "pixel_values": enc["pixel_values"].tolist() if "pixel_values" in enc else [None] * len(texts),
+            "pixel_values": enc["pixel_values"].tolist()
+            if "pixel_values" in enc
+            else [None] * len(texts),
             "labels": enc["input_ids"].tolist(),
         }
 

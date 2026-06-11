@@ -15,287 +15,137 @@ app_port: 7860
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
-TuneOS is an open-source workstation for the full lifecycle of Large Language Models.
-It provides a single interface for fine-tuning, dataset preparation, format conversion,
-and model analysis, with all training executed on infrastructure you control.
+TuneOS is an open-source fine-tuning workstation for large language models. You bring a model and a dataset; TuneOS handles the rest — from dataset prep through training, evaluation, and pushing the adapter to the Hub. All compute runs on infrastructure you control.
 
-The application ships in two forms from one codebase:
+It runs as a native macOS app (PyQt6 shell that manages its own Redis and worker) or as two Docker containers you can deploy on Hugging Face Spaces.
 
-- A **native desktop application** (PyQt6 shell) that orchestrates its own background services.
-- A **containerized web deployment** that runs on Hugging Face Spaces or any Docker host.
+## What's in this release
 
----
+The wizard now supports three training paths: supervised fine-tuning, DPO preference alignment, and knowledge distillation. Pick the mode in step 1 and the wizard adapts — step 3 shows the right dataset uploader, step 4 shows the right config fields. Vision-language model fine-tuning (`POST /api/jobs/vision`) is also live, backed by `AutoProcessor` for image-text datasets.
 
-## What's New
+On the adapter side, six techniques are now registered in `trainer/adapters.py` (lora, qlora, adalora, ia3, prefix, prompt) and selectable per run. Advanced mode adds an adapter composition section where you can stack a second technique on top of the trained model via `PeftMixedModel`.
 
-- **DPO and knowledge distillation wizard paths** — the fine-tuning wizard now routes to Direct Preference Optimization (`/api/jobs/dpo`) and knowledge distillation (`/api/jobs/distill`) in addition to the standard SFT path. Step 4 shows DPO beta / column-mapping cards or KD teacher-model / temperature cards based on the selected training mode.
-- **Vision-language model fine-tuning** — `trainer/vision_finetune.py` adds a `VisionJobConfig` and `vision_finetune()` pipeline backed by `AutoProcessor`. A dedicated Celery task (`workers/vision_task.py`) and `POST /api/jobs/vision` endpoint handle image-text datasets end to end.
-- **Adapter composition** — `trainer/adapters.py` exposes `stack_adapter()` which wraps a trained model as a `PeftMixedModel`, letting a second adapter technique be overlaid after training. Enabled per-run via `compose_adapters` + `overlay_technique` fields in the wizard (advanced UI mode, step 4).
-- **Adapter strategy registry** — inline if/elif chains in `finetune.py` are replaced by an `AdapterStrategy` protocol and a `REGISTRY` dict in `trainer/adapters.py`, covering LoRA, QLoRA, AdaLoRA, IA3, prefix-tuning, and prompt-tuning. `get_strategy(technique)` is the single call site.
-- **State architecture split** — `FinetuneState` (wizard config) is now the base for `TrainingPollerState` (training runtime, polling, eval, test-chat) which in turn is the base for `DeployState` (push-to-hub, GGUF export, GitHub push). Wizard steps 5–7 are extracted into component files under `app/components/finetune/`.
-- **Infra and reliability hardening (P2)** — Celery queues split into `sft`, `dpo`, and `kd`. Structured JSON logging via `python-json-logger`. Thread pool executor for blocking I/O in the API layer. `RedisLossCallback` batches `rpush` calls. Health check at `GET /api/health`.
-- **Correctness fixes (P0)** — `r.getdel()` for HF token cleanup in workers, early-fail on gated model load, `eval_split_ratio=0` skips eval cleanly, `torch.empty_cache()` + `model.cpu()` after training.
+Under the hood: Celery queues split into `sft`, `dpo`, and `kd` for independent scaling, structured JSON logging throughout, and a three-level state hierarchy (`FinetuneState` → `TrainingPollerState` → `DeployState`) that keeps wizard config, training runtime, and deploy actions cleanly separated.
 
----
+## How it works
 
-## Capabilities
-
-| Domain | Description |
-| --- | --- |
-| Parameter-efficient fine-tuning | LoRA, QLoRA, AdaLoRA, IA3, prefix-tuning, and prompt-tuning via PyTorch, PEFT, and TRL, with a pluggable adapter strategy registry. Optional `torch.compile()` acceleration. |
-| DPO preference alignment | Train on `(prompt, chosen, rejected)` triples using `trl.DPOTrainer`. Configurable beta, max length, and column mapping. Routed to the `dpo` Celery queue. |
-| Knowledge distillation | Fine-tune a student model against a teacher model's logits. Configurable teacher model, temperature, and alpha. Routed to the `kd` Celery queue. |
-| Vision-language model fine-tuning | Fine-tune multimodal models on image-text datasets via `AutoProcessor`. Dedicated `vision` training pipeline and Celery task. |
-| Adapter composition (PeftMixedModel) | Stack a second adapter technique over a trained adapter using `PeftMixedModel`. Enabled per-run in the wizard's advanced mode. |
-| Compute backends | Run each job on a local GPU, a free Modal.com T4 cloud GPU, or Hugging Face ZeroGPU — selected per job in step 4. |
-| Reproducible runs | A single configurable seed drives the train/validation split, data shuffling, and initialization, so a run can be reproduced exactly. |
-| Dataset preparation | Generate, format, and validate instruction, preference, and image-text datasets prior to training. |
-| Model conversion | Convert weights between Hugging Face, SafeTensors, and GGUF formats for downstream inference engines. |
-| Training analysis | Track training and validation loss curves plus held-out metrics (perplexity, ROUGE-1, BLEU, METEOR, gradient norm) and run history in real time. |
-| Experiment tracking | Persist every fine-tuning run (hyperparameters, loss history, metrics) in a local SQLite database, with comparison and filtering across runs. |
-| Model deployment | Download adapter weights, push to Hugging Face Hub or GitHub, export to GGUF, and test the fine-tuned model via a built-in inference chat. |
-| Model inspection | Explore architecture, tokenization behavior, and configuration of any supported checkpoint. |
-
----
-
-## System Architecture
-
-TuneOS separates the user interface from compute. The UI submits jobs to a Redis-backed
-queue; a Celery worker consumes them and runs the training stack. The same separation
-applies whether you run on a laptop or across two Hugging Face Spaces.
+The UI submits jobs to a Redis queue. A Celery worker picks them up and runs the training stack. Progress streams back to the UI in real time. Same flow whether you're on a laptop or across two HF Spaces.
 
 ```mermaid
 flowchart TB
-    subgraph Client["Presentation Layer"]
-        UI["Reflex Web UI<br/>(port 3000)"]
-        API["FastAPI Service<br/>(port 8000)"]
+    subgraph Client["UI"]
+        UI["Reflex (port 3000)"]
+        API["FastAPI (port 8000)"]
     end
-
-    subgraph Queue["Coordination"]
-        REDIS[("Redis Broker<br/>jobs and status")]
+    subgraph Queue
+        REDIS[("Redis")]
     end
-
-    subgraph Compute["Compute Layer"]
+    subgraph Compute
         WORKER["Celery Worker"]
-        STACK["PyTorch · PEFT · TRL<br/>Transformers · bitsandbytes"]
+        STACK["PyTorch · PEFT · TRL"]
     end
-
-    subgraph Storage["Persistence"]
-        ADAPTERS[("Adapter Store")]
-        DATASETS[("Dataset Store")]
+    subgraph Storage
+        DB[("SQLite / Postgres")]
+        ADAPTERS[("Adapter files")]
     end
 
     UI --> API
-    API -- enqueue job --> REDIS
+    API -- enqueue --> REDIS
     REDIS -- dispatch --> WORKER
     WORKER --> STACK
-    WORKER -- progress --> REDIS
+    WORKER -- step metrics --> REDIS
     REDIS -- live status --> API
     STACK --> ADAPTERS
-    API --> DATASETS
-    WORKER --> DATASETS
+    WORKER --> DB
+    API --> DB
 ```
 
-### Deployment Topologies
+Jobs go through a simple state machine: `queued → running → completed / failed`. The worker writes status to both Redis (live polling) and SQLite (durable fallback), so job history survives a Redis restart.
 
-TuneOS runs in two configurations that share the same application code.
+## Getting started
 
-```mermaid
-flowchart LR
-    subgraph Desktop["Desktop (single machine)"]
-        SHELL["PyQt6 Shell"]
-        SHELL --> RX1["Reflex + FastAPI"]
-        SHELL --> DC["Docker Compose"]
-        DC --> R1[("Redis")]
-        DC --> W1["Celery Worker"]
-    end
-
-    subgraph Cloud["Hugging Face Spaces"]
-        APP["App Space<br/>nginx → Reflex + FastAPI"]
-        WRK["Worker Space<br/>Celery Worker"]
-        UP[("Upstash Redis")]
-        APP --> UP
-        WRK --> UP
-    end
-```
-
-On the desktop, the PyQt6 shell manages the lifecycle of Reflex, FastAPI, Redis, and the
-Celery worker through Docker Compose. In the cloud, the App Space and Worker Space are
-deployed independently and communicate through a shared external Redis instance, because
-Hugging Face Spaces expose only a single port and cannot share a local broker.
-
----
-
-## Fine-Tuning Job Lifecycle
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant API as FastAPI
-    participant Q as Redis
-    participant W as Celery Worker
-    participant T as Training Stack
-
-    U->>API: Submit fine-tune request
-    API->>Q: Enqueue job (id, config)
-    API-->>U: Job accepted (job_id)
-    Q->>W: Dispatch job
-    W->>T: Load base model and dataset
-    loop Each training step
-        T->>W: Emit loss and metrics
-        W->>Q: Publish progress
-        API->>Q: Poll status
-        API-->>U: Stream loss curve
-    end
-    T->>W: Save adapter weights
-    W->>Q: Mark job complete
-    API-->>U: Final metrics and artifact
-```
-
-### Job State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> Queued
-    Queued --> Running: worker picks up
-    Running --> Completed: weights saved
-    Running --> Failed: error raised
-    Failed --> Queued: retry
-    Completed --> [*]
-```
-
----
-
-## Technology Stack
-
-| Layer | Technology |
-| --- | --- |
-| User interface | Reflex (React under the hood) |
-| API service | FastAPI |
-| Task queue | Celery with a Redis broker |
-| Training | PyTorch, Transformers, PEFT, TRL, bitsandbytes, Accelerate |
-| Data | Datasets, Evaluate, NLTK, pandas |
-| Desktop shell | PyQt6, PyQt6-WebEngine |
-| Packaging | Poetry, Docker, PyInstaller |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.10 or newer
-- [Poetry](https://python-poetry.org/)
-- Docker Desktop (for the Redis broker and Celery worker)
-
-### Web / Local Development
+You need Python 3.10+, Poetry, and Docker Desktop.
 
 ```bash
-# Clone the repository
 git clone https://github.com/SahilKumar75/TuneOS
 cd TuneOS
-
-# Provide a Hugging Face token for gated models
-cp .env.example .env
-
-# Install dependencies
+cp .env.example .env        # add HF_TOKEN for gated models
 poetry install
-
-# Start the background services (Redis + worker)
-docker compose up -d
-
-# Run the Reflex application
+docker compose up -d        # starts Redis + Celery worker
 poetry run reflex run
 ```
 
-The UI is then available at `http://localhost:3000`.
+Open `http://localhost:3000`. For your first run, try `EleutherAI/pythia-410m` — it's small enough to train on CPU and the whole pipeline finishes in a few minutes.
 
-### Desktop Application
+No Docker? Start Redis and the worker manually:
 
 ```bash
-# Install dependencies including the desktop group
+redis-server &
+celery -A workers.celery_app worker --loglevel=info
+```
+
+### Desktop app (macOS)
+
+```bash
 poetry install --with desktop
-
-# Build the native application
 poetry run python build_desktop.py
-
-# Launch (macOS)
 open dist/TuneOS.app
 ```
 
-The desktop build is packaged for macOS today; Windows and Linux targets are planned.
+The shell starts everything automatically. Windows and Linux packaging is on the roadmap.
 
-### Hugging Face Spaces
+### Deploying to Hugging Face Spaces
 
-The project deploys as two Docker Spaces (App and Worker) connected by an Upstash Redis
-broker. See [docs/deploy.md](docs/deploy.md) for the complete procedure.
+Two Spaces (App + Worker) connected by Upstash Redis. See [docs/deploy.md](docs/deploy.md) for the step-by-step.
 
----
+## Supported models
 
-## Supported Base Models
+Any Hugging Face causal LM works — `target_modules` are auto-detected per architecture. These are the ones with known-good defaults:
 
-| Model | Hugging Face ID | Notes |
-| --- | --- | --- |
-| Mistral 7B | `mistralai/Mistral-7B-v0.1` | Primary target, well tested with QLoRA |
-| Llama 3 8B | `meta-llama/Meta-Llama-3-8B` | Requires a Hugging Face token |
-| Phi-3 Mini | `microsoft/Phi-3-mini-4k-instruct` | Fast, runs on smaller GPUs |
-| Gemma 2B | `google/gemma-2b` | Suitable for low-VRAM environments |
+| Model | Hub ID | VRAM (QLoRA) |
+|---|---|---|
+| Mistral 7B | `mistralai/Mistral-7B-v0.1` | ~16 GB |
+| Llama 3 8B | `meta-llama/Meta-Llama-3-8B` | ~18 GB (gated) |
+| Phi-3 Mini | `microsoft/Phi-3-mini-4k-instruct` | ~8 GB |
+| Gemma 2B | `google/gemma-2b` | ~6 GB |
+| Pythia 410M | `EleutherAI/pythia-410m` | ~2 GB |
 
----
+Auto-detection covers Mistral, Llama, Gemma, Phi-3, Phi-4, Falcon, Qwen2/3, GPT-NeoX, StarCoder2, Mixtral, and more.
 
-## Project Structure
+## Stack
 
-```text
-TuneOS/
-├── app/
-│   ├── components/finetune/   Wizard step components (steps 5-7 extracted here)
-│   └── state/                 FinetuneState, TrainingPollerState, DeployState
-├── trainer/
-│   ├── adapters.py            AdapterStrategy protocol, REGISTRY, stack_adapter()
-│   ├── vision_finetune.py     VLM pipeline (VisionJobConfig, vision_finetune())
-│   ├── dataset.py             load_multimodal(), load_preference_pairs()
-│   └── ...                    finetune.py, dpo.py, metrics.py, evaluate.py
-├── workers/
-│   ├── train_task.py          SFT Celery task (sft queue)
-│   ├── dpo_task.py            DPO Celery task (dpo queue)
-│   ├── vision_task.py         VLM Celery task
-│   └── ...
-├── storage/         Adapter and dataset persistence
-├── desktop/         PyQt6 shell, process manager, system tray
-├── docs/            architecture.md, api-reference.md, deploy.md, quickstart.md, testing.md, supported-models.md, lora-explained.md, roadmap.md
-├── tests/           Test suite
-├── Dockerfile       Container image for the App Space
-└── docker-compose.yml  Local Redis and worker services
+Reflex + FastAPI on the frontend, Celery + Redis for the job queue, PyTorch + PEFT + TRL + bitsandbytes for training. Experiment history goes to SQLite by default; set `EXPERIMENTS_DB_URL` to a Postgres DSN for multi-worker deployments.
+
+## Project layout
+
+```
+app/
+  state/          FinetuneState, TrainingPollerState, DeployState
+  components/     Wizard step components, loss chart, dataset uploader
+trainer/
+  adapters.py     Strategy registry + stack_adapter()
+  finetune.py     SFT pipeline
+  dpo.py          DPO pipeline
+  vision_finetune.py  VLM pipeline
+  metrics.py      Perplexity, ROUGE, BLEU, METEOR registry
+workers/
+  train_task.py   SFT task (sft queue)
+  dpo_task.py     DPO task (dpo queue)
+  vision_task.py  VLM task
+docs/             api-reference, architecture, deploy, testing, and more
+tests/
 ```
 
----
-
-## Testing
+## Tests
 
 ```bash
-# Run the full test suite
 poetry run pytest
-
-# Lint and format checks
 poetry run ruff check .
 poetry run ruff format --check .
 ```
 
----
-
-## Roadmap
-
-- Cross-platform desktop packaging (`.exe`, `AppImage`, `Snap`) via GitHub Actions
-- Fully offline dataset processing and local Hugging Face cache management
-
----
+The trainer integration test (real GPU, real model) is opt-in: `TUNEOS_INTEGRATION_TESTS=1 pytest tests/test_trainer_integration.py`.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the
-development workflow, and [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for community
-expectations. Security reports should follow [SECURITY.md](.github/SECURITY.md).
-
-## License
-
-TuneOS is released under the Apache 2.0 License. See [LICENSE](LICENSE) for details.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md). Security issues go to [SECURITY.md](.github/SECURITY.md). Apache 2.0 license.

@@ -171,7 +171,7 @@ def _enqueue_finetune(config: JobConfig) -> str:
     kwargs = _build_finetune_kwargs(config)
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.train_task import run_finetune
 
@@ -248,7 +248,7 @@ async def create_dpo_job(config: DPOJobConfig):
 
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
 
     try:
         from workers.dpo_task import run_dpo
@@ -315,7 +315,7 @@ async def create_distill_job(config: DistillJobConfig):
 
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.kd_task import run_distill
 
@@ -378,7 +378,7 @@ async def create_vision_job(config: VisionJobConfig):
 
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.vision_task import run_vision_finetune
 
@@ -448,6 +448,7 @@ async def cancel_job(job_id: str):
         celery_app.control.revoke(job_id, terminate=True, signal="SIGTERM")
     except Exception:
         _logging.getLogger(__name__).warning("revoke failed for job %s", job_id, exc_info=True)
+        raise HTTPException(status_code=503, detail="Failed to cancel job") from None
     from app.state.experiments_db import write_job_status
 
     write_job_status(job_id, "cancelled")
@@ -507,7 +508,7 @@ async def merge_adapter(job_id: str, req: MergeRequest):
 
     _token = req.hf_token or os.getenv("HF_TOKEN", "")
     if _token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", _token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}-merge:hf_token", _token, ex=3600)
     try:
         from workers.merge_task import merge_adapter_task
 
@@ -575,7 +576,7 @@ async def push_github(job_id: str, req: GitHubPushRequest):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
-    _redis.from_url(REDIS_URL).set(f"job:{job_id}:github_token", req.github_token, ex=60)
+    _redis.from_url(REDIS_URL).set(f"job:{job_id}-github:github_token", req.github_token, ex=3600)
     try:
         from workers.merge_task import push_github_task
 

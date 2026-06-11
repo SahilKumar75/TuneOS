@@ -48,13 +48,18 @@ def test_rouge1_mismatched_lengths_returns_none():
 
 
 def test_bleu_perfect_match_is_one():
-    assert compute_bleu(["the cat sat"], ["the cat sat"]) == 1.0
+    # sacrebleu needs ≥4 words for 4-gram precision to be nonzero
+    sentence = "the cat sat on the mat"
+    assert compute_bleu([sentence], [sentence]) == 1.0
 
 
 def test_bleu_brevity_penalty_punishes_short_predictions():
-    # Prediction much shorter than reference → BLEU < 1 even with full precision.
-    score = compute_bleu(["the"], ["the cat sat on the mat"])
-    assert 0.0 < score < 1.0
+    # Prediction has matching 4-grams but is shorter than reference → 0 < BLEU < 1.
+    score = compute_bleu(
+        ["the cat sat on"],
+        ["the cat sat on the mat and more words here"],
+    )
+    assert score is not None and 0.0 < score < 1.0
 
 
 def test_bleu_mismatched_lengths_returns_none():

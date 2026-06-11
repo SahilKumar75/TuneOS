@@ -182,8 +182,8 @@ def test_cancel_job_returns_200():
 
 
 def test_cancel_job_payload_shape():
-    data = client.delete("/jobs/some-job-id").json()
-    assert data["job_id"] == "some-job-id"
+    data = client.delete("/jobs/cancel-shape-job-id").json()
+    assert data["job_id"] == "cancel-shape-job-id"
     assert "status" in data
 
 

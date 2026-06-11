@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 
 import redis
 
-_logger = logging.getLogger(__name__)
-
 from trainer.config import LoraConfig, ModelConfig, TrainingConfig
 from trainer.evaluate import evaluate_run
 from trainer.finetune import finetune
 from workers.celery_app import celery_app
+
+_logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

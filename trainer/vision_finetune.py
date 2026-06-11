@@ -9,7 +9,12 @@ from __future__ import annotations
 import os
 
 import torch
-from transformers import AutoModelForVision2Seq, AutoProcessor, BitsAndBytesConfig, TrainingArguments
+from transformers import (
+    AutoModelForVision2Seq,
+    AutoProcessor,
+    BitsAndBytesConfig,
+    TrainingArguments,
+)
 from trl import SFTTrainer
 
 from trainer.callbacks import RedisLossCallback
@@ -42,7 +47,7 @@ def finetune_vision(
         _bnb_cfg = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_compute_dtype=torch.bfloat16 if train_cfg.bf16 else torch.float16,
             bnb_4bit_use_double_quant=True,
         )
     model = AutoModelForVision2Seq.from_pretrained(

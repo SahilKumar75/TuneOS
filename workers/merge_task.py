@@ -33,7 +33,7 @@ def _run_merge_impl(
 @celery_app.task(bind=True, name="workers.merge_task.merge_adapter")
 def merge_adapter_task(self, job_id: str, base_model_id: str, adapter_path: str):
     r = redis.from_url(REDIS_URL)
-    _tok = r.getdel(f"job:{job_id}:hf_token")
+    _tok = r.getdel(f"job:{job_id}-merge:hf_token")
     hf_token = (_tok.decode() if isinstance(_tok, bytes) else _tok) or ""
     merged_key = f"job:{job_id}:merged"
     output_path = os.path.join(os.getenv("OUTPUT_DIR", "./outputs"), job_id, "merged")
@@ -82,7 +82,7 @@ def push_github_task(
     import tempfile
 
     r = redis.from_url(REDIS_URL)
-    _tok = r.getdel(f"job:{job_id}:github_token")
+    _tok = r.getdel(f"job:{job_id}-github:github_token")
     github_token = (_tok.decode() if isinstance(_tok, bytes) else _tok) or ""
 
     # Only allow GitHub HTTPS remotes — reject arbitrary hosts

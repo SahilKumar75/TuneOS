@@ -56,7 +56,7 @@ def evaluate_run(
     worker and the Modal runner without dragging in redis/celery on the remote side.
     """
     from trainer.config import ModelConfig, TrainingConfig
-    from trainer.dataset import load_and_tokenize, load_instruction_pairs, load_raw_dataset
+    from trainer.dataset import load_and_tokenize, load_raw_dataset
 
     try:
         cfg = ModelConfig(**model_cfg)

@@ -66,8 +66,6 @@ async def preview_dataset(dataset_id: str):
 @router.post("/datasets/generate")
 async def generate_dataset(req: DatasetGenRequest):
     """Generate synthetic training data from a plain-English use-case description."""
-    import asyncio
-
     async def _generate():
         hf_token = req.hf_token or os.getenv("HF_TOKEN", "")
         openrouter_key = os.getenv("OPENROUTER_API_KEY", "")

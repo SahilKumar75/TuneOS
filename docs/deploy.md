@@ -113,15 +113,15 @@ If no local GPU is available, individual jobs can route to a free Modal.com T4.
 
 1. Sign up at [modal.com](https://modal.com) and create an API token under
    Settings → Tokens.
-2. Install the optional dependency: `poetry install --with modal`
-3. Add credentials to `.env`:
+1. Install the optional dependency: `poetry install --with modal`
+1. Add credentials to `.env`:
 
 ```bash
 MODAL_TOKEN_ID=ak-...
 MODAL_TOKEN_SECRET=as-...
 ```
 
-4. In Step 4 (Configure), choose **Modal** under Compute backend before submitting.
+1. In Step 4 (Configure), choose **Modal** under Compute backend before submitting.
 
 The local Celery worker stays the orchestrator. It serializes the dataset, runs the
 training pipeline remotely on a T4, and streams the adapter and eval metrics back to

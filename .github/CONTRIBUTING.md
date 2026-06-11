@@ -24,26 +24,26 @@ git clone https://github.com/<your-username>/TuneOS.git
 cd TuneOS
 ```
 
-2. Install dependencies:
+1. Install dependencies:
 
 ```bash
 poetry install
 ```
 
-3. Set up environment variables:
+1. Set up environment variables:
 
 ```bash
 cp .env.example .env
 # Edit .env and add your Hugging Face token
 ```
 
-4. Start the backend services:
+1. Start the backend services:
 
 ```bash
 docker-compose up redis worker
 ```
 
-5. Run the Reflex UI in development mode:
+1. Run the Reflex UI in development mode:
 
 ```bash
 poetry run reflex run
@@ -159,9 +159,9 @@ Use `kind="loss"` for metrics over `(model, tokenizer, dataset)` and
 git checkout -b feat/my-feature
 ```
 
-2. Make focused, atomic commits.
-3. Ensure all tests pass and the code is formatted.
-4. Open a pull request using the [PR template](pull_request_template.md).
+1. Make focused, atomic commits.
+1. Ensure all tests pass and the code is formatted.
+1. Open a pull request using the [PR template](pull_request_template.md).
 
 ### Commit Convention
 

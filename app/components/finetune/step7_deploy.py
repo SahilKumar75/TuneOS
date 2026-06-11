@@ -126,6 +126,24 @@ def _deploy_body() -> rx.Component:
                         spacing="3",
                         width="100%",
                     ),
+                    # Version overwrite warning
+                    rx.cond(
+                        DeployState.hf_repo_name != "",
+                        rx.callout(
+                            rx.hstack(
+                                rx.icon("alert-triangle", size=14),
+                                rx.text(
+                                    "Pushing to an existing repo overwrites it. "
+                                    "Consider versioning: append -v2 or -v3 to the repo name."
+                                ),
+                                spacing="2",
+                                align="start",
+                            ),
+                            color_scheme="amber",
+                            size="1",
+                        ),
+                        rx.fragment(),
+                    ),
                     rx.button(
                         rx.cond(
                             DeployState.push_status == "pushing",

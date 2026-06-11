@@ -355,6 +355,60 @@ def _step3() -> rx.Component:
             ("generate", _generate_panel()),
             _upload_panel(),
         ),
+        # Formatted template preview — shown once a dataset is loaded
+        rx.cond(
+            FinetuneState.dataset_row_count > 0,
+            rx.vstack(
+                rx.button(
+                    rx.hstack(
+                        rx.icon("eye", size=14),
+                        rx.text("Preview formatted sample"),
+                        spacing="2",
+                        align="center",
+                    ),
+                    on_click=FinetuneState.preview_dataset_sample,
+                    variant="ghost",
+                    size="1",
+                    color_scheme="blue",
+                ),
+                rx.cond(
+                    FinetuneState.dataset_template_preview.length() > 0,
+                    rx.vstack(
+                        rx.text(
+                            "Rows after template applied (what the trainer sees):",
+                            font_size="0.76rem",
+                            color=c("text_muted"),
+                            font_weight="600",
+                        ),
+                        rx.foreach(
+                            FinetuneState.dataset_template_preview,
+                            lambda sample: rx.box(
+                                rx.text(
+                                    sample,
+                                    font_size="0.75rem",
+                                    color=c("text_secondary"),
+                                    white_space="pre-wrap",
+                                    font_family="monospace",
+                                ),
+                                background=c("bg_input"),
+                                border_radius="8px",
+                                padding="12px",
+                                border="1px solid",
+                                border_color=c("border"),
+                                width="100%",
+                            ),
+                        ),
+                        spacing="2",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="2",
+                width="100%",
+                align_items="flex-start",
+            ),
+            rx.fragment(),
+        ),
         _nav_buttons(
             next_label="Next: Configure →",
             next_disabled=~FinetuneState.can_go_to_configure,

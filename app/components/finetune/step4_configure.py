@@ -133,19 +133,48 @@ def _step4() -> rx.Component:
                         spacing="1",
                     ),
                     rx.vstack(
-                        _label("Max sequence length"),
-                        rx.select.root(
-                            rx.select.trigger(width="100%"),
-                            rx.select.content(
-                                *[
-                                    rx.select.item(str(v), value=str(v))
-                                    for v in [256, 512, 1024, 2048]
-                                ],
+                        _label("LoRA rank (r)"),
+                        rx.hstack(
+                            rx.text(
+                                FinetuneState.lora_r.to_string(),
+                                font_size="0.88rem",
+                                font_weight="500",
+                                color=c("text_primary"),
+                                min_width="28px",
                             ),
-                            value=FinetuneState.max_seq_length.to_string(),
-                            on_change=FinetuneState.set_max_seq_length,
+                            rx.button(
+                                "Advanced →",
+                                on_click=FinetuneState.set_ui_mode("advanced"),
+                                variant="ghost",
+                                size="1",
+                                color_scheme="blue",
+                                padding="0",
+                                height="auto",
+                            ),
+                            spacing="2",
+                            align="center",
                         ),
-                        rx.text("Tokens per sample", font_size="0.72rem", color=c("text_muted")),
+                        rx.cond(
+                            FinetuneState.lora_r <= 16,
+                            rx.text(
+                                "✅ Memory-efficient (recommended)",
+                                font_size="0.72rem",
+                                color="green",
+                            ),
+                            rx.cond(
+                                FinetuneState.lora_r <= 64,
+                                rx.text(
+                                    "⚠️ Moderate VRAM — increase only if underfitting",
+                                    font_size="0.72rem",
+                                    color="orange",
+                                ),
+                                rx.text(
+                                    "🔴 Very high rank — consider full fine-tuning",
+                                    font_size="0.72rem",
+                                    color="red",
+                                ),
+                            ),
+                        ),
                         spacing="1",
                     ),
                     rx.vstack(
@@ -200,13 +229,34 @@ def _step4() -> rx.Component:
                             _label("LoRA rank (r)"),
                             rx.slider(
                                 min=4,
-                                max=128,
+                                max=256,
                                 step=4,
                                 default_value=[FinetuneState.lora_r],
                                 on_value_commit=FinetuneState.set_lora_r,
                             ),
                             rx.text(
                                 FinetuneState.lora_r, font_size="0.82rem", color=c("text_secondary")
+                            ),
+                            rx.cond(
+                                FinetuneState.lora_r <= 16,
+                                rx.text(
+                                    "✅ Memory-efficient (recommended)",
+                                    font_size="0.72rem",
+                                    color="green",
+                                ),
+                                rx.cond(
+                                    FinetuneState.lora_r <= 64,
+                                    rx.text(
+                                        "⚠️ Moderate VRAM — increase only if underfitting",
+                                        font_size="0.72rem",
+                                        color="orange",
+                                    ),
+                                    rx.text(
+                                        "🔴 Very high rank — consider full fine-tuning",
+                                        font_size="0.72rem",
+                                        color="red",
+                                    ),
+                                ),
                             ),
                             spacing="1",
                         ),
@@ -344,16 +394,23 @@ def _step4() -> rx.Component:
                             spacing="1",
                         ),
                         rx.vstack(
-                            _label("Sample packing"),
+                            rx.hstack(
+                                _label("Sample packing"),
+                                rx.tooltip(
+                                    rx.icon("info", size=13, color=c("text_muted"), cursor="help"),
+                                    content=(
+                                        "Packing concatenates examples up to max_seq_length for "
+                                        "faster training. May cause attention to leak across example "
+                                        "boundaries. Disable for short datasets (<500 examples)."
+                                    ),
+                                ),
+                                spacing="2",
+                                align="center",
+                            ),
                             rx.switch(
                                 checked=FinetuneState.packing,
                                 on_change=FinetuneState.set_packing,
                                 size="2",
-                            ),
-                            rx.text(
-                                "Concatenate examples to fill the sequence — faster on GPU",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
                             ),
                             spacing="1",
                         ),
@@ -456,12 +513,24 @@ def _step4() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # VRAM warning
+        # VRAM warning — high batch × seq
         rx.cond(
             (FinetuneState.batch_size * FinetuneState.max_seq_length) > 4096,
             rx.callout(
                 "⚠ High memory config — estimated >12GB VRAM. Reduce batch size or sequence length if you hit OOM.",
                 color_scheme="orange",
+                size="1",
+            ),
+            rx.fragment(),
+        ),
+        # Non-4bit VRAM warning — large model without QLoRA
+        rx.cond(
+            FinetuneState.needs_vram_warning,
+            rx.callout(
+                "Without 4-bit quantisation this model needs ~14 GB VRAM before optimizer states. "
+                "Switch to QLoRA (Step 1) or use a 24 GB+ GPU.",
+                color_scheme="orange",
+                icon="alert-triangle",
                 size="1",
             ),
             rx.fragment(),

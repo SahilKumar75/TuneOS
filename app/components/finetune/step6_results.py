@@ -340,6 +340,23 @@ def step6_results() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        # Compare link — only meaningful when we have an experiment ID
+        rx.cond(
+            TrainingPollerState.experiment_id != "",
+            rx.button(
+                rx.hstack(
+                    rx.icon("git-compare", size=14),
+                    rx.text("Compare this run →"),
+                    spacing="2",
+                    align="center",
+                ),
+                on_click=rx.redirect("/compare?ids=" + TrainingPollerState.job_id),
+                variant="soft",
+                color_scheme="blue",
+                size="2",
+            ),
+            rx.fragment(),
+        ),
         _nav_buttons(next_label="Next: Deploy →"),
         spacing="4",
         width="100%",
@@ -364,6 +381,22 @@ def step6_panel() -> rx.Component:
                     align="center",
                 ),
                 rx.spacer(),
+                rx.cond(
+                    TrainingPollerState.experiment_id != "",
+                    rx.button(
+                        rx.hstack(
+                            rx.icon("git-compare", size=13),
+                            rx.text("Compare this run"),
+                            spacing="1",
+                            align="center",
+                        ),
+                        on_click=rx.redirect("/compare?ids=" + TrainingPollerState.job_id),
+                        variant="ghost",
+                        size="1",
+                        color_scheme="blue",
+                    ),
+                    rx.fragment(),
+                ),
                 width="100%",
                 align="center",
                 margin_bottom="14px",

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["poetry"],
+      "groupName": "ML stack",
+      "matchPackageNames": [
+        "torch", "transformers", "peft", "trl",
+        "accelerate", "bitsandbytes", "datasets", "evaluate"
+      ],
+      "schedule": ["on the first day of the month"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["poetry"],
+      "groupName": "Celery + Redis",
+      "matchPackageNames": ["celery", "redis"],
+      "automerge": false
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "Dev tools",
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "matchManagers": ["poetry"],
+      "matchPackageNames": ["python-dotenv", "huggingface-hub", "pandas", "cachetools"],
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": ["patch"]
+    }
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "commitMessagePrefix": "chore(deps):"
+}

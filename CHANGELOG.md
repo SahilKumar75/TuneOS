@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-11
+
+### Added
+
+- **DPO preference alignment** — `trainer/dpo.py` trains a LoRA adapter on `(prompt, chosen, rejected)` triples via `trl.DPOTrainer`. `DPOConfig` exposes beta, max_length, and max_prompt_length. `trainer/dataset.py` adds `load_preference_pairs()` and `detect_dataset_type()`. `workers/dpo_task.py` runs on the new `dpo` Celery queue. `POST /api/jobs/dpo` accepts `DPOJobConfig`.
+- **Knowledge distillation** — `POST /api/jobs/distill` runs a student model against a configurable teacher model. Parameters: `kd_teacher_model`, `kd_temperature`, `kd_alpha`. Routed to the `kd` Celery queue.
+- **Vision-language model fine-tuning** — `trainer/vision_finetune.py` (`VisionJobConfig`, `vision_finetune()`) processes image-text datasets via `AutoProcessor`. `workers/vision_task.py` Celery task. `POST /api/jobs/vision` endpoint. `modality` field on job schemas (`text`/`vision`).
+- **Adapter strategy registry** — `trainer/adapters.py` defines an `AdapterStrategy` protocol and a `REGISTRY` dict covering lora, qlora, adalora, ia3, prefix-tuning, and prompt-tuning. `get_strategy(technique)` replaces inline if/elif in `finetune.py`.
+- **Adapter composition** — `stack_adapter(model, technique, r, ...)` in `trainer/adapters.py` returns a `PeftMixedModel`. `compose_adapters` bool and `overlay_technique` field on `FinetuneState`; the worker calls `stack_adapter` post-training when enabled. Wizard step 4 exposes an Adapter Composition section in advanced UI mode.
+- **DPO and KD wizard UI** — `training_mode` field on `FinetuneState` (`sft`/`dpo`/`kd`) with `is_sft`, `is_dpo`, `is_kd` computed vars. `TrainingPollerState.start_training` routes to the correct endpoint based on mode. Step 4 shows DPO param card (beta, column mapping) or KD param card (teacher model, temperature, alpha) based on mode.
+- **Health check endpoint** — `GET /api/health` returns `{status, redis, worker_count}`.
+- **Gradient norm logging** — `RedisLossCallback` now publishes a `grad_norm` field alongside loss at each step.
+- **`eval_steps` config** — `TrainingConfig.eval_steps` enables step-level validation, producing a denser validation curve.
+- **VRAM warning** — the wizard emits a warning when `batch_size × seq_len > 4096`.
+- **Model preview card** — step 1 shows a model metadata card fetched from the Hugging Face Hub when a model ID is entered.
+- **Compare-runs link** — a link to the run comparison view appears after training completes.
+
+### Changed
+
+- Celery queues split from a single default queue into `sft`, `dpo`, and `kd`.
+- Structured JSON logging via `python-json-logger` replaces plain-text log output in workers and the API layer.
+- Blocking I/O operations in the FastAPI service moved to a thread pool executor.
+- `RedisLossCallback` batches `rpush` calls instead of issuing one call per step.
+- `FinetuneState` split into a three-level hierarchy: `FinetuneState` (wizard config fields) → `TrainingPollerState` (training runtime, polling, eval, test-chat) → `DeployState` (deploy actions). `TrainingPollerState.rehydrate_from_api` restores in-progress run state on page load.
+- Wizard steps 5–7 extracted from the monolithic state file into component files under `app/components/finetune/`. Step guards prevent skipping ahead.
+
+### Fixed
+
+- Worker HF token cleanup changed from `r.delete()` + re-read to `r.getdel()` (atomic, prevents token leakage between jobs).
+- Gated model load now fails early with a clear error before enqueueing the job.
+- `eval_split_ratio=0` no longer creates an empty eval split; evaluation is skipped cleanly.
+- `torch.empty_cache()` and `model.cpu()` called after training to release VRAM promptly.
+- `split-before-tokenize` applied correctly so the eval split is taken from raw text, not tokenized tensors (fixes label leakage, issue #23).
+
+---
+
 ## [Unreleased]
 
 ### Added

@@ -209,6 +209,62 @@ def load_raw_dataset(
     )
 
 
+def load_multimodal(
+    file_path: str,
+    processor,
+    max_seq_length: int = 512,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+    image_col: str = "image",
+) -> "Dataset":
+    """Load an image-text dataset and prepare it for VLM fine-tuning.
+
+    Returns a dataset with ``input_ids``, ``pixel_values``, and ``labels``
+    columns — the shape expected by ``transformers`` VLM trainers.
+
+    ``processor`` should be an ``AutoProcessor`` instance for the target VLM
+    (e.g. LLaVA, Qwen2-VL). Text is formatted via the alpaca template; images
+    are processed with ``processor.image_processor``.
+    """
+    if hub_dataset_id:
+        raw = load_dataset(hub_dataset_id, split=hub_split, trust_remote_code=False)
+    elif file_path.endswith(".csv"):
+        raw = Dataset.from_pandas(pd.read_csv(file_path))
+    else:
+        raw = load_dataset("json", data_files=file_path, split="train")
+
+    template = PROMPT_TEMPLATES["alpaca"]
+
+    def _process(batch):
+        texts = [
+            template.format(
+                instruction=batch[instruction_col][i],
+                output=batch[output_col][i],
+            )
+            for i in range(len(batch[instruction_col]))
+        ]
+        images = batch.get(image_col, [None] * len(texts))
+        enc = processor(
+            text=texts,
+            images=images if any(img is not None for img in images) else None,
+            return_tensors="pt",
+            padding="max_length",
+            truncation=True,
+            max_length=max_seq_length,
+        )
+        return {
+            "input_ids": enc["input_ids"].tolist(),
+            "pixel_values": enc["pixel_values"].tolist()
+            if "pixel_values" in enc
+            else [None] * len(texts),
+            "labels": enc["input_ids"].tolist(),
+        }
+
+    return raw.map(_process, batched=True, remove_columns=raw.column_names)
+
+
 def load_and_tokenize(
     file_path: str,
     tokenizer: PreTrainedTokenizer,

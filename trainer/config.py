@@ -65,6 +65,7 @@ class ModelConfig:
     attn_implementation: str = ""
     # Optional RoPE scaling to extend context, e.g. {"type": "linear", "factor": 2.0}.
     rope_scaling: dict | None = None
+    modality: Literal["text", "vision"] = "text"
 
 
 @dataclass

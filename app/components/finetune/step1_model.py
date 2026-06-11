@@ -15,6 +15,7 @@ _MODELS = [
         "size": "7B params",
         "notes": "Well-tested with QLoRA, great all-rounder",
         "token_required": False,
+        "modality": "text",
     },
     {
         "id": "meta-llama/Meta-Llama-3-8B",
@@ -22,6 +23,7 @@ _MODELS = [
         "size": "8B params",
         "notes": "Strong general-purpose model",
         "token_required": True,
+        "modality": "text",
     },
     {
         "id": "microsoft/Phi-3-mini-4k-instruct",
@@ -29,6 +31,7 @@ _MODELS = [
         "size": "3.8B params",
         "notes": "Fast, runs on smaller GPUs",
         "token_required": False,
+        "modality": "text",
     },
     {
         "id": "google/gemma-2b",
@@ -36,6 +39,7 @@ _MODELS = [
         "size": "2B params",
         "notes": "Good for low-VRAM environments",
         "token_required": False,
+        "modality": "text",
     },
     {
         "id": "EleutherAI/pythia-410m",
@@ -43,6 +47,7 @@ _MODELS = [
         "size": "410M params",
         "notes": "Tiny model — great for testing pipelines fast",
         "token_required": False,
+        "modality": "text",
     },
     {
         "id": "bigcode/starcoder2-3b",
@@ -50,6 +55,26 @@ _MODELS = [
         "size": "3B params",
         "notes": "Excellent for code generation tasks",
         "token_required": False,
+        "modality": "text",
+    },
+]
+
+_VLM_MODELS = [
+    {
+        "id": "llava-hf/llava-1.5-7b-hf",
+        "name": "LLaVA-1.5 7B",
+        "size": "7B params",
+        "notes": "Strong image-text instruction following",
+        "token_required": False,
+        "modality": "vision",
+    },
+    {
+        "id": "Qwen/Qwen2-VL-2B-Instruct",
+        "name": "Qwen2-VL 2B",
+        "size": "2B params",
+        "notes": "Compact VLM, good for low-VRAM fine-tuning",
+        "token_required": False,
+        "modality": "vision",
     },
 ]
 
@@ -121,6 +146,34 @@ def _step1() -> rx.Component:
         rx.cond(
             FinetuneState.model_source == "hub",
             rx.vstack(
+                # Vision models — only shown when user selected "vision" intent
+                rx.cond(
+                    FinetuneState.intent_task_type == "vision",
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("image", size=14),
+                            rx.text(
+                                "Vision-Language Models",
+                                font_size="0.8rem",
+                                font_weight="600",
+                                color=c("text_secondary"),
+                            ),
+                            spacing="1",
+                            align="center",
+                            margin_bottom="8px",
+                        ),
+                        rx.grid(
+                            *[_model_card(m) for m in _VLM_MODELS],
+                            columns="2",
+                            spacing="3",
+                            width="100%",
+                        ),
+                        width="100%",
+                        spacing="0",
+                        margin_bottom="12px",
+                    ),
+                    rx.fragment(),
+                ),
                 rx.grid(*[_model_card(m) for m in _MODELS], columns="2", spacing="3", width="100%"),
                 # HF token field for gated models
                 rx.box(height="12px"),

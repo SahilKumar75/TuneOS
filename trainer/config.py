@@ -127,6 +127,8 @@ class TrainingConfig:
     # Sample packing: concatenate examples up to max_seq_length for higher GPU
     # efficiency. When True the trainer tokenizes raw text itself.
     packing: bool = False
+    # Adapter technique: one of "qlora" | "lora" | "adalora" | "ia3" | "prefix" | "prompt"
+    technique: str = "qlora"
     # Multi-GPU sharded training via PyTorch FSDP. Empty disables it; otherwise a
     # space-separated option string, e.g. "full_shard auto_wrap". Passed straight
     # to TrainingArguments(fsdp=, fsdp_config=).

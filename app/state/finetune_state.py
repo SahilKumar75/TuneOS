@@ -1701,4 +1701,3 @@ Write ONLY the summary, no other text."""
             self.early_stopping_patience = max(0, int(value))
         except (ValueError, TypeError):
             pass
-

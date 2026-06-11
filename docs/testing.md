@@ -1,256 +1,170 @@
-# Testing Guide for Intent Flow Improvements
+# Testing Guide
 
-## Quick Start
+TuneOS has a pytest-based test suite covering unit tests for the training pipeline,
+dataset utilities, and experiment database, plus an opt-in integration test that runs
+a real training step on a tiny model.
 
-### 1. Setup Environment Variables
+---
 
-Add to your `.env` file:
-```bash
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-```
-
-Get a free API key from: https://openrouter.ai/
-
-### 2. Start the Application
+## Running the Suite
 
 ```bash
-# If using reflex
-reflex run
+# Full test suite (no GPU required)
+poetry run pytest
 
-# Or if using another command
-python main.py
+# With coverage report
+poetry run pytest --cov=app --cov=trainer --cov=workers
+
+# Verbose output
+poetry run pytest -v
 ```
 
-### 3. Navigate to Fine-Tune Wizard
+Most tests are mocked and pass without a GPU. The integration test loads a tiny model
+and runs an actual training step — opt in explicitly:
 
-Go to the Fine-tune section and start a new project.
+```bash
+TUNEOS_INTEGRATION_TESTS=1 poetry run pytest tests/test_trainer_integration.py
+```
 
-## Test Scenarios
+---
 
-### Test 1: Full Flow with OpenRouter
+## Lint and Type Checks
 
-**Goal:** Verify personalized questions are generated
+CI enforces Ruff formatting, Ruff linting, and mypy type checking. Run the same
+checks locally before pushing:
 
-**Steps:**
-1. Fill out Phase A:
-   - Project Name: "Medical Q&A Bot"
-   - Description: "Answer patient questions about diabetes management"
-   - Use Case: Personal
-   - Domain: Healthcare
-   - Task Type: Text generation
+```bash
+# Lint
+poetry run ruff check .
 
-2. Click "Continue to Questions"
+# Format check (what CI runs)
+poetry run ruff format --check .
 
-3. **Expected:**
-   - Loading spinner appears: "Generating personalized questions..."
-   - After 2-5 seconds, question 1 appears
-   - Questions should be healthcare/diabetes specific
-   - Example: "What level of medical accuracy is required?"
+# Apply formatting
+poetry run ruff format .
 
-4. Answer first question
+# Type checking (pure-logic backend modules)
+poetry run mypy
+```
 
-5. **Expected:**
-   - Live Plan amber card appears above question 2
-   - Plan summary mentions diabetes, healthcare, Q&A
-   - Example: "A text generation model for healthcare that provides accurate diabetes management information to patients."
+---
 
-6. Answer remaining questions
+## Test Files
 
-7. **Expected:**
-   - Plan updates after each answer
-   - Progress dots advance (1/5, 2/5, etc.)
-   - Smooth scroll to next question
+| File | What it covers |
+|---|---|
+| `tests/test_dataset.py` | `load_and_tokenize`, `load_preference_pairs`, `load_multimodal`, `detect_dataset_type` |
+| `tests/test_metrics.py` | Perplexity, rouge1, rouge2, rougeL, bleu, meteor registry |
+| `tests/test_dpo.py` | DPO dataset loading and `train_dpo` smoke test |
+| `tests/test_experiments_db.py` | All DB helpers, upsert idempotency, SQL placeholder conversion |
+| `tests/test_trainer_integration.py` | Full training step on a tiny model — opt-in only |
 
-8. Review Phase C
+---
 
-9. **Expected:**
-   - Summary includes live plan
-   - All answers displayed
-   - Project details shown
+## Environment Setup
 
-### Test 2: Fallback (No API Key)
+Copy the example env file and set the variables you need for the scenarios you want
+to exercise:
 
-**Goal:** Verify graceful degradation
+```bash
+cp .env.example .env
+```
 
-**Steps:**
-1. Remove or comment out `OPENROUTER_API_KEY` in `.env`
-2. Restart application
-3. Go through Phase A
-4. Click "Continue to Questions"
+| Variable | Required for |
+|---|---|
+| `HF_TOKEN` | Loading gated models (Llama 3, Mistral-instruct) in integration tests |
+| `OPENROUTER_API_KEY` | Testing the intent flow question generation and plan updates |
+| `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` | Testing the Modal cloud GPU backend |
+| `REDIS_URL` | Defaults to `redis://localhost:6379/0` |
 
-**Expected:**
-- Default questions appear immediately (no loading)
-- Questions are generic:
-  - "What is the primary goal of this model?"
-  - "Who is the target audience?"
-  - etc.
-- No live plan updates (amber card doesn't appear)
-- Flow still works end-to-end
+---
 
-### Test 3: Different Domains
+## Manual Test Scenarios
 
-**Goal:** Verify questions adapt to different domains
+### SFT Golden Path
 
-**Test each domain:**
+1. Start the application (`reflex run` or `docker-compose up`).
+2. Open `http://localhost:3000` and navigate to the Fine-tune section.
+3. Complete the intent flow (Phase A → B → C) with any context.
+4. Paste `EleutherAI/pythia-410m` as the model ID — small enough to run locally
+   with ~2 GB VRAM.
+5. Upload a small instruction CSV or generate a synthetic one in step 3.
+6. Accept defaults in step 4 and submit.
+7. Watch the loss curve update live in step 5.
+8. Verify that eval metrics (perplexity, ROUGE-1, BLEU) appear in step 6.
 
-**Finance:**
-- Project: "Investment Advisor"
-- Domain: Finance
-- Expected questions about: risk tolerance, regulatory compliance, financial accuracy
+### DPO Path
 
-**Legal:**
-- Project: "Contract Analyzer"
-- Domain: Legal
-- Expected questions about: jurisdiction, legal accuracy, citation requirements
+1. In step 1, choose **DPO** as the training technique.
+2. In step 3, upload a preference dataset with `prompt`, `chosen`, `rejected` columns.
+3. In step 4, verify the DPO beta and column-mapping fields appear.
+4. Submit and confirm the job routes to the `dpo` Celery queue.
 
-**Education:**
-- Project: "Homework Helper"
-- Domain: Education
-- Expected questions about: grade level, learning objectives, pedagogy
+### Knowledge Distillation Path
 
-**Code:**
-- Project: "Code Review Bot"
-- Task Type: Code
-- Expected questions about: programming languages, code style, review depth
+1. Choose **Knowledge Distillation** in step 1.
+2. In step 4, enter a teacher model ID in the KD field.
+3. Submit and confirm the job routes to the `kd` Celery queue.
 
-### Test 4: UI/UX Testing
+### Vision-Language Model Path
 
-**Goal:** Verify iOS-style design works
+1. Select a VLM model ID (e.g. a LLaVA checkpoint).
+2. Upload an image-text dataset with `image`, `instruction`, `output` columns.
+3. Confirm the job submits to `POST /api/jobs/vision` and processes via
+   `AutoProcessor`.
 
-**Phase A:**
-- [ ] Chips animate on hover (lift up)
-- [ ] Chips change color when selected
-- [ ] Text inputs have focus states (blue border + shadow)
-- [ ] Continue button has hover effect
-- [ ] Circular "1" badge displays
+### Fallback Behavior — No API Key
 
-**Phase B:**
-- [ ] Progress dots animate smoothly
-- [ ] Option buttons show check icon when selected
-- [ ] "Other" expands smoothly with animation
-- [ ] Custom input has focus state
-- [ ] Back/Continue buttons styled correctly
-- [ ] Live plan amber card displays properly
-- [ ] Questions scroll smoothly
+1. Remove `OPENROUTER_API_KEY` from `.env` and restart.
+2. Go through Phase A of the intent flow and click Continue.
+3. Confirm that five generic default questions appear immediately (no spinner).
+4. Confirm no live plan amber card appears.
+5. Confirm the rest of the wizard still completes end to end.
 
-**Phase C:**
-- [ ] Markdown renders correctly
-- [ ] Edit button works
-- [ ] Approve button proceeds to next step
+### Worker Health Check
 
-### Test 5: Edge Cases
+1. Stop the Celery worker.
+2. Try to submit a training job.
+3. Confirm the UI shows a warning that no worker is alive instead of queuing
+   the job silently.
 
-**Empty Fields:**
-- Leave all Phase A fields blank
-- Click Continue
-- Expected: Generic questions generated
+### Modal Cloud GPU
 
-**Very Long Description:**
-- Enter 500+ character description
-- Expected: Questions still relevant, no errors
+1. Set `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` in `.env`.
+2. In step 4, choose **Modal** under Compute backend.
+3. Submit a small job and confirm the Provisioning banner appears.
+4. Confirm the loss chart updates live once training starts on the remote GPU.
 
-**Custom "Other" Answers:**
-- Select "Other" for every question
-- Enter custom text
-- Expected: Plan updates with custom answers
+---
 
-**API Timeout:**
-- Use slow network connection
-- Expected: Falls back to default questions after timeout
+## Common Issues
 
-**Rapid Clicking:**
-- Click through questions very fast
-- Expected: No duplicate plan updates, smooth navigation
+**Tests fail with import errors** — Run `poetry install` to ensure all dependencies
+are installed.
 
-### Test 6: Synthetic Data Generation
+**Integration test hangs on first run** — Downloading the test model can take a few
+minutes. Set `HF_HOME` to a warmed cache directory if you run this test frequently.
 
-**Goal:** Verify data generation uses OpenRouter
+**Ruff format fails in CI** — Run `poetry run ruff format .` locally and commit the
+result.
 
-**Steps:**
-1. Complete intent flow with meaningful answers
-2. Go to data generation step
-3. Generate 10 samples
+**mypy errors on Reflex state vars** — State vars that hold lists must use
+`list[ConcreteModel]` where `ConcreteModel` inherits from `pydantic.BaseModel`.
+`list[dict[str, Any]]` and bare `Any` will fail to compile in `rx.foreach`.
 
-**Expected:**
-- Generation completes in <30 seconds
-- Samples are high quality and relevant
-- Stats show `"generation_method": "openrouter"`
-- No errors in console
+---
 
-**Without API Key:**
-- Stats show `"generation_method": "template"`
-- Still generates samples (lower quality)
+## Adding a New Metric
 
-## Debugging Tips
+Metrics live in `trainer/metrics.py`. Register a function with the `@register`
+decorator:
 
-### Check Console Logs
-
-Look for these messages:
 ```python
-print(f"Error generating questions: {e}")  # Question generation failed
-print(f"Error updating live plan: {e}")    # Plan update failed
+@register("my_metric", greater_is_better=True, kind="reference")
+def compute_my_metric(predictions: list[str], references: list[str]) -> float | None:
+    ...
 ```
 
-### Check Network Tab
-
-OpenRouter API calls should show:
-- POST to `https://openrouter.ai/api/v1/chat/completions`
-- Status 200
-- Response with JSON content
-
-### Common Issues
-
-**Issue:** Questions not generating
-- **Check:** `OPENROUTER_API_KEY` in .env
-- **Check:** Network connectivity
-- **Check:** API key is valid (not expired)
-- **Solution:** System falls back to defaults automatically
-
-**Issue:** Plan not updating
-- **Check:** Console for error messages
-- **Check:** Network tab for API calls
-- **Solution:** Feature is optional, flow continues without it
-
-**Issue:** UI looks broken
-- **Check:** CSS variables are defined (--blue-9, --gray-5, etc.)
-- **Check:** Radix UI theme is loaded
-- **Solution:** Check browser console for CSS errors
-
-**Issue:** Synthetic data fails
-- **Check:** Both OPENROUTER_API_KEY and HF_TOKEN if available
-- **Solution:** Will fall back to template method automatically
-
-## Performance Benchmarks
-
-**Question Generation:**
-- With OpenRouter: 2-5 seconds
-- Fallback: Instant
-
-**Plan Updates:**
-- Per answer: 1-2 seconds
-- Async, doesn't block UI
-
-**Synthetic Data:**
-- OpenRouter (10 samples): 10-20 seconds
-- HuggingFace (10 samples): 15-30 seconds
-- Template (10 samples): <1 second
-
-## Success Criteria
-
-All tests should pass with:
-- No Python errors
-- No JavaScript console errors
-- Smooth animations (60fps)
-- Questions relevant to context
-- Plan updates accurately
-- Graceful fallbacks work
-- UI matches iOS design patterns
-
-## Report Issues
-
-When reporting issues, include:
-1. Test scenario number
-2. Expected vs actual behavior
-3. Console logs (Python and Browser)
-4. Network requests (if API related)
-5. Environment details (OS, browser, Python version)
+Use `kind="loss"` for metrics that take `(model, tokenizer, dataset)` and
+`kind="reference"` for metrics over prediction/reference string pairs. Add a test in
+`tests/test_metrics.py`.

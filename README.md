@@ -228,7 +228,7 @@ The desktop build is packaged for macOS today; Windows and Linux targets are pla
 ### Hugging Face Spaces
 
 The project deploys as two Docker Spaces (App and Worker) connected by an Upstash Redis
-broker. See [docs/DEPLOY.md](docs/DEPLOY.md) for the complete procedure.
+broker. See [docs/deploy.md](docs/deploy.md) for the complete procedure.
 
 ---
 
@@ -262,7 +262,7 @@ TuneOS/
 │   └── ...
 ├── storage/         Adapter and dataset persistence
 ├── desktop/         PyQt6 shell, process manager, system tray
-├── docs/            Deployment, quickstart, and reference documentation
+├── docs/            architecture.md, api-reference.md, deploy.md, quickstart.md, testing.md, supported-models.md, lora-explained.md, roadmap.md
 ├── tests/           Test suite
 ├── Dockerfile       Container image for the App Space
 └── docker-compose.yml  Local Redis and worker services
@@ -292,9 +292,9 @@ poetry run ruff format --check .
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the
-development workflow, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community
-expectations. Security reports should follow [SECURITY.md](SECURITY.md).
+Contributions are welcome. Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the
+development workflow, and [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for community
+expectations. Security reports should follow [SECURITY.md](.github/SECURITY.md).
 
 ## License
 

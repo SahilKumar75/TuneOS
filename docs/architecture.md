@@ -1,532 +1,269 @@
-# Intent Flow Architecture
+# Architecture
 
-## System Overview
+TuneOS is built around a clear separation between the user interface and the compute
+layer. The UI submits training jobs to a Redis-backed queue; a Celery worker picks them
+up and runs the full training stack. That separation works the same way whether TuneOS
+is running on a laptop or deployed across two Hugging Face Spaces.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         TuneOS Intent Flow                      │
-│                     (3-Phase Wizard System)                     │
-└─────────────────────────────────────────────────────────────────┘
+---
 
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│   Phase A    │ ───> │   Phase B    │ ───> │   Phase C    │
-│   Context    │      │  Questions   │      │   Review     │
-└──────────────┘      └──────────────┘      └──────────────┘
-```
+## High-Level Design
 
-## Phase A: Context Collection (iOS-Style)
+```mermaid
+flowchart TB
+    subgraph Client["Presentation Layer"]
+        UI["Reflex Web UI (port 3000)"]
+        API["FastAPI Service (port 8000)"]
+    end
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  ⦿ Tell us about your project                               │
-│  All fields optional - personalized questions follow        │
-│                                                              │
-│  Project Name: [___________________________________]         │
-│                                                              │
-│  Description:  [___________________________________]         │
-│                [___________________________________]         │
-│                                                              │
-│  Use Case:  ( Personal )  ( Company )                       │
-│                                                              │
-│  Domain:    ( Healthcare ) ( Finance ) ( Education )        │
-│             ( Legal ) ( Creative ) ( Technology )           │
-│                                                              │
-│  Task Type: ( Text ) ( Vision ) ( Audio ) ( Code )          │
-│                                                              │
-│  [          Continue to Questions →           ]             │
-└─────────────────────────────────────────────────────────────┘
+    subgraph Queue["Coordination"]
+        REDIS[("Redis Broker\njobs and status")]
+    end
 
-User State Captured:
-├── intent_project_name
-├── intent_description
-├── intent_use_for
-├── intent_domain
-└── intent_task_type
-```
+    subgraph Compute["Compute Layer"]
+        WORKER["Celery Worker"]
+        STACK["PyTorch · PEFT · TRL\nTransformers · bitsandbytes"]
+    end
 
-## Phase A → B Transition: AI Question Generation
+    subgraph Storage["Persistence"]
+        DB[("SQLite / PostgreSQL\nexperiments.db")]
+        ADAPTERS[("Adapter Store\nstorage/")]
+    end
 
-```
-                  Click "Continue"
-                        │
-                        ▼
-         ┌──────────────────────────┐
-         │ intent_next_phase()      │
-         │ (async method)           │
-         └──────────────────────────┘
-                        │
-                        ▼
-    ┌────────────────────────────────────┐
-    │ _generate_personalized_questions() │
-    │ (OpenRouter API Call)              │
-    └────────────────────────────────────┘
-                        │
-            ┌───────────┴───────────┐
-            │                       │
-         [Success]              [Failure]
-            │                       │
-            ▼                       ▼
-    Generate 5 custom         Use default
-    questions based on        5 questions
-    user context
-            │                       │
-            └───────────┬───────────┘
-                        ▼
-            Store in intent_questions[]
-                        │
-                        ▼
-                Display Phase B
-```
-
-### API Request Example:
-
-```json
-POST https://openrouter.ai/api/v1/chat/completions
-{
-  "model": "deepseek/deepseek-v4-flash:free",
-  "messages": [
-    {
-      "role": "system",
-      "content": "You generate JSON only..."
-    },
-    {
-      "role": "user",
-      "content": "Generate 5 personalized questions for:\n- Project: Medical Q&A\n- Domain: Healthcare\n..."
-    }
-  ],
-  "max_tokens": 1500,
-  "temperature": 0.7
-}
-```
-
-### API Response:
-
-```json
-{
-  "questions": [
-    {
-      "heading": "What level of medical accuracy is required?",
-      "options": [
-        "General health information",
-        "Clinical-grade accuracy",
-        "Patient education level"
-      ]
-    },
-    // ... 4 more questions
-  ]
-}
-```
-
-## Phase B: Dynamic Questions with Live Plan
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Question 1 of 5               ●●●○○                        │
-│                                                              │
-│  What level of medical accuracy is required?                │
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │ ✓  General health information                      │    │
-│  └────────────────────────────────────────────────────┘    │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │    Clinical-grade accuracy                         │    │
-│  └────────────────────────────────────────────────────┘    │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │    Patient education level                         │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                              │
-│  [← Back]                             [Continue →]          │
-└─────────────────────────────────────────────────────────────┘
-
-After selecting answer:
-                        │
-                        ▼
-         ┌──────────────────────────┐
-         │ set_intent_answer()      │
-         │ (async method)           │
-         └──────────────────────────┘
-                        │
-                        ▼
-         ┌──────────────────────────┐
-         │ _update_live_plan()      │
-         │ (OpenRouter API Call)    │
-         └──────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│  💡 Your Plan                                                │
-│  A healthcare text generation model that provides            │
-│  general health information to patients with clear,          │
-│  accessible language for diabetes management.                │
-└─────────────────────────────────────────────────────────────┘
-│                                                              │
-│  Question 2 of 5               ●●●○○                        │
-│  ...                                                         │
-```
-
-### Question Rendering Logic:
-
-```python
-# Dynamic rendering based on state
-rx.foreach(
-    FinetuneState.intent_questions,
-    lambda q, idx: rx.cond(
-        FinetuneState.intent_question_idx == idx,
-        _phase_b_question(idx),  # Show current question
-        rx.fragment(),           # Hide others
-    ),
-)
-
-# Each question dynamically renders options
-rx.foreach(
-    q["options"],
-    lambda opt: _question_option_btn(q_idx, opt),
-)
-```
-
-### State Flow:
-
-```
-intent_question_idx = 0
-intent_questions = [Q1, Q2, Q3, Q4, Q5]
-intent_answers = ["", "", "", "", ""]
-intent_live_plan = ""
-
-User selects option for Q1
-    ↓
-intent_answers[0] = "Clinical-grade accuracy"
-    ↓
-_update_live_plan() API call
-    ↓
-intent_live_plan = "A healthcare model that..."
-    ↓
-intent_question_idx = 1  (advance to Q2)
-```
-
-## Phase C: Review & Approve
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Review your intent profile                                  │
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │ ✓ Intent profile ready                              │    │
-│  │                                                      │    │
-│  │ # Fine-Tuning Intent Profile                        │    │
-│  │                                                      │    │
-│  │ ## Summary                                           │    │
-│  │ A healthcare text generation model that provides     │    │
-│  │ clinical-grade diabetes management information...    │    │
-│  │                                                      │    │
-│  │ ## Use Case Context                                  │    │
-│  │ - Project: Medical Q&A Bot                           │    │
-│  │ - Domain: Healthcare                                 │    │
-│  │ - Task: Text generation                              │    │
-│  │                                                      │    │
-│  │ ## Questionnaire                                     │    │
-│  │ 1. Medical accuracy: Clinical-grade                  │    │
-│  │ 2. Target audience: Healthcare professionals         │    │
-│  │ ...                                                  │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                              │
-│  [← Edit]                              [Approve →]          │
-└─────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-                 approve_intent()
-                        │
-                        ▼
-         user_intent = intent_md (full profile)
-                        │
-                        ▼
-              Proceed to next wizard step
-```
-
-## Synthetic Data Generation Flow
-
-```
-User completes intent → Goes to data generation step
-                        │
-                        ▼
-            Select: Generate 50 samples
-                        │
-                        ▼
-         ┌──────────────────────────┐
-         │ /datasets/generate       │
-         │ (API endpoint)           │
-         └──────────────────────────┘
-                        │
-            ┌───────────┴───────────┐
-            │                       │
-         Try #1:                 Try #2:
-       OpenRouter               HuggingFace
-            │                       │
-         [Success]               [Success]
-            │                       │
-            ▼                       ▼
-      Use AI-generated         Use HF model
-         samples                 samples
-            │                       │
-            └───────────┬───────────┘
-                        │
-                    [If both fail]
-                        │
-                        ▼
-                  Try #3: Template
-                        │
-                        ▼
-            ┌────────────────────┐
-            │ Deduplicate        │
-            │ Calculate stats    │
-            │ Save to .jsonl     │
-            └────────────────────┘
-                        │
-                        ▼
-            Return: {samples, path, stats}
-```
-
-### Data Generation Hierarchy:
-
-```
-┌─────────────────────────────────────────────────┐
-│ Priority 1: OpenRouter (New!)                   │
-│ • Model: deepseek/deepseek-v4-flash:free        │
-│ • Speed: Fast (10-20s for 10 samples)           │
-│ • Quality: High                                 │
-│ • Cost: Free                                    │
-└─────────────────────────────────────────────────┘
-                    ↓ (if fails)
-┌─────────────────────────────────────────────────┐
-│ Priority 2: HuggingFace                         │
-│ • Model: Mistral-7B-Instruct                    │
-│ • Speed: Medium (15-30s)                        │
-│ • Quality: Medium-High                          │
-│ • Requires: HF_TOKEN                            │
-└─────────────────────────────────────────────────┘
-                    ↓ (if fails)
-┌─────────────────────────────────────────────────┐
-│ Priority 3: Templates (Fallback)                │
-│ • Method: Rule-based generation                 │
-│ • Speed: Instant                                │
-│ • Quality: Basic but functional                 │
-│ • Always works                                  │
-└─────────────────────────────────────────────────┘
-```
-
-## State Management
-
-### FinetuneState Class:
-
-```python
-class FinetuneState:
-    # Phase tracking
-    intent_phase: int = 1  # 1=Context, 2=Questions, 3=Review
-    
-    # Phase A: Context
-    intent_project_name: str = ""
-    intent_description: str = ""
-    intent_use_for: str = ""
-    intent_domain: str = ""
-    intent_task_type: str = ""
-    
-    # Phase B: Dynamic questions
-    intent_questions: list[dict] = []  # Generated by AI
-    intent_question_idx: int = 0       # Current question
-    intent_answers: list[str] = []     # User's answers
-    intent_is_generating_questions: bool = False  # Loading state
-    intent_live_plan: str = ""         # Real-time plan summary
-    
-    # Phase C: Final
-    intent_md: str = ""                # Full markdown profile
-    intent_approved: bool = False
-    user_intent: str = ""              # Legacy compat
-```
-
-## API Integration Points
-
-### 1. Question Generation (Phase A → B)
-
-```
-Endpoint: OpenRouter Chat Completions
-Trigger: intent_next_phase() when phase=1
-Input: Phase A context fields
-Output: Array of question objects
-Fallback: Default 5 questions
-```
-
-### 2. Plan Updates (Phase B, per answer)
-
-```
-Endpoint: OpenRouter Chat Completions
-Trigger: set_intent_answer() after each selection
-Input: All answers so far + context
-Output: 2-3 sentence summary
-Fallback: Silent (no plan shown)
-```
-
-### 3. Synthetic Data (After intent approval)
-
-```
-Endpoint: OpenRouter Chat Completions
-Trigger: /datasets/generate API call
-Input: Final user_intent (markdown)
-Output: Array of {instruction, output} pairs
-Fallback: HuggingFace → Templates
-```
-
-## Error Handling Strategy
-
-```
-┌─────────────────────────────────────────────────┐
-│ Graceful Degradation Principles                 │
-├─────────────────────────────────────────────────┤
-│ 1. Never block user progress                    │
-│ 2. Always have a fallback                       │
-│ 3. Log errors, don't show to user              │
-│ 4. Features are progressive enhancements        │
-└─────────────────────────────────────────────────┘
-
-Example: Question Generation Fails
-    ↓
-Log: print(f"Error generating questions: {e}")
-    ↓
-Fallback: intent_questions = DEFAULT_QUESTIONS
-    ↓
-User Experience: Slightly less personalized but functional
-    ↓
-Flow Continues: No disruption
-```
-
-## Performance Characteristics
-
-```
-Operation                   | Time      | Blocking? | Fallback
-──────────────────────────────────────────────────────────────
-Phase A → B (Questions)     | 2-5s      | Yes*      | Instant
-Answer → Plan Update        | 1-2s      | No        | Silent
-Synthetic Data (10 samples) | 10-20s    | Yes       | 1-30s
-UI Animations               | 0.2-0.3s  | No        | N/A
-
-* Shows loading spinner, doesn't freeze UI
-```
-
-## Security & Privacy
-
-```
-┌─────────────────────────────────────────────────┐
-│ Data Sent to OpenRouter:                        │
-├─────────────────────────────────────────────────┤
-│ ✓ Project name (user provided)                  │
-│ ✓ Project description (user provided)           │
-│ ✓ Selected domain/use case (choices)            │
-│ ✓ Question answers (user provided)              │
-│                                                  │
-│ ✗ No API keys or credentials                    │
-│ ✗ No personal data (unless user enters it)      │
-│ ✗ No file contents or code                      │
-└─────────────────────────────────────────────────┘
-```
-
-## Future Enhancements
-
-```
-1. Question Refinement
-   └── Allow user to edit AI-generated questions
-
-2. Multi-turn Clarification
-   └── AI asks follow-up questions based on answers
-
-3. Intent Templates
-   └── Save and reuse common intent patterns
-
-4. Collaborative Intents
-   └── Share intent profiles with team
-
-5. Intent Versioning
-   └── Track changes to intent over time
-
-6. A/B Testing
-   └── Test different question sets for better results
-
-7. Analytics Dashboard
-   └── Track which intents lead to best models
+    UI --> API
+    API -- enqueue job --> REDIS
+    REDIS -- dispatch --> WORKER
+    WORKER --> STACK
+    WORKER -- progress --> REDIS
+    REDIS -- live status --> API
+    STACK --> ADAPTERS
+    WORKER --> DB
+    API --> DB
 ```
 
 ---
 
-# Fine-Tuning State Architecture
+## Deployment Topologies
 
-The fine-tuning wizard uses a three-level state hierarchy. Each level inherits the
-fields of its parent and adds responsibility for a distinct concern.
+TuneOS ships from one codebase but runs in two configurations.
 
+```mermaid
+flowchart LR
+    subgraph Desktop["Desktop (single machine)"]
+        SHELL["PyQt6 Shell"]
+        SHELL --> RX1["Reflex + FastAPI"]
+        SHELL --> DC["Docker Compose"]
+        DC --> R1[("Redis")]
+        DC --> W1["Celery Worker"]
+    end
+
+    subgraph Cloud["Hugging Face Spaces"]
+        APP["App Space\nnginx — Reflex + FastAPI"]
+        WRK["Worker Space\nCelery Worker"]
+        UP[("Upstash Redis")]
+        APP --> UP
+        WRK --> UP
+    end
 ```
-FinetuneState
-│   Wizard configuration: steps 1–4 fields, technique, DPO/KD params,
-│   compose_adapters, overlay_technique, training_mode, step guards.
-│   Source of truth for everything the user has configured before training starts.
-│
-└── TrainingPollerState(FinetuneState)
-│   Training runtime: start_training() with SFT/DPO/KD routing,
-│   _poll_job_loop(), eval metric display, test-chat interface.
-│   rehydrate_from_api() restores in-progress run state on page load.
-│
-    └── DeployState(TrainingPollerState)
-        Deploy actions: push_to_hub(), push_to_github(),
-        start_merge(), start_gguf_export().
-        Active only after training reaches the Completed state.
-```
 
-### Key fields by level
+On the desktop, the PyQt6 shell manages the lifecycle of Reflex, FastAPI, Redis, and the
+Celery worker through Docker Compose.
 
-**FinetuneState** — model_id, dataset config, technique, lora_rank, lora_alpha,
-lora_dropout, epochs, batch_size, learning_rate, seed, eval_split_ratio, eval_steps,
-prompt_template, packing, compute_backend, training_mode (`sft`/`dpo`/`kd`),
-dpo_beta, dpo_max_length, dpo_max_prompt_length, prompt_col, chosen_col,
-rejected_col, kd_teacher_model, kd_temperature, kd_alpha,
-compose_adapters, overlay_technique.
-
-Computed vars: `is_sft`, `is_dpo`, `is_kd`.
-
-**TrainingPollerState** — job_id, job_status, loss_history, eval_loss_history,
-grad_norm_history, current_epoch, current_step, final_metrics, test_chat_output.
-
-**DeployState** — hub_repo_id, github_repo_url, merge_status, gguf_export_status.
-
-### Component extraction
-
-Wizard steps 5–7 are implemented as component files under
-`app/components/finetune/` rather than inline in the page module. Step guards on
-`FinetuneState` prevent advancing past a step until its required fields are set.
+In the cloud, the App Space and Worker Space are deployed independently and share an
+external Upstash Redis instance. Hugging Face Spaces expose only a single port and
+cannot share a local broker, so an external broker is required.
 
 ---
 
-# Trainer Modules
+## Training Job Lifecycle
 
-| Module | Responsibility |
-|---|---|
-| `trainer/adapters.py` | `AdapterStrategy` protocol; `REGISTRY` dict (lora, qlora, adalora, ia3, prefix, prompt); `get_strategy(technique)`; `stack_adapter(model, technique, r, ...)` → `PeftMixedModel` |
-| `trainer/finetune.py` | SFT training pipeline; calls `get_strategy()` for adapter injection |
-| `trainer/dpo.py` | DPO training pipeline via `trl.DPOTrainer` |
-| `trainer/vision_finetune.py` | VLM training pipeline (`VisionJobConfig`, `vision_finetune()`); uses `AutoProcessor` for image-text preprocessing |
-| `trainer/dataset.py` | `load_and_tokenize()`, `load_preference_pairs()`, `load_multimodal()`, `detect_dataset_type()`, `PROMPT_TEMPLATES` registry |
-| `trainer/metrics.py` | Pluggable metric registry: perplexity, rouge1, rouge2, rougeL, bleu, meteor |
-| `trainer/evaluate.py` | `evaluate_model()`, `generate_predictions()` (batched) |
+When a user submits a fine-tuning job, this is the path it takes:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as FastAPI
+    participant Q as Redis
+    participant W as Celery Worker
+    participant T as Training Stack
+
+    U->>API: POST /api/jobs (or /dpo, /distill, /vision)
+    API->>Q: Enqueue task (job_id, config)
+    API-->>U: 200 { job_id }
+    Q->>W: Dispatch to sft / dpo / kd queue
+    W->>T: Load base model and dataset
+    loop Each training step
+        T->>W: Loss, eval loss, grad norm
+        W->>Q: rpush job:{id}:loss_history
+        API->>Q: Poll job status
+        API-->>U: Stream loss curve (live)
+    end
+    T->>W: Save adapter weights
+    W->>Q: SET job:{id}:status = done
+    W->>DB: write_job_status + save_final_metrics
+    API-->>U: Final metrics and download link
+```
+
+### Job State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued
+    Queued --> Provisioning : Modal backend selected
+    Provisioning --> Running : GPU ready
+    Queued --> Running : local or hf_spaces
+    Running --> Completed : weights saved
+    Running --> Failed : error raised
+    Failed --> Queued : manual retry
+    Completed --> [*]
+```
 
 ---
 
-# Celery Queues
+## Celery Queue Routing
 
-Jobs are dispatched to named queues so workers can be scaled independently per
-training modality.
+Jobs are dispatched to named queues so workers can be scaled independently per training
+modality.
 
-| Queue | Task module | Job type |
+| Queue | Worker module | Job type |
 |---|---|---|
 | `sft` | `workers/train_task.py` | Supervised fine-tuning |
 | `dpo` | `workers/dpo_task.py` | Direct Preference Optimization |
 | `kd` | `workers/kd_task.py` | Knowledge distillation |
+| `sft` (default) | `workers/vision_task.py` | Vision-language model fine-tuning |
 
-Vision jobs are routed via `workers/vision_task.py`; the queue name is `sft` by
-default unless a dedicated `vision` queue is configured.
+To dedicate a worker to a single modality:
 
-All workers publish structured JSON log output via `python-json-logger` and emit
-progress to Redis using batched `rpush` calls from `RedisLossCallback`.
+```bash
+celery -A workers.celery_app worker --queues=dpo --loglevel=info
+```
+
+---
+
+## Trainer Modules
+
+| Module | Responsibility |
+|---|---|
+| `trainer/adapters.py` | `AdapterStrategy` protocol; `REGISTRY` (lora, qlora, adalora, ia3, prefix, prompt); `get_strategy(technique)`; `stack_adapter()` for `PeftMixedModel` composition |
+| `trainer/finetune.py` | SFT training pipeline; calls `get_strategy()` for adapter injection |
+| `trainer/dpo.py` | DPO training via `trl.DPOTrainer` |
+| `trainer/vision_finetune.py` | VLM pipeline (`VisionJobConfig`, `vision_finetune()`); uses `AutoProcessor` for image-text preprocessing |
+| `trainer/dataset.py` | `load_and_tokenize()`, `load_preference_pairs()`, `load_multimodal()`, `detect_dataset_type()`, `PROMPT_TEMPLATES` registry |
+| `trainer/metrics.py` | Pluggable metric registry: perplexity, rouge1, rouge2, rougeL, bleu, meteor |
+| `trainer/evaluate.py` | `evaluate_run()`, `generate_predictions()` (batched) |
+| `trainer/config.py` | `ModelConfig`, `LoraConfig`, `TrainingConfig`, `DPOConfig`; `get_target_modules()` auto-detects LoRA targets per architecture |
+
+---
+
+## UI State Hierarchy
+
+The fine-tuning wizard uses a three-level state hierarchy. Each level inherits from its
+parent and owns a distinct concern.
+
+```
+FinetuneState
+    Wizard configuration: steps 1-4 fields, technique, DPO/KD params,
+    compose_adapters, overlay_technique, training_mode, step guards.
+    Computed vars: is_sft, is_dpo, is_kd.
+
+    TrainingPollerState(FinetuneState)
+        Training runtime: start_training() with SFT/DPO/KD routing,
+        _poll_job_loop(), eval metric display, test-chat interface.
+        rehydrate_from_api() restores in-progress run state on page load.
+
+        DeployState(TrainingPollerState)
+            Deploy actions: push_to_hub(), push_to_github(),
+            start_merge(), start_gguf_export().
+            Active only after training reaches Completed state.
+```
+
+**FinetuneState** fields — model_id, dataset config, technique, lora_rank, lora_alpha,
+lora_dropout, epochs, batch_size, learning_rate, seed, eval_split_ratio, eval_steps,
+prompt_template, packing, compute_backend, training_mode (sft/dpo/kd), dpo_beta,
+dpo_max_length, dpo_max_prompt_length, prompt_col, chosen_col, rejected_col,
+kd_teacher_model, kd_temperature, kd_alpha, compose_adapters, overlay_technique.
+
+**TrainingPollerState** fields — job_id, job_status, loss_history, eval_loss_history,
+grad_norm_history, current_epoch, current_step, final_metrics, test_chat_output.
+
+**DeployState** fields — hub_repo_id, github_repo_url, merge_status, gguf_export_status.
+
+Wizard steps 5-7 are implemented as component files under `app/components/finetune/`
+rather than inline in the page module. Step guards on `FinetuneState` prevent advancing
+past a step until its required fields are set.
+
+---
+
+## AI Intent Flow
+
+The fine-tuning wizard opens with a three-phase intent collection flow that uses
+OpenRouter to personalize the experience.
+
+```
+Phase A (Context)  -->  Phase B (Questions)  -->  Phase C (Review)
+```
+
+**Phase A** collects project name, description, use case, domain, and task type. On
+clicking Continue, `intent_next_phase()` calls the OpenRouter API to generate five
+questions tailored to that context. If the call fails, five default questions are used
+instead — the user never sees an error.
+
+**Phase B** steps through the questions one at a time. After each answer,
+`_update_live_plan()` fires an async call to summarize the plan so far in two or three
+sentences. That summary appears in an amber card above the next question. If the API
+call fails, the card simply does not appear.
+
+**Phase C** shows the complete intent profile as Markdown and lets the user approve or
+go back to edit. The approved text populates `user_intent` and drives synthetic data
+generation in step 3.
+
+| Operation | Typical latency | Fallback |
+|---|---|---|
+| Question generation | 2-5 s | Default 5 questions (instant) |
+| Live plan update | 1-2 s | Silent — card not shown |
+| Synthetic data (10 samples) | 10-20 s | HuggingFace, then templates |
+
+---
+
+## Persistence
+
+### Redis (ephemeral)
+
+| Key pattern | Content | TTL |
+|---|---|---|
+| `job:{id}:status` | JSON status blob | 48 h after completion |
+| `job:{id}:loss_history` | List of step metric entries | Deleted after flush to SQLite |
+| `job:{id}:eval` | Final eval metrics JSON | 48 h |
+| `job:{id}:hf_token` | Short-TTL HF token | Consumed atomically by `r.getdel()` |
+
+### SQLite / PostgreSQL (durable)
+
+Set `EXPERIMENTS_DB_URL` to a `postgresql://` DSN to switch to PostgreSQL.
+The default is `storage/experiments.db`.
+
+| Table | Purpose |
+|---|---|
+| `runs` | One row per run: config, final loss/perplexity, status, output path |
+| `run_metrics` | Step-level metrics `(run_id, key, value, step, timestamp)` |
+| `run_params` | Immutable hyperparameter snapshot `(run_id, key, value)` |
+| `registered_models` | Named model registry `(name, run_id, alias, metric_snapshot)` |
+
+All upserts use `ON CONFLICT ... DO UPDATE` syntax compatible with both SQLite 3.24+
+and PostgreSQL.
+
+---
+
+## Compute Backends
+
+Each job selects a compute backend independently via `compute_backend` in step 4.
+
+| Backend | Where training runs | Required credentials |
+|---|---|---|
+| `local` | This Celery worker's device | None |
+| `modal` | Free Modal.com T4 GPU | `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` |
+| `hf_spaces` | ZeroGPU on a Hugging Face Space | `spaces` package; `@spaces.GPU` decorator |
+
+For Modal: the worker serializes the dataset, runs `trainer.finetune` remotely, and
+streams the adapter and eval metrics back to local disk. Loss progress is published to
+the shared Redis broker so the loss chart updates live, identical to a local run.
+Modal's free tier provides roughly 10-15 T4 hours per month.

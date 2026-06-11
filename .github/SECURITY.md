@@ -2,25 +2,29 @@
 
 ## Supported Versions
 
-Currently, the following versions of TuneOS are supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+|---|---|
+| 0.3.x | Yes |
+| 0.2.x | Yes |
+| 0.1.x | No |
 
 ## Reporting a Vulnerability
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-If you believe you have found a security vulnerability in TuneOS, please report it to us by email at `shekhar59324@gmail.com`. 
+If you believe you have found a security vulnerability in TuneOS, send details by
+email to `shekhar59324@gmail.com`.
 
-We will investigate all legitimate reports and do our best to quickly fix the problem.
+We will investigate all legitimate reports and fix confirmed vulnerabilities promptly.
+Low-severity issues typically receive a patch within 30 days; critical issues within
+7 days.
 
 ### What to include
 
-Please provide as much information as possible to help us reproduce and fix the vulnerability:
+Providing as much of the following as possible helps us reproduce and fix the issue
+faster:
 
 - The version of TuneOS affected
-- The steps to reproduce the issue
+- Steps to reproduce the issue
 - The potential impact of the vulnerability
-- Any available logs, error messages, or screenshots
+- Available logs, error messages, or reproduction scripts

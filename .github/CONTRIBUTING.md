@@ -1,16 +1,16 @@
 # Contributing to TuneOS
 
-Thank you for your interest in contributing to TuneOS! We welcome contributions from the community — whether it's fixing a typo, reporting a bug, or building a major feature.
+Contributions are welcome — whether it's a typo fix, a bug report, or a new feature.
+This document covers the development workflow, code standards, and how to open a
+good pull request.
 
-## Code of Conduct
-
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.10 or newer
 - [Poetry](https://python-poetry.org/)
 - Docker Desktop (for background training workers)
 - Git
@@ -18,82 +18,112 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 ### Development Setup
 
 1. Fork the repository and clone it locally:
-   ```bash
-   git clone https://github.com/<your-username>/TuneOS.git
-   cd TuneOS
-   ```
-
-2. Install dependencies:
-   ```bash
-   poetry install
-   ```
-
-3. Set up your environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your Hugging Face token
-   ```
-
-4. Start the backend services:
-   ```bash
-   docker-compose up redis worker
-   ```
-
-5. Run the Reflex UI in development mode:
-   ```bash
-   poetry run reflex run
-   ```
-
-### Running Tests
 
 ```bash
-poetry run pytest
+git clone https://github.com/<your-username>/TuneOS.git
+cd TuneOS
 ```
 
-To run with coverage:
+2. Install dependencies:
+
 ```bash
+poetry install
+```
+
+3. Set up environment variables:
+
+```bash
+cp .env.example .env
+# Edit .env and add your Hugging Face token
+```
+
+4. Start the backend services:
+
+```bash
+docker-compose up redis worker
+```
+
+5. Run the Reflex UI in development mode:
+
+```bash
+poetry run reflex run
+```
+
+---
+
+## Running Tests
+
+```bash
+# Full suite (no GPU required)
+poetry run pytest
+
+# With coverage
 poetry run pytest --cov=app --cov=trainer --cov=workers
 ```
 
-### Dependency Management
+The trainer integration test loads a real model and runs a training step. It is
+skipped by default:
 
-We use Poetry for dependency management. To ensure reproducibility across all environments, **you must commit the `poetry.lock` file** with any dependency changes.
-
-If you add or remove a dependency, run:
 ```bash
-poetry add <package>
-```
-This automatically updates `pyproject.toml` and `poetry.lock`. Ensure both files are included in your pull request.
-
-### Code Style
-
-We use **Ruff** for linting and formatting:
-```bash
-poetry run ruff check .
-poetry run ruff format .
+TUNEOS_INTEGRATION_TESTS=1 poetry run pytest tests/test_trainer_integration.py
 ```
 
-CI will fail if linting or formatting issues are present.
+See [docs/testing.md](../docs/testing.md) for the full testing guide, including
+manual test scenarios and how to add a new evaluation metric.
 
-## Architecture Overview
+---
+
+## Dependency Management
+
+Use Poetry for all dependency changes. **Always commit `poetry.lock`** alongside
+`pyproject.toml` so environments are reproducible across machines.
+
+```bash
+poetry add <package>        # add a runtime dependency
+poetry add -G dev <package> # add a dev-only dependency
+```
+
+---
+
+## Code Style
+
+Ruff handles both linting and formatting. CI will fail if either check fails.
+
+```bash
+poetry run ruff check .       # lint
+poetry run ruff format .      # apply formatting
+poetry run ruff format --check .  # check only (what CI runs)
+```
+
+Type checking with mypy runs over the pure-logic backend modules:
+
+```bash
+poetry run mypy
+```
+
+---
+
+## Architecture Notes
+
+### Project Layout
 
 ```
 TuneOS/
-├── app/              # Reflex UI (pages, components, state)
-│   ├── pages/        # Route-level page components
-│   ├── components/   # Reusable UI components
-│   └── state/        # Reflex state management
-├── trainer/          # ML training logic (LoRA, QLoRA, evaluation)
-├── workers/          # Celery task definitions for async training
-├── desktop/          # PyQt6 desktop shell
-├── docs/             # Project documentation
-└── tests/            # Test suite
+├── app/
+│   ├── pages/          Route-level page components
+│   ├── components/     Reusable UI components
+│   └── state/          Reflex state (FinetuneState, TrainingPollerState, DeployState)
+├── trainer/            ML training logic (adapters, finetune, dpo, metrics, evaluate)
+├── workers/            Celery task definitions (sft, dpo, kd, vision queues)
+├── desktop/            PyQt6 desktop shell
+├── docs/               Documentation
+└── tests/              Test suite
 ```
 
 ### State Data Models
 
-Any data class used **inside** a Reflex `rx.State` var (e.g. a list of records
-bound to `rx.foreach`) must inherit from `pydantic.BaseModel`:
+Any data class held inside a Reflex `rx.State` var (e.g. a list bound to
+`rx.foreach`) must inherit from `pydantic.BaseModel`:
 
 ```python
 from pydantic import BaseModel
@@ -103,16 +133,12 @@ class ExperimentRun(BaseModel):
     name: str = ""
 ```
 
-Do **not** use `rx.Base` — it was removed in newer Reflex versions. Pydantic
-models also give Reflex a concrete element type, which `rx.foreach` requires;
-an untyped `list[dict[str, Any]]` state var will fail to compile. Always
-annotate state vars with a concrete type (e.g. `list[ExperimentRun]`), never
-`Any`.
+Do not use `rx.Base` — it was removed in newer Reflex. Always annotate state vars
+with a concrete type (`list[ExperimentRun]`, not `list[dict[str, Any]]`).
 
 ### Evaluation Metrics
 
-Evaluation metrics live in a registry in `trainer/metrics.py`. To add a metric,
-register a function with `@register(...)`:
+Metrics live in a registry in `trainer/metrics.py`. To add one:
 
 ```python
 @register("my_metric", greater_is_better=True, kind="reference")
@@ -120,52 +146,52 @@ def compute_my_metric(predictions: list[str], references: list[str]) -> float | 
     ...
 ```
 
-Use `kind="loss"` for metrics that take `(model, tokenizer, dataset)` and
+Use `kind="loss"` for metrics over `(model, tokenizer, dataset)` and
 `kind="reference"` for metrics over `(predictions, references)` string pairs.
-Registered metrics are then available by name through `trainer.evaluate`.
 
-### Tests
-
-Run the suite with `poetry run pytest`. Most tests are mocked and need no GPU.
-The trainer **integration test** actually loads a tiny model and runs a training
-step; it is skipped unless you opt in:
-
-```bash
-TUNEOS_INTEGRATION_TESTS=1 poetry run pytest tests/test_trainer_integration.py
-```
-
-`mypy` runs in CI over the pure-logic backend modules (see `[tool.mypy]` in
-`pyproject.toml`); run it locally with `poetry run mypy`.
+---
 
 ## Pull Requests
 
-1. Create a new branch from `main` for your feature or bugfix:
-   ```bash
-   git checkout -b feat/my-feature
-   ```
-2. Make your changes with clear, atomic commits.
-3. Ensure all tests pass and code is formatted.
-4. Submit a pull request with a clear description using the [PR template](.github/pull_request_template.md).
+1. Create a branch from `main`:
+
+```bash
+git checkout -b feat/my-feature
+```
+
+2. Make focused, atomic commits.
+3. Ensure all tests pass and the code is formatted.
+4. Open a pull request using the [PR template](pull_request_template.md).
 
 ### Commit Convention
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` — New feature
-- `fix:` — Bug fix
-- `docs:` — Documentation only
-- `refactor:` — Code change that neither fixes a bug nor adds a feature
-- `test:` — Adding or updating tests
-- `build:` — Build system or dependency changes
-- `ci:` — CI/CD configuration changes
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Prefix | When to use |
+|---|---|
+| `feat:` | New feature |
+| `fix:` | Bug fix |
+| `docs:` | Documentation only |
+| `refactor:` | Code change that neither fixes a bug nor adds a feature |
+| `test:` | Adding or updating tests |
+| `build:` | Build system or dependency changes |
+| `ci:` | CI/CD configuration changes |
+
+---
 
 ## Issues
 
-If you find a bug or have a feature request, please [open an issue](https://github.com/SahilKumar75/TuneOS/issues). Use the provided issue templates to give us enough context to act on it quickly.
+Open an issue at [github.com/SahilKumar75/TuneOS/issues](https://github.com/SahilKumar75/TuneOS/issues).
+Use the provided templates to give enough context to act on it quickly.
 
-### Issue Labels
+---
 
-See [docs/issue-labels.md](docs/issue-labels.md) for the full labeling taxonomy.
+## Code of Conduct
+
+By participating in this project you agree to abide by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under its [Apache 2.0 License](LICENSE).
+By contributing to TuneOS you agree that your contributions will be licensed under
+the [Apache 2.0 License](../LICENSE).

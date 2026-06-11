@@ -1,9 +1,12 @@
 import json
+import logging
 import os
 import traceback
 from datetime import datetime, timezone
 
 import redis
+
+_logger = logging.getLogger(__name__)
 
 from trainer.config import LoraConfig, ModelConfig, TrainingConfig
 from trainer.evaluate import evaluate_run
@@ -143,7 +146,6 @@ def _run_finetune_impl(
                 hub_split=hub_split,
                 instruction_col=instruction_col,
                 output_col=output_col,
-                technique=train_cfg.get("technique", "qlora"),
                 redis_client=r,
             )
 
@@ -185,7 +187,7 @@ def _run_finetune_impl(
                 {k: v for k, v in eval_results.items() if isinstance(v, int | float)},
             )
         except Exception:
-            pass
+            _logger.warning("Failed to persist final eval metrics for job %s", job_id, exc_info=True)
 
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart
@@ -232,7 +234,7 @@ def _run_finetune_impl(
                 save_run_metrics(job_id, loss_history)
                 r.delete(key)
         except Exception:
-            pass
+            _logger.warning("Failed to persist loss history for job %s", job_id, exc_info=True)
 
 
 @celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200, queue="sft")

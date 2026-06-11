@@ -38,7 +38,6 @@ def finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
-    technique: str = "qlora",
     redis_client=None,
 ):
     """

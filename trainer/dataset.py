@@ -19,6 +19,17 @@ PROMPT_TEMPLATES: dict[str, str] = {
 PROMPT_TEMPLATE = PROMPT_TEMPLATES["alpaca"]
 
 
+def _format_prompt_prefix(row: dict, template: str = "alpaca") -> str:
+    """Return just the instruction part of the formatted text (no output).
+
+    Used to compute prompt token length for label masking — the model should
+    only compute loss on the response, not on the repeated instruction.
+    """
+    tmpl = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"])
+    prefix_tmpl = tmpl.split("{output}")[0]
+    return prefix_tmpl.format(instruction=row.get("instruction", ""))
+
+
 def format_prompt(
     row: dict,
     instruction_col: str = "instruction",
@@ -293,16 +304,38 @@ def load_and_tokenize(
         )
     )
 
-    raw = raw.map(lambda x: {"text": format_prompt(x, template=template)})
-    tokenized = raw.map(
-        lambda x: tokenizer(
-            x["text"],
+    raw = raw.map(
+        lambda x: {
+            "text": format_prompt(x, template=template),
+            "prefix": _format_prompt_prefix(x, template=template),
+        }
+    )
+
+    def _tokenize_and_mask(examples):
+        full_enc = tokenizer(
+            examples["text"],
             truncation=True,
             max_length=max_seq_length,
             padding="max_length",
-        ),
+        )
+        prefix_enc = tokenizer(
+            examples["prefix"],
+            truncation=True,
+            max_length=max_seq_length,
+            add_special_tokens=False,
+        )
+        labels = []
+        for input_ids, prefix_ids in zip(full_enc["input_ids"], prefix_enc["input_ids"]):
+            lbl = list(input_ids)
+            prompt_len = min(len(prefix_ids), len(lbl))
+            lbl[:prompt_len] = [-100] * prompt_len
+            labels.append(lbl)
+        full_enc["labels"] = labels
+        return full_enc
+
+    tokenized = raw.map(
+        _tokenize_and_mask,
         batched=True,
         remove_columns=raw.column_names,
     )
-    tokenized = tokenized.map(lambda x: {"labels": x["input_ids"].copy()})
     return tokenized

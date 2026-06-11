@@ -144,6 +144,7 @@ def _run_finetune_impl(
                 instruction_col=instruction_col,
                 output_col=output_col,
                 technique=train_cfg.get("technique", "qlora"),
+                redis_client=r,
             )
 
             if compose_adapters and overlay_technique:

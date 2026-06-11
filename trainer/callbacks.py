@@ -21,9 +21,9 @@ class RedisLossCallback(TrainerCallback):
     for the real-time UI channel — it does not block training.
     """
 
-    def __init__(self, job_id: str):
+    def __init__(self, job_id: str, redis_client: "redis.Redis | None" = None):
         self.job_id = job_id
-        self.redis = redis.from_url(REDIS_URL)
+        self.redis = redis_client if redis_client is not None else redis.from_url(REDIS_URL)
         self.channel = f"job:{job_id}:progress"
         self._start_time: float = 0.0
         self._buffer: list[str] = []

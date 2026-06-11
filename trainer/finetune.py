@@ -39,6 +39,7 @@ def finetune(
     instruction_col: str = "instruction",
     output_col: str = "output",
     technique: str = "qlora",
+    redis_client=None,
 ):
     """
     Full fine-tuning pipeline:
@@ -189,7 +190,7 @@ def finetune(
         greater_is_better=False if use_early_stopping else None,
     )
 
-    callbacks = [RedisLossCallback(job_id=job_id)]
+    callbacks = [RedisLossCallback(job_id=job_id, redis_client=redis_client)]
     if use_early_stopping:
         callbacks.append(
             EarlyStoppingCallback(early_stopping_patience=train_cfg.early_stopping_patience)

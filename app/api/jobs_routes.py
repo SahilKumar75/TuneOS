@@ -182,7 +182,8 @@ def _ensure_worker_alive() -> None:
     except HTTPException:
         raise
     except Exception:
-        pass
+        import logging as _logging
+        _logging.getLogger(__name__).debug("Worker ping failed — assuming alive", exc_info=True)
 
 
 @router.post("/jobs/dpo", response_model=JobCreated, status_code=201)
@@ -328,7 +329,6 @@ async def create_vision_job(config: VisionJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
         "modality": "vision",
@@ -354,6 +354,8 @@ async def create_vision_job(config: VisionJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
     try:
         from workers.vision_task import run_vision_finetune
 
@@ -408,12 +410,24 @@ async def get_job(job_id: str):
 
 @router.delete("/jobs/{job_id}", response_model=JobStatus)
 async def cancel_job(job_id: str):
+    import logging as _logging
+
+    state = _get_job_status_from_redis(job_id)
+    if state.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    if state.get("status") in ("done", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=409, detail=f"Job already in terminal state: {state['status']}"
+        )
     try:
         from workers.celery_app import celery_app
 
         celery_app.control.revoke(job_id, terminate=True, signal="SIGTERM")
     except Exception:
-        pass
+        _logging.getLogger(__name__).warning("revoke failed for job %s", job_id, exc_info=True)
+    from app.state.experiments_db import write_job_status
+
+    write_job_status(job_id, "cancelled")
     return JobStatus(job_id=job_id, status="cancelled")
 
 
@@ -476,6 +490,9 @@ async def merge_adapter(job_id: str, req: MergeRequest):
     if not base_model_id:
         raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
 
+    _token = req.hf_token or os.getenv("HF_TOKEN", "")
+    if _token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", _token, ex=60)
     try:
         from workers.merge_task import merge_adapter_task
 
@@ -484,7 +501,6 @@ async def merge_adapter(job_id: str, req: MergeRequest):
                 "job_id": job_id,
                 "base_model_id": base_model_id,
                 "adapter_path": adapter_dir,
-                "hf_token": req.hf_token or os.getenv("HF_TOKEN", ""),
             },
             task_id=f"{job_id}-merge",
         )
@@ -515,8 +531,16 @@ async def download_merged(job_id: str):
     )
 
 
+_ALLOWED_QUANT_TYPES = {"Q4_K_M", "Q5_K_M", "Q8_0", "Q4_0", "Q5_0", "Q2_K", "Q3_K_M", "F16"}
+
+
 @router.post("/jobs/{job_id}/export-gguf", status_code=202)
 async def export_gguf(job_id: str, req: GgufRequest):
+    if req.quant_type not in _ALLOWED_QUANT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"quant_type must be one of {sorted(_ALLOWED_QUANT_TYPES)}",
+        )
     merged_dir = os.path.join(_resolve_job_dir(job_id), "merged")
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=400, detail="Merge the model first before exporting GGUF")
@@ -544,6 +568,7 @@ async def push_github(job_id: str, req: GitHubPushRequest):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
+    _redis.from_url(REDIS_URL).set(f"job:{job_id}:github_token", req.github_token, ex=60)
     try:
         from workers.merge_task import push_github_task
 
@@ -552,7 +577,6 @@ async def push_github(job_id: str, req: GitHubPushRequest):
                 "job_id": job_id,
                 "adapter_path": adapter_dir,
                 "repo_url": req.repo_url,
-                "github_token": req.github_token,
             },
             task_id=f"{job_id}-github",
         )

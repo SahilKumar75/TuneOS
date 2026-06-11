@@ -42,6 +42,10 @@ def _run_vision_impl(
     from app.state.experiments_db import save_run_metrics, write_job_status
 
     r = redis.from_url(REDIS_URL)
+    _tok = r.getdel(f"job:{job_id}:hf_token")
+    _hf_token = (_tok.decode() if isinstance(_tok, bytes) else _tok) or ""
+    if _hf_token:
+        model_cfg = {**model_cfg, "hf_token": _hf_token}
     status_key = f"job:{job_id}:status"
     started_at = datetime.now(timezone.utc).isoformat()
 

@@ -214,9 +214,9 @@ class PushHubRequest(BaseModel):
 
 
 class InferRequest(BaseModel):
-    prompt: str
-    max_new_tokens: int = 300
-    temperature: float = 0.7
+    prompt: str = Field(..., max_length=8192)
+    max_new_tokens: int = Field(default=256, ge=1, le=2048)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
 
 class MergeRequest(BaseModel):

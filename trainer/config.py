@@ -136,6 +136,10 @@ class TrainingConfig:
     fsdp: str = ""
     fsdp_config: dict | None = None
 
+    def __post_init__(self):
+        if self.fp16 and self.bf16:
+            raise ValueError("fp16 and bf16 are mutually exclusive — set at most one to True")
+
 
 @dataclass
 class DistillConfig:
@@ -157,6 +161,10 @@ class DistillConfig:
     bf16: bool = False
     seed: int = 42
     prompt_template: str = "alpaca"
+
+    def __post_init__(self):
+        if self.fp16 and self.bf16:
+            raise ValueError("fp16 and bf16 are mutually exclusive — set at most one to True")
 
 
 @dataclass

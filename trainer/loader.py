@@ -64,7 +64,8 @@ def load_model_and_tokenizer(cfg: ModelConfig):
         token=token,
         local_files_only=local_only,
     )
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
     return model, tokenizer

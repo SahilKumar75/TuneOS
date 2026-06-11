@@ -133,8 +133,6 @@ async def generate_dataset(req: DatasetGenRequest):
     result = await _generate()
     return result
 
-    result = await asyncio.get_event_loop().run_in_executor(None, _generate)
-    return result
 
 
 # ── Dataset generation helpers ───────────────────────────────────

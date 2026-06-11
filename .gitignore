@@ -20,6 +20,7 @@ ENV/
 
 # Claude Code
 .claude/
+skills-lock.json
 
 # Vendored agent skills (restore via `npx skills install`; lockfile is committed)
 .agents/
@@ -49,8 +50,9 @@ storage/
 # HF deploy clone
 hf_deploy/
 
-# Test cache
+# Test / lint cache
 .pytest_cache/
+.ruff_cache/
 
 # Logs & DB
 *.log

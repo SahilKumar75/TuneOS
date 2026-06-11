@@ -526,3 +526,161 @@ asyncio.run(test_questions())
 - Dashboard: https://openrouter.ai/activity
 - Shows: requests, tokens, costs, errors
 - Free tier: $0 cost but has limits
+
+---
+
+# Training Job API
+
+The following endpoints are served by the FastAPI backend (default port 8000).
+All job endpoints return `{"job_id": "<uuid>"}` on success and a `4xx` JSON error
+body on validation failure.
+
+---
+
+## GET /api/health
+
+Returns the operational status of the API, Redis broker, and worker pool.
+
+### Response
+
+```json
+{
+  "status": "ok",
+  "redis": true,
+  "worker_count": 2
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | `string` | `"ok"` when the service is healthy |
+| `redis` | `bool` | `true` when the Redis broker is reachable |
+| `worker_count` | `int` | Number of Celery workers currently registered |
+
+---
+
+## POST /api/jobs
+
+Submit a supervised fine-tuning (SFT) job. The job is placed on the `sft` Celery queue.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `model_id` | `string` | yes | Hugging Face model ID (e.g. `mistralai/Mistral-7B-v0.1`) |
+| `dataset_path` | `string` | one of | Path to a local `.jsonl` dataset file |
+| `hub_dataset_id` | `string` | one of | Hugging Face dataset ID |
+| `lora_rank` | `int` | no | LoRA rank `r` (default `8`) |
+| `lora_alpha` | `int` | no | LoRA scaling alpha (default `16`) |
+| `lora_dropout` | `float` | no | LoRA dropout (default `0.05`) |
+| `epochs` | `int` | no | Training epochs (default `3`) |
+| `batch_size` | `int` | no | Per-device train batch size (default `4`) |
+| `learning_rate` | `float` | no | AdamW learning rate (default `2e-4`) |
+| `bf16` | `bool` | no | Enable bfloat16 mixed precision |
+| `seed` | `int` | no | Global random seed (default `42`) |
+| `eval_split_ratio` | `float` | no | Fraction of data reserved for eval; `0` skips eval |
+| `eval_steps` | `int` | no | Run evaluation every N steps |
+| `prompt_template` | `string` | no | One of `alpaca`, `chatml`, `llama3`, `phi3`, `zephyr` |
+| `packing` | `bool` | no | Enable SFTTrainer sample packing |
+| `compute_backend` | `string` | no | `local`, `modal`, or `zerogpu` (default `local`) |
+| `experiment_id` | `string` | no | Tag this run under an existing experiment |
+
+### Response
+
+```json
+{ "job_id": "b3f2a1c0-..." }
+```
+
+---
+
+## POST /api/jobs/dpo
+
+Submit a Direct Preference Optimization job. The job is placed on the `dpo` Celery queue.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `model_id` | `string` | yes | Base model Hugging Face ID |
+| `dataset_path` | `string` | one of | Path to a local preference dataset file |
+| `hub_dataset_id` | `string` | one of | Hugging Face dataset ID |
+| `prompt_col` | `string` | no | Column name for the prompt (default `"prompt"`) |
+| `chosen_col` | `string` | no | Column name for the chosen response (default `"chosen"`) |
+| `rejected_col` | `string` | no | Column name for the rejected response (default `"rejected"`) |
+| `beta` | `float` | no | KL-penalty coefficient (default `0.1`) |
+| `max_length` | `int` | no | Maximum total sequence length (default `1024`) |
+| `max_prompt_length` | `int` | no | Maximum prompt length (default `512`) |
+| `lora_rank` | `int` | no | LoRA rank `r` (default `8`) |
+| `lora_alpha` | `int` | no | LoRA scaling alpha (default `16`) |
+| `lora_dropout` | `float` | no | LoRA dropout (default `0.05`) |
+| `epochs` | `int` | no | Training epochs (default `1`) |
+| `batch_size` | `int` | no | Per-device train batch size (default `4`) |
+| `bf16` | `bool` | no | Enable bfloat16 mixed precision |
+| `seed` | `int` | no | Global random seed (default `42`) |
+| `experiment_id` | `string` | no | Tag this run under an existing experiment |
+
+### Response
+
+```json
+{ "job_id": "c7e4d2f1-..." }
+```
+
+---
+
+## POST /api/jobs/distill
+
+Submit a knowledge distillation job. The student model is fine-tuned to match the
+teacher model's output distribution. The job is placed on the `kd` Celery queue.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `model_id` | `string` | yes | Student model Hugging Face ID |
+| `teacher_model` | `string` | yes | Teacher model Hugging Face ID |
+| `dataset_path` | `string` | one of | Path to a local `.jsonl` dataset file |
+| `hub_dataset_id` | `string` | one of | Hugging Face dataset ID |
+| `temperature` | `float` | no | Softmax temperature for distillation (default `2.0`) |
+| `alpha` | `float` | no | Weight on the distillation loss vs. CE loss (default `0.5`) |
+| `lora_rank` | `int` | no | LoRA rank `r` (default `8`) |
+| `lora_alpha` | `int` | no | LoRA scaling alpha (default `16`) |
+| `lora_dropout` | `float` | no | LoRA dropout (default `0.05`) |
+| `epochs` | `int` | no | Training epochs (default `3`) |
+| `batch_size` | `int` | no | Per-device train batch size (default `4`) |
+| `seed` | `int` | no | Global random seed (default `42`) |
+| `experiment_id` | `string` | no | Tag this run under an existing experiment |
+
+### Response
+
+```json
+{ "job_id": "a1b2c3d4-..." }
+```
+
+---
+
+## POST /api/jobs/vision
+
+Submit a vision-language model fine-tuning job. The dataset must contain an image
+column and text columns; images are preprocessed via `AutoProcessor`.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `model_id` | `string` | yes | Multimodal model Hugging Face ID |
+| `dataset_path` | `string` | one of | Path to a local dataset directory or file |
+| `hub_dataset_id` | `string` | one of | Hugging Face dataset ID |
+| `image_col` | `string` | no | Column name for images (default `"image"`) |
+| `instruction_col` | `string` | no | Column name for instruction text (default `"instruction"`) |
+| `output_col` | `string` | no | Column name for target output text (default `"output"`) |
+| `modality` | `string` | no | Must be `"vision"` (used for queue routing) |
+| `use_4bit` | `bool` | no | Enable 4-bit quantization via bitsandbytes |
+| `lora_rank` | `int` | no | LoRA rank `r` (default `8`) |
+| `epochs` | `int` | no | Training epochs (default `3`) |
+| `batch_size` | `int` | no | Per-device train batch size (default `2`) |
+
+### Response
+
+```json
+{ "job_id": "f9e8d7c6-..." }
+```

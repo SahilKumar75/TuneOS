@@ -451,3 +451,82 @@ UI Animations               | 0.2-0.3s  | No        | N/A
 7. Analytics Dashboard
    └── Track which intents lead to best models
 ```
+
+---
+
+# Fine-Tuning State Architecture
+
+The fine-tuning wizard uses a three-level state hierarchy. Each level inherits the
+fields of its parent and adds responsibility for a distinct concern.
+
+```
+FinetuneState
+│   Wizard configuration: steps 1–4 fields, technique, DPO/KD params,
+│   compose_adapters, overlay_technique, training_mode, step guards.
+│   Source of truth for everything the user has configured before training starts.
+│
+└── TrainingPollerState(FinetuneState)
+│   Training runtime: start_training() with SFT/DPO/KD routing,
+│   _poll_job_loop(), eval metric display, test-chat interface.
+│   rehydrate_from_api() restores in-progress run state on page load.
+│
+    └── DeployState(TrainingPollerState)
+        Deploy actions: push_to_hub(), push_to_github(),
+        start_merge(), start_gguf_export().
+        Active only after training reaches the Completed state.
+```
+
+### Key fields by level
+
+**FinetuneState** — model_id, dataset config, technique, lora_rank, lora_alpha,
+lora_dropout, epochs, batch_size, learning_rate, seed, eval_split_ratio, eval_steps,
+prompt_template, packing, compute_backend, training_mode (`sft`/`dpo`/`kd`),
+dpo_beta, dpo_max_length, dpo_max_prompt_length, prompt_col, chosen_col,
+rejected_col, kd_teacher_model, kd_temperature, kd_alpha,
+compose_adapters, overlay_technique.
+
+Computed vars: `is_sft`, `is_dpo`, `is_kd`.
+
+**TrainingPollerState** — job_id, job_status, loss_history, eval_loss_history,
+grad_norm_history, current_epoch, current_step, final_metrics, test_chat_output.
+
+**DeployState** — hub_repo_id, github_repo_url, merge_status, gguf_export_status.
+
+### Component extraction
+
+Wizard steps 5–7 are implemented as component files under
+`app/components/finetune/` rather than inline in the page module. Step guards on
+`FinetuneState` prevent advancing past a step until its required fields are set.
+
+---
+
+# Trainer Modules
+
+| Module | Responsibility |
+|---|---|
+| `trainer/adapters.py` | `AdapterStrategy` protocol; `REGISTRY` dict (lora, qlora, adalora, ia3, prefix, prompt); `get_strategy(technique)`; `stack_adapter(model, technique, r, ...)` → `PeftMixedModel` |
+| `trainer/finetune.py` | SFT training pipeline; calls `get_strategy()` for adapter injection |
+| `trainer/dpo.py` | DPO training pipeline via `trl.DPOTrainer` |
+| `trainer/vision_finetune.py` | VLM training pipeline (`VisionJobConfig`, `vision_finetune()`); uses `AutoProcessor` for image-text preprocessing |
+| `trainer/dataset.py` | `load_and_tokenize()`, `load_preference_pairs()`, `load_multimodal()`, `detect_dataset_type()`, `PROMPT_TEMPLATES` registry |
+| `trainer/metrics.py` | Pluggable metric registry: perplexity, rouge1, rouge2, rougeL, bleu, meteor |
+| `trainer/evaluate.py` | `evaluate_model()`, `generate_predictions()` (batched) |
+
+---
+
+# Celery Queues
+
+Jobs are dispatched to named queues so workers can be scaled independently per
+training modality.
+
+| Queue | Task module | Job type |
+|---|---|---|
+| `sft` | `workers/train_task.py` | Supervised fine-tuning |
+| `dpo` | `workers/dpo_task.py` | Direct Preference Optimization |
+| `kd` | `workers/kd_task.py` | Knowledge distillation |
+
+Vision jobs are routed via `workers/vision_task.py`; the queue name is `sft` by
+default unless a dedicated `vision` queue is configured.
+
+All workers publish structured JSON log output via `python-json-logger` and emit
+progress to Redis using batched `rpush` calls from `RedisLossCallback`.

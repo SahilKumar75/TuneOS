@@ -28,10 +28,13 @@ The application ships in two forms from one codebase:
 
 ## What's New
 
-- **7-step fine-tuning wizard** — a guided end-to-end flow from model selection through dataset, technique (LoRA/QLoRA), hyperparameters, live training, and deployment. Opens as a first-class workspace tab.
-- **Experiment tracking** — every training run is recorded in a local SQLite database (`storage/experiments.db`). Run history, hyperparameters, loss curves, and final metrics persist across restarts and are browsable in the Experiments view.
-- **Deploy tab** — after training completes, step 7 provides one-click actions: download the adapter weights, push to Hugging Face Hub, export to GGUF for local inference engines, push to a GitHub repository, and test the model in a built-in chat interface.
-- **Free cloud GPU (Modal)** — no local GPU required: choose the **Modal** compute backend in step 4 to run training on a free T4, with the adapter weights and evaluation metrics streamed back to your machine. Local GPU and Hugging Face ZeroGPU remain available.
+- **DPO and knowledge distillation wizard paths** — the fine-tuning wizard now routes to Direct Preference Optimization (`/api/jobs/dpo`) and knowledge distillation (`/api/jobs/distill`) in addition to the standard SFT path. Step 4 shows DPO beta / column-mapping cards or KD teacher-model / temperature cards based on the selected training mode.
+- **Vision-language model fine-tuning** — `trainer/vision_finetune.py` adds a `VisionJobConfig` and `vision_finetune()` pipeline backed by `AutoProcessor`. A dedicated Celery task (`workers/vision_task.py`) and `POST /api/jobs/vision` endpoint handle image-text datasets end to end.
+- **Adapter composition** — `trainer/adapters.py` exposes `stack_adapter()` which wraps a trained model as a `PeftMixedModel`, letting a second adapter technique be overlaid after training. Enabled per-run via `compose_adapters` + `overlay_technique` fields in the wizard (advanced UI mode, step 4).
+- **Adapter strategy registry** — inline if/elif chains in `finetune.py` are replaced by an `AdapterStrategy` protocol and a `REGISTRY` dict in `trainer/adapters.py`, covering LoRA, QLoRA, AdaLoRA, IA3, prefix-tuning, and prompt-tuning. `get_strategy(technique)` is the single call site.
+- **State architecture split** — `FinetuneState` (wizard config) is now the base for `TrainingPollerState` (training runtime, polling, eval, test-chat) which in turn is the base for `DeployState` (push-to-hub, GGUF export, GitHub push). Wizard steps 5–7 are extracted into component files under `app/components/finetune/`.
+- **Infra and reliability hardening (P2)** — Celery queues split into `sft`, `dpo`, and `kd`. Structured JSON logging via `python-json-logger`. Thread pool executor for blocking I/O in the API layer. `RedisLossCallback` batches `rpush` calls. Health check at `GET /api/health`.
+- **Correctness fixes (P0)** — `r.getdel()` for HF token cleanup in workers, early-fail on gated model load, `eval_split_ratio=0` skips eval cleanly, `torch.empty_cache()` + `model.cpu()` after training.
 
 ---
 
@@ -39,12 +42,16 @@ The application ships in two forms from one codebase:
 
 | Domain | Description |
 | --- | --- |
-| Parameter-efficient fine-tuning | LoRA and QLoRA training via PyTorch, PEFT, and TRL, executed locally or on a dedicated worker. Optional `torch.compile()` acceleration. |
+| Parameter-efficient fine-tuning | LoRA, QLoRA, AdaLoRA, IA3, prefix-tuning, and prompt-tuning via PyTorch, PEFT, and TRL, with a pluggable adapter strategy registry. Optional `torch.compile()` acceleration. |
+| DPO preference alignment | Train on `(prompt, chosen, rejected)` triples using `trl.DPOTrainer`. Configurable beta, max length, and column mapping. Routed to the `dpo` Celery queue. |
+| Knowledge distillation | Fine-tune a student model against a teacher model's logits. Configurable teacher model, temperature, and alpha. Routed to the `kd` Celery queue. |
+| Vision-language model fine-tuning | Fine-tune multimodal models on image-text datasets via `AutoProcessor`. Dedicated `vision` training pipeline and Celery task. |
+| Adapter composition (PeftMixedModel) | Stack a second adapter technique over a trained adapter using `PeftMixedModel`. Enabled per-run in the wizard's advanced mode. |
 | Compute backends | Run each job on a local GPU, a free Modal.com T4 cloud GPU, or Hugging Face ZeroGPU — selected per job in step 4. |
 | Reproducible runs | A single configurable seed drives the train/validation split, data shuffling, and initialization, so a run can be reproduced exactly. |
-| Dataset preparation | Generate, format, and validate instruction and chat datasets prior to training. |
+| Dataset preparation | Generate, format, and validate instruction, preference, and image-text datasets prior to training. |
 | Model conversion | Convert weights between Hugging Face, SafeTensors, and GGUF formats for downstream inference engines. |
-| Training analysis | Track training and validation loss curves plus held-out metrics (perplexity, ROUGE-1, BLEU) and run history in real time. |
+| Training analysis | Track training and validation loss curves plus held-out metrics (perplexity, ROUGE-1, BLEU, METEOR, gradient norm) and run history in real time. |
 | Experiment tracking | Persist every fine-tuning run (hyperparameters, loss history, metrics) in a local SQLite database, with comparison and filtering across runs. |
 | Model deployment | Download adapter weights, push to Hugging Face Hub or GitHub, export to GGUF, and test the fine-tuned model via a built-in inference chat. |
 | Model inspection | Explore architecture, tokenization behavior, and configuration of any supported checkpoint. |
@@ -240,9 +247,19 @@ broker. See [docs/DEPLOY.md](docs/DEPLOY.md) for the complete procedure.
 
 ```text
 TuneOS/
-├── app/             Reflex UI, pages, components, and application state
-├── trainer/         Fine-tuning logic: LoRA, QLoRA, dataset, evaluation
-├── workers/         Celery application, training task, and status reporting
+├── app/
+│   ├── components/finetune/   Wizard step components (steps 5-7 extracted here)
+│   └── state/                 FinetuneState, TrainingPollerState, DeployState
+├── trainer/
+│   ├── adapters.py            AdapterStrategy protocol, REGISTRY, stack_adapter()
+│   ├── vision_finetune.py     VLM pipeline (VisionJobConfig, vision_finetune())
+│   ├── dataset.py             load_multimodal(), load_preference_pairs()
+│   └── ...                    finetune.py, dpo.py, metrics.py, evaluate.py
+├── workers/
+│   ├── train_task.py          SFT Celery task (sft queue)
+│   ├── dpo_task.py            DPO Celery task (dpo queue)
+│   ├── vision_task.py         VLM Celery task
+│   └── ...
 ├── storage/         Adapter and dataset persistence
 ├── desktop/         PyQt6 shell, process manager, system tray
 ├── docs/            Deployment, quickstart, and reference documentation
@@ -269,7 +286,6 @@ poetry run ruff format --check .
 ## Roadmap
 
 - Cross-platform desktop packaging (`.exe`, `AppImage`, `Snap`) via GitHub Actions
-- Native completion notifications for long-running training jobs
 - Fully offline dataset processing and local Hugging Face cache management
 
 ---

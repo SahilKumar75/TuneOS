@@ -225,12 +225,16 @@ def load_and_tokenize(
     If ``preloaded`` is given (a pre-split raw Dataset) the load step is
     skipped, avoiding redundant I/O when split-before-tokenize is active.
     """
-    raw = preloaded if preloaded is not None else _load_raw(
-        file_path,
-        hub_dataset_id=hub_dataset_id,
-        hub_split=hub_split,
-        instruction_col=instruction_col,
-        output_col=output_col,
+    raw = (
+        preloaded
+        if preloaded is not None
+        else _load_raw(
+            file_path,
+            hub_dataset_id=hub_dataset_id,
+            hub_split=hub_split,
+            instruction_col=instruction_col,
+            output_col=output_col,
+        )
     )
 
     raw = raw.map(lambda x: {"text": format_prompt(x, template=template)})

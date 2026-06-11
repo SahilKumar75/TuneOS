@@ -139,9 +139,7 @@ def _init_db():
             )
         """)
         # #18 — index for ORDER BY created_at DESC in list_runs
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(started_at DESC)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(started_at DESC)")
 
 
 def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
@@ -270,9 +268,7 @@ def list_stale_running_jobs(max_age_seconds: int = 7200) -> list[str]:
     """
     try:
         _init_db()
-        cutoff = datetime.fromtimestamp(
-            time.time() - max_age_seconds, tz=timezone.utc
-        ).isoformat()
+        cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
         with _get_conn() as conn:
             rows = conn.execute(
                 "SELECT id FROM runs WHERE status = ? AND started_at < ?",

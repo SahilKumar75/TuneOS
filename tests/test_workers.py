@@ -14,6 +14,7 @@ for _mod in [
     "redis",
     "celery",
     "celery.app",
+    "celery.signals",
     "peft",
     "torch",
     "torch.nn",

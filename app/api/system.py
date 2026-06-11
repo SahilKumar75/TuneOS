@@ -78,11 +78,13 @@ def recover_stale_jobs() -> None:
             write_job_status(job_id, "failed")
             r.set(
                 f"job:{job_id}:status",
-                json.dumps({
-                    "status": "failed",
-                    "job_id": job_id,
-                    "error": "Stale — worker likely restarted",
-                }),
+                json.dumps(
+                    {
+                        "status": "failed",
+                        "job_id": job_id,
+                        "error": "Stale — worker likely restarted",
+                    }
+                ),
             )
             r.expire(f"job:{job_id}:status", 172800)
             _log.warning("Marked stale job %s as failed on startup", job_id)

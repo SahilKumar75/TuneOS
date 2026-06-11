@@ -98,8 +98,13 @@ def _run_finetune_impl(
             # #16 — signal GPU provisioning so UI shows a banner instead of spinner
             r.set(
                 status_key,
-                json.dumps({"status": "provisioning", "job_id": job_id,
-                            "message": "Provisioning GPU on Modal..."}),
+                json.dumps(
+                    {
+                        "status": "provisioning",
+                        "job_id": job_id,
+                        "message": "Provisioning GPU on Modal...",
+                    }
+                ),
             )
             r.expire(status_key, 21600)
 

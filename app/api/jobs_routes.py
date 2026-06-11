@@ -585,7 +585,9 @@ async def get_eval(job_id: str):
     return {"status": "not_ready", "perplexity": None, "bleu": None}
 
 
-def _do_infer(job_id: str, adapter_dir: str, prompt: str, max_new_tokens: int, temperature: float) -> str:
+def _do_infer(
+    job_id: str, adapter_dir: str, prompt: str, max_new_tokens: int, temperature: float
+) -> str:
     """Sync inference logic — runs in a threadpool so the event loop stays free."""
     import torch
 
@@ -626,7 +628,7 @@ def _do_infer(job_id: str, adapter_dir: str, prompt: str, max_new_tokens: int, t
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        return tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+        return tokenizer.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
 

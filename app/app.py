@@ -12,9 +12,9 @@ try:
     from pythonjsonlogger import jsonlogger  # type: ignore[import]
 
     _handler = logging.StreamHandler()
-    _handler.setFormatter(jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(name)s %(levelname)s %(message)s"
-    ))
+    _handler.setFormatter(
+        jsonlogger.JsonFormatter(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
+    )
     logging.root.handlers = [_handler]
     logging.root.setLevel(logging.INFO)
 except ImportError:

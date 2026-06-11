@@ -41,9 +41,7 @@ def configure_worker_logging(**kwargs):
         from pythonjsonlogger import jsonlogger  # type: ignore[import]
 
         handler = logging.StreamHandler()
-        formatter = jsonlogger.JsonFormatter(
-            fmt="%(asctime)s %(name)s %(levelname)s %(message)s"
-        )
+        formatter = jsonlogger.JsonFormatter(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
         handler.setFormatter(formatter)
         root = logging.getLogger()
         root.handlers = [handler]

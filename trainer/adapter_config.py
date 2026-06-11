@@ -20,27 +20,27 @@ from typing import Any
 @dataclass
 class AdapterConfig:
     # ── common ────────────────────────────────────────────────────────────────
-    method: str = "qlora"           # qlora | lora | adalora | ia3 | prefix | prompt
-    task_type: str = "CAUSAL_LM"   # CAUSAL_LM | SEQ_2_SEQ_LM | (vision types P6)
+    method: str = "qlora"  # qlora | lora | adalora | ia3 | prefix | prompt
+    task_type: str = "CAUSAL_LM"  # CAUSAL_LM | SEQ_2_SEQ_LM | (vision types P6)
 
     # ── LoRA / QLoRA / AdaLoRA ───────────────────────────────────────────────
     r: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.05
     bias: str = "none"
-    target_modules: list[str] | None = None   # None → arch-map lookup in lora.py
-    use_all_linear: bool = False              # True → target_modules="all-linear"
+    target_modules: list[str] | None = None  # None → arch-map lookup in lora.py
+    use_all_linear: bool = False  # True → target_modules="all-linear"
     init_lora_weights: str | bool = True
 
     # ── AdaLoRA-specific ─────────────────────────────────────────────────────
-    adalora_init_r: int = 12        # initial rank before adaptive pruning
-    adalora_target_r: int = 8       # final rank after pruning
+    adalora_init_r: int = 12  # initial rank before adaptive pruning
+    adalora_target_r: int = 8  # final rank after pruning
 
     # ── IA³-specific ─────────────────────────────────────────────────────────
     ia3_feedforward_modules: list[str] = field(default_factory=list)
 
     # ── Prefix / Prompt tuning ───────────────────────────────────────────────
-    num_virtual_tokens: int = 20    # virtual tokens prepended to each input
+    num_virtual_tokens: int = 20  # virtual tokens prepended to each input
 
     # -------------------------------------------------------------------------
 
@@ -51,6 +51,7 @@ class AdapterConfig:
         Uses ``getattr`` with safe defaults so callers don't need to import
         ``JobConfig`` and this stays circular-import-free.
         """
+
         def _get(attr: str, default: Any) -> Any:
             return getattr(config, attr, default)
 

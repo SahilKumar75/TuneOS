@@ -55,7 +55,9 @@ def _run_finetune_impl(
     # Retrieve the short-TTL token stored by the API before enqueue; never travels in task kwargs.
     _stored_token = r.getdel(f"job:{job_id}:hf_token")
     if _stored_token:
-        os.environ["HF_TOKEN"] = _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+        os.environ["HF_TOKEN"] = (
+            _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+        )
 
     try:
         # Early-fail for gated models with no token — avoids a silent hang during download.

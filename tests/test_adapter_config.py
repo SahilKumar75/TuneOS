@@ -17,6 +17,7 @@ from trainer.adapter_config import AdapterConfig
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _job(technique: str = "qlora", **kwargs) -> SimpleNamespace:
     """Minimal stand-in for a JobConfig with sensible defaults."""
     defaults = dict(
@@ -38,6 +39,7 @@ def _job(technique: str = "qlora", **kwargs) -> SimpleNamespace:
 # ---------------------------------------------------------------------------
 # from_job_config round-trip — one per technique
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("technique", ["qlora", "lora", "adalora", "ia3", "prefix", "prompt"])
 def test_from_job_config_method_field(technique):
@@ -92,8 +94,17 @@ def test_use_all_linear_propagates():
 # to_lora_cfg_dict — keys match what LoraConfig expects
 # ---------------------------------------------------------------------------
 
-_LORA_CFG_KEYS = {"r", "lora_alpha", "lora_dropout", "bias", "task_type",
-                  "target_modules", "use_all_linear", "init_lora_weights"}
+_LORA_CFG_KEYS = {
+    "r",
+    "lora_alpha",
+    "lora_dropout",
+    "bias",
+    "task_type",
+    "target_modules",
+    "use_all_linear",
+    "init_lora_weights",
+}
+
 
 def test_to_lora_cfg_dict_keys():
     cfg = AdapterConfig.from_job_config(_job())
@@ -112,6 +123,7 @@ def test_to_lora_cfg_dict_values_match_fields():
 # to_dict — full round-trip
 # ---------------------------------------------------------------------------
 
+
 def test_to_dict_contains_all_fields():
     cfg = AdapterConfig()
     d = cfg.to_dict()
@@ -129,6 +141,7 @@ def test_to_dict_round_trip():
 # ---------------------------------------------------------------------------
 # Missing attributes on caller object — graceful fallback
 # ---------------------------------------------------------------------------
+
 
 def test_from_job_config_missing_attrs():
     """from_job_config must not raise when optional fields are absent."""

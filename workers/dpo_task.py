@@ -49,7 +49,9 @@ def _run_dpo_impl(
 
     _stored_token = r.getdel(f"job:{job_id}:hf_token")
     if _stored_token:
-        os.environ["HF_TOKEN"] = _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+        os.environ["HF_TOKEN"] = (
+            _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+        )
 
     try:
         write_job_status(job_id, "running", started_at=started_at)

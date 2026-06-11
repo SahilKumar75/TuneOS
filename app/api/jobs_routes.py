@@ -146,9 +146,7 @@ def _enqueue_finetune(config: JobConfig) -> str:
     kwargs = _build_finetune_kwargs(config)
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(
-            f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60
-        )
+        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60)
     try:
         from workers.train_task import run_finetune
 

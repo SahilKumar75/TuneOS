@@ -46,21 +46,34 @@ def evaluate_run(
     instruction_col: str = "instruction",
     output_col: str = "output",
 ) -> dict:
-    """Evaluate a trained model on a 20% sample of its data.
+    """Evaluate a trained model on the held-out split from training.
 
-    Returns a metrics dict (perplexity + best-effort rouge1/bleu). Never raises —
-    on any failure it logs the reason and returns the null-metric fallback so a
-    job never fails on eval. Lives in the framework-light ``trainer`` layer so it
-    is shared by the local Celery worker and the Modal runner without dragging in
-    redis/celery on the remote side.
+    Uses the same eval_split_ratio and seed as training so the eval set never
+    overlaps with training data. Returns a metrics dict (perplexity +
+    best-effort rouge1/bleu). Never raises — on any failure it logs the reason
+    and returns the null-metric fallback so a job never fails on eval. Lives in
+    the framework-light ``trainer`` layer so it is shared by the local Celery
+    worker and the Modal runner without dragging in redis/celery on the remote side.
     """
     from trainer.config import ModelConfig, TrainingConfig
-    from trainer.dataset import load_and_tokenize, load_instruction_pairs
+    from trainer.dataset import load_and_tokenize, load_instruction_pairs, load_raw_dataset
 
     try:
         cfg = ModelConfig(**model_cfg)
-        seed = TrainingConfig(**train_cfg).seed
-        full_dataset = load_and_tokenize(
+        t_cfg = TrainingConfig(**train_cfg)
+        seed = t_cfg.seed
+        eval_ratio = t_cfg.eval_split_ratio if 0.0 < t_cfg.eval_split_ratio < 1.0 else 0.1
+
+        # Re-derive the same held-out split that was withheld during training.
+        raw = load_raw_dataset(
+            dataset_path,
+            hub_dataset_id=hub_dataset_id,
+            hub_split=hub_split,
+            instruction_col=instruction_col,
+            output_col=output_col,
+        )
+        raw_split = raw.train_test_split(test_size=eval_ratio, seed=seed)
+        eval_sample = load_and_tokenize(
             dataset_path,
             tokenizer,
             cfg.max_seq_length,
@@ -68,23 +81,15 @@ def evaluate_run(
             hub_split=hub_split,
             instruction_col=instruction_col,
             output_col=output_col,
+            preloaded=raw_split["test"],
         )
-        n_eval = max(1, int(0.2 * len(full_dataset)))
-        eval_sample = full_dataset.shuffle(seed=seed).select(range(n_eval))
         eval_results = evaluate_model(model, tokenizer, eval_sample)
 
         # Reference metrics (ROUGE-1/BLEU) need generated predictions vs. the
-        # raw reference text. Sample the same indices from the raw pairs.
+        # raw reference text. Use the same held-out raw split (cap at 32 rows).
         try:
-            raw_pairs = load_instruction_pairs(
-                dataset_path,
-                hub_dataset_id=hub_dataset_id,
-                hub_split=hub_split,
-                instruction_col=instruction_col,
-                output_col=output_col,
-            )
-            n_ref = min(len(raw_pairs), 32)
-            ref_sample = raw_pairs.shuffle(seed=seed).select(range(n_ref))
+            n_ref = min(len(raw_split["test"]), 32)
+            ref_sample = raw_split["test"].select(range(n_ref))
             instructions = [row["instruction"] for row in ref_sample]
             references = [row["output"] for row in ref_sample]
             predictions = generate_predictions(model, tokenizer, instructions)

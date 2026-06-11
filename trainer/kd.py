@@ -56,6 +56,17 @@ def distill(
     for p in teacher.parameters():
         p.requires_grad_(False)
 
+    # Put teacher on a secondary GPU when available to avoid competing with the
+    # student for VRAM on the primary device. Falls back to CPU so training still
+    # works on single-GPU setups (at the cost of host↔device transfer overhead).
+    import torch as _torch
+    if _torch.cuda.is_available() and _torch.cuda.device_count() > 1:
+        teacher = teacher.to("cuda:1")
+        _teacher_device = "cuda:1"
+    else:
+        teacher = teacher.to("cpu")
+        _teacher_device = "cpu"
+
     dataset = load_and_tokenize(
         dataset_path,
         tokenizer,
@@ -75,10 +86,12 @@ def distill(
             outputs = model(**inputs)
             ce_loss = outputs.loss  # hard-label cross-entropy
             with torch.no_grad():
-                teacher_logits = teacher(
-                    input_ids=inputs["input_ids"],
-                    attention_mask=inputs.get("attention_mask"),
-                ).logits
+                teacher_inputs = {
+                    k: v.to(_teacher_device)
+                    for k, v in inputs.items()
+                    if k in ("input_ids", "attention_mask")
+                }
+                teacher_logits = teacher(**teacher_inputs).logits.to(outputs.logits.device)
             t = temperature
             kl = F.kl_div(
                 F.log_softmax(outputs.logits / t, dim=-1),

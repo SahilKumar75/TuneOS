@@ -45,7 +45,7 @@ class AdapterConfig:
     # -------------------------------------------------------------------------
 
     @classmethod
-    def from_job_config(cls, config: Any) -> "AdapterConfig":
+    def from_job_config(cls, config: Any) -> AdapterConfig:
         """Build from a ``JobConfig`` (or any object with matching attributes).
 
         Uses ``getattr`` with safe defaults so callers don't need to import

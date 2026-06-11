@@ -199,7 +199,8 @@ def step6_results() -> rx.Component:
         ),
         # Register to model registry
         rx.cond(
-            (TrainingPollerState.training_status == "done") & (TrainingPollerState.experiment_id != ""),
+            (TrainingPollerState.training_status == "done")
+            & (TrainingPollerState.experiment_id != ""),
             _card(
                 rx.vstack(
                     rx.hstack(
@@ -448,11 +449,19 @@ def step6_panel() -> rx.Component:
                             rx.cond(
                                 TrainingPollerState.eval_status == "done",
                                 rx.grid(
-                                    _metric_tile("ROUGE-1", TrainingPollerState.eval_rouge1.to_string()),
-                                    _metric_tile("ROUGE-2", TrainingPollerState.eval_rouge2.to_string()),
-                                    _metric_tile("ROUGE-L", TrainingPollerState.eval_rougeL.to_string()),
+                                    _metric_tile(
+                                        "ROUGE-1", TrainingPollerState.eval_rouge1.to_string()
+                                    ),
+                                    _metric_tile(
+                                        "ROUGE-2", TrainingPollerState.eval_rouge2.to_string()
+                                    ),
+                                    _metric_tile(
+                                        "ROUGE-L", TrainingPollerState.eval_rougeL.to_string()
+                                    ),
                                     _metric_tile("BLEU", TrainingPollerState.eval_bleu.to_string()),
-                                    _metric_tile("METEOR", TrainingPollerState.eval_meteor.to_string()),
+                                    _metric_tile(
+                                        "METEOR", TrainingPollerState.eval_meteor.to_string()
+                                    ),
                                     columns="3",
                                     spacing="3",
                                     width="100%",
@@ -550,7 +559,9 @@ def step6_panel() -> rx.Component:
                             ),
                             rx.cond(
                                 TrainingPollerState.chat_error != "",
-                                rx.callout(TrainingPollerState.chat_error, color_scheme="red", size="1"),
+                                rx.callout(
+                                    TrainingPollerState.chat_error, color_scheme="red", size="1"
+                                ),
                                 rx.fragment(),
                             ),
                             spacing="3",

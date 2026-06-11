@@ -64,7 +64,9 @@ def step5_train() -> rx.Component:
             rx.vstack(
                 rx.text("Training", font_size="1.1rem", font_weight="700", color=c("text_primary")),
                 rx.text(
-                    TrainingPollerState.effective_model_name, font_size="0.82rem", color=c("text_muted")
+                    TrainingPollerState.effective_model_name,
+                    font_size="0.82rem",
+                    color=c("text_muted"),
                 ),
                 spacing="0",
             ),
@@ -97,7 +99,10 @@ def step5_train() -> rx.Component:
                 ),
             ),
             rx.progress(
-                value=TrainingPollerState.epoch_progress_pct, max=100, width="100%", color_scheme="blue"
+                value=TrainingPollerState.epoch_progress_pct,
+                max=100,
+                width="100%",
+                color_scheme="blue",
             ),
             width="100%",
             spacing="1",
@@ -109,7 +114,9 @@ def step5_train() -> rx.Component:
                 rx.hstack(
                     rx.icon("sparkles", size=16, color=c("accent")),
                     rx.text(
-                        TrainingPollerState.ai_commentary, font_size="0.86rem", color=c("text_primary")
+                        TrainingPollerState.ai_commentary,
+                        font_size="0.86rem",
+                        color=c("text_primary"),
                     ),
                     spacing="2",
                     align="start",

@@ -231,7 +231,9 @@ def _workspace_header() -> rx.Component:
                 variant=rx.cond(TrainingPollerState.training_status == "done", "solid", "soft"),
                 size="2",
                 opacity=rx.cond(TrainingPollerState.training_status == "done", "1", "0.45"),
-                cursor=rx.cond(TrainingPollerState.training_status == "done", "pointer", "not-allowed"),
+                cursor=rx.cond(
+                    TrainingPollerState.training_status == "done", "pointer", "not-allowed"
+                ),
             ),
             width="100%",
             align="center",

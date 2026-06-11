@@ -350,9 +350,7 @@ def step6_results() -> rx.Component:
                     spacing="2",
                     align="center",
                 ),
-                on_click=rx.redirect(
-                    "/compare?ids=" + TrainingPollerState.job_id
-                ),
+                on_click=rx.redirect("/compare?ids=" + TrainingPollerState.job_id),
                 variant="soft",
                 color_scheme="blue",
                 size="2",
@@ -392,9 +390,7 @@ def step6_panel() -> rx.Component:
                             spacing="1",
                             align="center",
                         ),
-                        on_click=rx.redirect(
-                            "/compare?ids=" + TrainingPollerState.job_id
-                        ),
+                        on_click=rx.redirect("/compare?ids=" + TrainingPollerState.job_id),
                         variant="ghost",
                         size="1",
                         color_scheme="blue",

@@ -156,11 +156,23 @@ def _step4() -> rx.Component:
                         ),
                         rx.cond(
                             FinetuneState.lora_r <= 16,
-                            rx.text("✅ Memory-efficient (recommended)", font_size="0.72rem", color="green"),
+                            rx.text(
+                                "✅ Memory-efficient (recommended)",
+                                font_size="0.72rem",
+                                color="green",
+                            ),
                             rx.cond(
                                 FinetuneState.lora_r <= 64,
-                                rx.text("⚠️ Moderate VRAM — increase only if underfitting", font_size="0.72rem", color="orange"),
-                                rx.text("🔴 Very high rank — consider full fine-tuning", font_size="0.72rem", color="red"),
+                                rx.text(
+                                    "⚠️ Moderate VRAM — increase only if underfitting",
+                                    font_size="0.72rem",
+                                    color="orange",
+                                ),
+                                rx.text(
+                                    "🔴 Very high rank — consider full fine-tuning",
+                                    font_size="0.72rem",
+                                    color="red",
+                                ),
                             ),
                         ),
                         spacing="1",
@@ -227,11 +239,23 @@ def _step4() -> rx.Component:
                             ),
                             rx.cond(
                                 FinetuneState.lora_r <= 16,
-                                rx.text("✅ Memory-efficient (recommended)", font_size="0.72rem", color="green"),
+                                rx.text(
+                                    "✅ Memory-efficient (recommended)",
+                                    font_size="0.72rem",
+                                    color="green",
+                                ),
                                 rx.cond(
                                     FinetuneState.lora_r <= 64,
-                                    rx.text("⚠️ Moderate VRAM — increase only if underfitting", font_size="0.72rem", color="orange"),
-                                    rx.text("🔴 Very high rank — consider full fine-tuning", font_size="0.72rem", color="red"),
+                                    rx.text(
+                                        "⚠️ Moderate VRAM — increase only if underfitting",
+                                        font_size="0.72rem",
+                                        color="orange",
+                                    ),
+                                    rx.text(
+                                        "🔴 Very high rank — consider full fine-tuning",
+                                        font_size="0.72rem",
+                                        color="red",
+                                    ),
                                 ),
                             ),
                             spacing="1",

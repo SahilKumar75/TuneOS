@@ -6,7 +6,6 @@ import reflex as rx
 
 from app.components.finetune.shared import _card, _label, _nav_buttons, _section_heading
 from app.state.finetune_state import FinetuneState
-from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 _LR_PRESETS = [
@@ -64,6 +63,155 @@ def _compute_section() -> rx.Component:
             ),
             spacing="0",
             width="100%",
+        )
+    )
+
+
+def _dpo_params_card() -> rx.Component:
+    """DPO-specific hyperparameters shown instead of the LoRA advanced panel."""
+    return _card(
+        rx.vstack(
+            rx.text(
+                "DPO hyperparameters",
+                font_size="0.88rem",
+                font_weight="600",
+                color=c("text_primary"),
+                margin_bottom="12px",
+            ),
+            rx.grid(
+                rx.vstack(
+                    _label("Beta (regularisation)"),
+                    rx.input(
+                        value=FinetuneState.dpo_beta.to_string(),
+                        on_change=FinetuneState.set_dpo_beta,
+                        type="number",
+                        width="100%",
+                    ),
+                    rx.text(
+                        "Lower β → more aggressive alignment. Default 0.1",
+                        font_size="0.72rem",
+                        color=c("text_muted"),
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Max sequence length"),
+                    rx.select.root(
+                        rx.select.trigger(width="100%"),
+                        rx.select.content(
+                            *[
+                                rx.select.item(str(v), value=str(v))
+                                for v in [512, 1024, 2048, 4096]
+                            ],
+                        ),
+                        value=FinetuneState.dpo_max_length.to_string(),
+                        on_change=FinetuneState.set_dpo_max_length,
+                    ),
+                    rx.text(
+                        "Prompt + completion combined", font_size="0.72rem", color=c("text_muted")
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Max prompt length"),
+                    rx.select.root(
+                        rx.select.trigger(width="100%"),
+                        rx.select.content(
+                            *[rx.select.item(str(v), value=str(v)) for v in [128, 256, 512, 1024]],
+                        ),
+                        value=FinetuneState.dpo_max_prompt_length.to_string(),
+                        on_change=FinetuneState.set_dpo_max_prompt_length,
+                    ),
+                    rx.text(
+                        "Tokens reserved for the prompt", font_size="0.72rem", color=c("text_muted")
+                    ),
+                    spacing="1",
+                ),
+                columns="3",
+                spacing="4",
+                width="100%",
+            ),
+            rx.callout(
+                "DPO doesn't use a generative loss — it directly optimises the preference margin. "
+                "Dataset must have prompt / chosen / rejected columns (set in Step 3).",
+                color_scheme="blue",
+                icon="info",
+                size="1",
+            ),
+            spacing="3",
+        )
+    )
+
+
+def _kd_params_card() -> rx.Component:
+    """Knowledge-Distillation specific params."""
+    return _card(
+        rx.vstack(
+            rx.text(
+                "Knowledge Distillation",
+                font_size="0.88rem",
+                font_weight="600",
+                color=c("text_primary"),
+                margin_bottom="12px",
+            ),
+            rx.vstack(
+                _label("Teacher model (Hub ID)"),
+                rx.input(
+                    placeholder="e.g. meta-llama/Meta-Llama-3-70B",
+                    value=FinetuneState.kd_teacher_model,
+                    on_change=FinetuneState.set_kd_teacher_model,
+                    width="100%",
+                ),
+                rx.text(
+                    "The larger model whose knowledge is distilled into the student selected in Step 1",
+                    font_size="0.72rem",
+                    color=c("text_muted"),
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            rx.grid(
+                rx.vstack(
+                    _label("Temperature"),
+                    rx.input(
+                        value=FinetuneState.kd_temperature.to_string(),
+                        on_change=FinetuneState.set_kd_temperature,
+                        type="number",
+                        width="100%",
+                    ),
+                    rx.text(
+                        "Higher T → softer probability distributions",
+                        font_size="0.72rem",
+                        color=c("text_muted"),
+                    ),
+                    spacing="1",
+                ),
+                rx.vstack(
+                    _label("Alpha (KD weight)"),
+                    rx.slider(
+                        min=0.0,
+                        max=1.0,
+                        step=0.1,
+                        default_value=[FinetuneState.kd_alpha],
+                        on_value_commit=FinetuneState.set_kd_alpha,
+                    ),
+                    rx.text(
+                        FinetuneState.kd_alpha.to_string(),
+                        font_size="0.82rem",
+                        color=c("text_secondary"),
+                    ),
+                    rx.text(
+                        "1.0 = pure KD loss, 0.0 = pure CE loss",
+                        font_size="0.72rem",
+                        color=c("text_muted"),
+                    ),
+                    spacing="1",
+                ),
+                columns="2",
+                spacing="4",
+                width="100%",
+            ),
+            spacing="3",
         )
     )
 
@@ -133,48 +281,19 @@ def _step4() -> rx.Component:
                         spacing="1",
                     ),
                     rx.vstack(
-                        _label("LoRA rank (r)"),
-                        rx.hstack(
-                            rx.text(
-                                FinetuneState.lora_r.to_string(),
-                                font_size="0.88rem",
-                                font_weight="500",
-                                color=c("text_primary"),
-                                min_width="28px",
+                        _label("Max sequence length"),
+                        rx.select.root(
+                            rx.select.trigger(width="100%"),
+                            rx.select.content(
+                                *[
+                                    rx.select.item(str(v), value=str(v))
+                                    for v in [256, 512, 1024, 2048]
+                                ],
                             ),
-                            rx.button(
-                                "Advanced →",
-                                on_click=FinetuneState.set_ui_mode("advanced"),
-                                variant="ghost",
-                                size="1",
-                                color_scheme="blue",
-                                padding="0",
-                                height="auto",
-                            ),
-                            spacing="2",
-                            align="center",
+                            value=FinetuneState.max_seq_length.to_string(),
+                            on_change=FinetuneState.set_max_seq_length,
                         ),
-                        rx.cond(
-                            FinetuneState.lora_r <= 16,
-                            rx.text(
-                                "✅ Memory-efficient (recommended)",
-                                font_size="0.72rem",
-                                color="green",
-                            ),
-                            rx.cond(
-                                FinetuneState.lora_r <= 64,
-                                rx.text(
-                                    "⚠️ Moderate VRAM — increase only if underfitting",
-                                    font_size="0.72rem",
-                                    color="orange",
-                                ),
-                                rx.text(
-                                    "🔴 Very high rank — consider full fine-tuning",
-                                    font_size="0.72rem",
-                                    color="red",
-                                ),
-                            ),
-                        ),
+                        rx.text("Tokens per sample", font_size="0.72rem", color=c("text_muted")),
                         spacing="1",
                     ),
                     rx.vstack(
@@ -203,334 +322,295 @@ def _step4() -> rx.Component:
                 spacing="0",
             )
         ),
-        # Advanced mode
+        # DPO / KD param cards (replace LoRA advanced panel when not SFT)
+        rx.cond(FinetuneState.is_dpo, _dpo_params_card(), rx.fragment()),
+        rx.cond(FinetuneState.is_kd, _kd_params_card(), rx.fragment()),
+        # Advanced LoRA card — SFT only
         rx.cond(
-            FinetuneState.ui_mode == "advanced",
-            _card(
-                rx.vstack(
-                    rx.text(
-                        "Advanced hyperparameters",
-                        font_size="0.88rem",
-                        font_weight="600",
-                        color=c("text_primary"),
-                        margin_bottom="12px",
-                    ),
-                    # Section 1 — LoRA
-                    rx.text(
-                        "LoRA Adapter",
-                        font_size="0.78rem",
-                        font_weight="600",
-                        color=c("text_secondary"),
-                        margin_top="8px",
-                    ),
-                    rx.divider(margin_y="6px"),
-                    rx.grid(
-                        rx.vstack(
-                            _label("LoRA rank (r)"),
-                            rx.slider(
-                                min=4,
-                                max=256,
-                                step=4,
-                                default_value=[FinetuneState.lora_r],
-                                on_value_commit=FinetuneState.set_lora_r,
-                            ),
-                            rx.text(
-                                FinetuneState.lora_r, font_size="0.82rem", color=c("text_secondary")
-                            ),
-                            rx.cond(
-                                FinetuneState.lora_r <= 16,
+            FinetuneState.is_sft,
+            rx.cond(
+                FinetuneState.ui_mode == "advanced",
+                _card(
+                    rx.vstack(
+                        rx.text(
+                            "Advanced hyperparameters",
+                            font_size="0.88rem",
+                            font_weight="600",
+                            color=c("text_primary"),
+                            margin_bottom="12px",
+                        ),
+                        # Section 1 — LoRA
+                        rx.text(
+                            "LoRA Adapter",
+                            font_size="0.78rem",
+                            font_weight="600",
+                            color=c("text_secondary"),
+                            margin_top="8px",
+                        ),
+                        rx.divider(margin_y="6px"),
+                        rx.grid(
+                            rx.vstack(
+                                _label("LoRA rank (r)"),
+                                rx.slider(
+                                    min=4,
+                                    max=128,
+                                    step=4,
+                                    default_value=[FinetuneState.lora_r],
+                                    on_value_commit=FinetuneState.set_lora_r,
+                                ),
                                 rx.text(
-                                    "✅ Memory-efficient (recommended)",
+                                    FinetuneState.lora_r,
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("LoRA alpha"),
+                                rx.input(
+                                    value=FinetuneState.lora_alpha.to_string(),
+                                    on_change=FinetuneState.set_lora_alpha,
+                                    type="number",
+                                    width="100%",
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("LoRA dropout"),
+                                rx.slider(
+                                    min=0.0,
+                                    max=0.3,
+                                    step=0.01,
+                                    default_value=[FinetuneState.lora_dropout],
+                                    on_value_commit=FinetuneState.set_lora_dropout,
+                                ),
+                                rx.text(
+                                    FinetuneState.lora_dropout,
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                spacing="1",
+                            ),
+                            columns="3",
+                            spacing="4",
+                            width="100%",
+                        ),
+                        # Section 2 — Batch & Memory
+                        rx.text(
+                            "Batch & Memory",
+                            font_size="0.78rem",
+                            font_weight="600",
+                            color=c("text_secondary"),
+                            margin_top="16px",
+                        ),
+                        rx.divider(margin_y="6px"),
+                        rx.grid(
+                            rx.vstack(
+                                _label("Batch size"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [1, 2, 4, 8, 16]
+                                        ],
+                                    ),
+                                    value=FinetuneState.batch_size.to_string(),
+                                    on_change=FinetuneState.set_batch_size,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Max sequence length"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [128, 256, 512, 1024, 2048]
+                                        ],
+                                    ),
+                                    value=FinetuneState.max_seq_length.to_string(),
+                                    on_change=FinetuneState.set_max_seq_length,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Gradient accumulation steps"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(str(v), value=str(v))
+                                            for v in [1, 2, 4, 8, 16]
+                                        ],
+                                    ),
+                                    value=FinetuneState.gradient_accumulation_steps.to_string(),
+                                    on_change=FinetuneState.set_gradient_accumulation_steps,
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("BF16 mode (A100/H100 only)"),
+                                rx.switch(
+                                    checked=FinetuneState.bf16,
+                                    on_change=FinetuneState.set_bf16,
+                                    size="2",
+                                ),
+                                rx.text(
+                                    "Better precision than FP16 on Ampere+ GPUs",
                                     font_size="0.72rem",
-                                    color="green",
+                                    color=c("text_muted"),
                                 ),
-                                rx.cond(
-                                    FinetuneState.lora_r <= 64,
-                                    rx.text(
-                                        "⚠️ Moderate VRAM — increase only if underfitting",
-                                        font_size="0.72rem",
-                                        color="orange",
+                                spacing="1",
+                            ),
+                            columns="3",
+                            spacing="4",
+                            width="100%",
+                        ),
+                        # Section 2b — Data formatting
+                        rx.text(
+                            "Data formatting",
+                            font_size="0.78rem",
+                            font_weight="600",
+                            color=c("text_secondary"),
+                            margin_top="16px",
+                        ),
+                        rx.divider(margin_y="6px"),
+                        rx.grid(
+                            rx.vstack(
+                                _label("Prompt template"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(v, value=v)
+                                            for v in [
+                                                "alpaca",
+                                                "chatml",
+                                                "llama3",
+                                                "phi3",
+                                                "zephyr",
+                                            ]
+                                        ],
                                     ),
-                                    rx.text(
-                                        "🔴 Very high rank — consider full fine-tuning",
-                                        font_size="0.72rem",
-                                        color="red",
-                                    ),
+                                    value=FinetuneState.prompt_template,
+                                    on_change=FinetuneState.set_prompt_template,
                                 ),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("LoRA alpha"),
-                            rx.input(
-                                value=FinetuneState.lora_alpha.to_string(),
-                                on_change=FinetuneState.set_lora_alpha,
-                                type="number",
-                                width="100%",
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("LoRA dropout"),
-                            rx.slider(
-                                min=0.0,
-                                max=0.3,
-                                step=0.01,
-                                default_value=[FinetuneState.lora_dropout],
-                                on_value_commit=FinetuneState.set_lora_dropout,
-                            ),
-                            rx.text(
-                                FinetuneState.lora_dropout,
-                                font_size="0.82rem",
-                                color=c("text_secondary"),
-                            ),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
-                    ),
-                    # Section 2 — Batch & Memory
-                    rx.text(
-                        "Batch & Memory",
-                        font_size="0.78rem",
-                        font_weight="600",
-                        color=c("text_secondary"),
-                        margin_top="16px",
-                    ),
-                    rx.divider(margin_y="6px"),
-                    rx.grid(
-                        rx.vstack(
-                            _label("Batch size"),
-                            rx.select.root(
-                                rx.select.trigger(width="100%"),
-                                rx.select.content(
-                                    *[
-                                        rx.select.item(str(v), value=str(v))
-                                        for v in [1, 2, 4, 8, 16]
-                                    ],
+                                rx.text(
+                                    "How prompts are wrapped for the model",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
                                 ),
-                                value=FinetuneState.batch_size.to_string(),
-                                on_change=FinetuneState.set_batch_size,
+                                spacing="1",
                             ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Max sequence length"),
-                            rx.select.root(
-                                rx.select.trigger(width="100%"),
-                                rx.select.content(
-                                    *[
-                                        rx.select.item(str(v), value=str(v))
-                                        for v in [128, 256, 512, 1024, 2048]
-                                    ],
-                                ),
-                                value=FinetuneState.max_seq_length.to_string(),
-                                on_change=FinetuneState.set_max_seq_length,
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Gradient accumulation steps"),
-                            rx.select.root(
-                                rx.select.trigger(width="100%"),
-                                rx.select.content(
-                                    *[
-                                        rx.select.item(str(v), value=str(v))
-                                        for v in [1, 2, 4, 8, 16]
-                                    ],
-                                ),
-                                value=FinetuneState.gradient_accumulation_steps.to_string(),
-                                on_change=FinetuneState.set_gradient_accumulation_steps,
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("BF16 mode (A100/H100 only)"),
-                            rx.switch(
-                                checked=FinetuneState.bf16,
-                                on_change=FinetuneState.set_bf16,
-                                size="2",
-                            ),
-                            rx.text(
-                                "Better precision than FP16 on Ampere+ GPUs",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
-                    ),
-                    # Section 2b — Data formatting
-                    rx.text(
-                        "Data formatting",
-                        font_size="0.78rem",
-                        font_weight="600",
-                        color=c("text_secondary"),
-                        margin_top="16px",
-                    ),
-                    rx.divider(margin_y="6px"),
-                    rx.grid(
-                        rx.vstack(
-                            _label("Prompt template"),
-                            rx.select.root(
-                                rx.select.trigger(width="100%"),
-                                rx.select.content(
-                                    *[
-                                        rx.select.item(v, value=v)
-                                        for v in ["alpaca", "chatml", "llama3", "phi3", "zephyr"]
-                                    ],
-                                ),
-                                value=FinetuneState.prompt_template,
-                                on_change=FinetuneState.set_prompt_template,
-                            ),
-                            rx.text(
-                                "How prompts are wrapped for the model",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            rx.hstack(
+                            rx.vstack(
                                 _label("Sample packing"),
-                                rx.tooltip(
-                                    rx.icon("info", size=13, color=c("text_muted"), cursor="help"),
-                                    content=(
-                                        "Packing concatenates examples up to max_seq_length for "
-                                        "faster training. May cause attention to leak across example "
-                                        "boundaries. Disable for short datasets (<500 examples)."
+                                rx.switch(
+                                    checked=FinetuneState.packing,
+                                    on_change=FinetuneState.set_packing,
+                                    size="2",
+                                ),
+                                rx.text(
+                                    "Concatenate examples to fill the sequence — faster on GPU",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
+                                ),
+                                spacing="1",
+                            ),
+                            columns="2",
+                            spacing="4",
+                            width="100%",
+                        ),
+                        # Section 3 — Scheduler & Tracking
+                        rx.text(
+                            "Scheduler & Tracking",
+                            font_size="0.78rem",
+                            font_weight="600",
+                            color=c("text_secondary"),
+                            margin_top="16px",
+                        ),
+                        rx.divider(margin_y="6px"),
+                        rx.grid(
+                            rx.vstack(
+                                _label("LR scheduler"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(v, value=v)
+                                            for v in [
+                                                "cosine",
+                                                "linear",
+                                                "constant",
+                                                "cosine_with_restarts",
+                                            ]
+                                        ],
                                     ),
+                                    value=FinetuneState.lr_scheduler,
+                                    on_change=FinetuneState.set_lr_scheduler,
                                 ),
-                                spacing="2",
-                                align="center",
+                                spacing="1",
                             ),
-                            rx.switch(
-                                checked=FinetuneState.packing,
-                                on_change=FinetuneState.set_packing,
-                                size="2",
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Auto-detect all linear layers (recommended)"),
-                            rx.switch(
-                                checked=FinetuneState.use_all_linear,
-                                on_change=FinetuneState.set_use_all_linear,
-                                size="2",
-                            ),
-                            rx.text(
-                                "Passes target_modules='all-linear' to PEFT — no architecture map needed",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
-                    ),
-                    # Section 3 — Scheduler & Tracking
-                    rx.text(
-                        "Scheduler & Tracking",
-                        font_size="0.78rem",
-                        font_weight="600",
-                        color=c("text_secondary"),
-                        margin_top="16px",
-                    ),
-                    rx.divider(margin_y="6px"),
-                    rx.grid(
-                        rx.vstack(
-                            _label("LR scheduler"),
-                            rx.select.root(
-                                rx.select.trigger(width="100%"),
-                                rx.select.content(
-                                    *[
-                                        rx.select.item(v, value=v)
-                                        for v in [
-                                            "cosine",
-                                            "linear",
-                                            "constant",
-                                            "cosine_with_restarts",
-                                        ]
-                                    ],
+                            rx.vstack(
+                                _label("Experiment name"),
+                                rx.input(
+                                    placeholder="my-run-1",
+                                    value=FinetuneState.experiment_name,
+                                    on_change=FinetuneState.set_experiment_name,
+                                    width="100%",
                                 ),
-                                value=FinetuneState.lr_scheduler,
-                                on_change=FinetuneState.set_lr_scheduler,
+                                spacing="1",
                             ),
-                            spacing="1",
+                            rx.vstack(
+                                _label("Eval split ratio"),
+                                rx.slider(
+                                    min=0.0,
+                                    max=0.3,
+                                    step=0.05,
+                                    default_value=[FinetuneState.eval_split_ratio],
+                                    on_value_commit=FinetuneState.set_eval_split_ratio,
+                                ),
+                                rx.text(
+                                    FinetuneState.eval_split_ratio.to_string(),
+                                    font_size="0.82rem",
+                                    color=c("text_secondary"),
+                                ),
+                                rx.text(
+                                    "Fraction held out for validation",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                _label("Early stopping patience"),
+                                rx.input(
+                                    value=FinetuneState.early_stopping_patience.to_string(),
+                                    on_change=FinetuneState.set_early_stopping_patience,
+                                    type="number",
+                                    width="100%",
+                                ),
+                                rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
+                                spacing="1",
+                            ),
+                            columns="3",
+                            spacing="4",
+                            width="100%",
                         ),
-                        rx.vstack(
-                            _label("Experiment name"),
-                            rx.input(
-                                placeholder="my-run-1",
-                                value=FinetuneState.experiment_name,
-                                on_change=FinetuneState.set_experiment_name,
-                                width="100%",
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Eval split ratio"),
-                            rx.slider(
-                                min=0.0,
-                                max=0.3,
-                                step=0.05,
-                                default_value=[FinetuneState.eval_split_ratio],
-                                on_value_commit=FinetuneState.set_eval_split_ratio,
-                            ),
-                            rx.text(
-                                FinetuneState.eval_split_ratio.to_string(),
-                                font_size="0.82rem",
-                                color=c("text_secondary"),
-                            ),
-                            rx.text(
-                                "Fraction held out for validation",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Early stopping patience"),
-                            rx.input(
-                                value=FinetuneState.early_stopping_patience.to_string(),
-                                on_change=FinetuneState.set_early_stopping_patience,
-                                type="number",
-                                width="100%",
-                            ),
-                            rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
-                    ),
-                    spacing="0",
-                )
+                        spacing="0",
+                    )
+                ),
+                rx.fragment(),
             ),
-            rx.fragment(),
+            rx.fragment(),  # is_sft else-branch
         ),
-        # VRAM warning — high batch × seq
+        # VRAM warning
         rx.cond(
             (FinetuneState.batch_size * FinetuneState.max_seq_length) > 4096,
             rx.callout(
                 "⚠ High memory config — estimated >12GB VRAM. Reduce batch size or sequence length if you hit OOM.",
                 color_scheme="orange",
-                size="1",
-            ),
-            rx.fragment(),
-        ),
-        # Non-4bit VRAM warning — large model without QLoRA
-        rx.cond(
-            FinetuneState.needs_vram_warning,
-            rx.callout(
-                "Without 4-bit quantisation this model needs ~14 GB VRAM before optimizer states. "
-                "Switch to QLoRA (Step 1) or use a 24 GB+ GPU.",
-                color_scheme="orange",
-                icon="alert-triangle",
                 size="1",
             ),
             rx.fragment(),
@@ -603,7 +683,7 @@ def _step4() -> rx.Component:
         _nav_buttons(
             next_label="Start Training →",
             next_disabled=~FinetuneState.can_start_training,
-            next_event=TrainingPollerState.start_training,
+            next_event=FinetuneState.start_training,
         ),
         spacing="4",
         width="100%",

@@ -133,43 +133,98 @@ class TrainingPollerState(FinetuneState):
             self.ai_commentary = ""
             self.training_status = "idle"
 
-        use_4bit = self.selected_technique == "qlora"
-        payload = {
-            "model_id": self.effective_model_id,
-            "model_source": self.model_source,
-            "local_model_path": self.local_model_path,
-            "hf_token": self.hf_token,
-            "dataset_path": self.dataset_path
-            if self.data_source not in ("hub_dataset", "skip")
-            else "",
-            "hub_dataset_id": self.hub_dataset_id if self.data_source == "hub_dataset" else "",
-            "hub_dataset_split": self.hub_dataset_split,
-            "instruction_col": self.hub_dataset_instruction_col,
-            "output_col": self.hub_dataset_output_col,
-            "technique": self.selected_technique,
-            "use_4bit": use_4bit,
-            "lora_rank": self.lora_r,
-            "lora_alpha": self.lora_alpha,
-            "lora_dropout": self.lora_dropout,
-            "learning_rate": float(self.learning_rate),
-            "epochs": self.epochs,
-            "batch_size": self.batch_size,
-            "max_seq_length": self.max_seq_length,
-            "gradient_accumulation_steps": self.gradient_accumulation_steps,
-            "warmup_ratio": self.warmup_ratio,
-            "lr_scheduler_type": self.lr_scheduler,
-            "bf16": self.bf16,
-            "user_intent": self.user_intent,
-            "experiment_name": exp_name,
-            "experiment_id": exp_id,
-            "compute_backend": self.compute_backend,
-            "prompt_template": self.prompt_template,
-            "packing": self.packing,
-        }
+        _ds_path = self.dataset_path if self.data_source not in ("hub_dataset", "skip") else ""
+        _hub_id = self.hub_dataset_id if self.data_source == "hub_dataset" else ""
+
+        if self.is_dpo:
+            endpoint = f"{API_BASE}/api/jobs/dpo"
+            payload = {
+                "model_id": self.effective_model_id,
+                "model_source": self.model_source,
+                "local_model_path": self.local_model_path,
+                "hf_token": self.hf_token,
+                "dataset_path": _ds_path,
+                "hub_dataset_id": _hub_id,
+                "hub_dataset_split": self.hub_dataset_split,
+                "prompt_col": self.dpo_prompt_col,
+                "chosen_col": self.dpo_chosen_col,
+                "rejected_col": self.dpo_rejected_col,
+                "use_4bit": True,
+                "lora_rank": self.lora_r,
+                "lora_alpha": self.lora_alpha,
+                "lora_dropout": self.lora_dropout,
+                "beta": self.dpo_beta,
+                "learning_rate": float(self.learning_rate),
+                "epochs": self.epochs,
+                "batch_size": self.batch_size,
+                "gradient_accumulation_steps": self.gradient_accumulation_steps,
+                "max_length": self.dpo_max_length,
+                "max_prompt_length": self.dpo_max_prompt_length,
+                "bf16": self.bf16,
+                "seed": 42,
+                "experiment_id": exp_id,
+            }
+        elif self.is_kd:
+            endpoint = f"{API_BASE}/api/jobs/distill"
+            payload = {
+                "model_id": self.effective_model_id,
+                "model_source": self.model_source,
+                "local_model_path": self.local_model_path,
+                "hf_token": self.hf_token,
+                "teacher_model": self.kd_teacher_model,
+                "dataset_path": _ds_path,
+                "hub_dataset_id": _hub_id,
+                "hub_dataset_split": self.hub_dataset_split,
+                "instruction_col": self.hub_dataset_instruction_col,
+                "output_col": self.hub_dataset_output_col,
+                "use_4bit": True,
+                "lora_rank": self.lora_r,
+                "lora_alpha": self.lora_alpha,
+                "lora_dropout": self.lora_dropout,
+                "temperature": self.kd_temperature,
+                "alpha": self.kd_alpha,
+                "learning_rate": float(self.learning_rate),
+                "epochs": self.epochs,
+                "batch_size": self.batch_size,
+                "seed": 42,
+                "experiment_id": exp_id,
+            }
+        else:
+            endpoint = f"{API_BASE}/api/jobs"
+            payload = {
+                "model_id": self.effective_model_id,
+                "model_source": self.model_source,
+                "local_model_path": self.local_model_path,
+                "hf_token": self.hf_token,
+                "dataset_path": _ds_path,
+                "hub_dataset_id": _hub_id,
+                "hub_dataset_split": self.hub_dataset_split,
+                "instruction_col": self.hub_dataset_instruction_col,
+                "output_col": self.hub_dataset_output_col,
+                "technique": self.selected_technique,
+                "use_4bit": self.selected_technique == "qlora",
+                "lora_rank": self.lora_r,
+                "lora_alpha": self.lora_alpha,
+                "lora_dropout": self.lora_dropout,
+                "learning_rate": float(self.learning_rate),
+                "epochs": self.epochs,
+                "batch_size": self.batch_size,
+                "max_seq_length": self.max_seq_length,
+                "gradient_accumulation_steps": self.gradient_accumulation_steps,
+                "warmup_ratio": self.warmup_ratio,
+                "lr_scheduler_type": self.lr_scheduler,
+                "bf16": self.bf16,
+                "user_intent": self.user_intent,
+                "experiment_name": exp_name,
+                "experiment_id": exp_id,
+                "compute_backend": self.compute_backend,
+                "prompt_template": self.prompt_template,
+                "packing": self.packing,
+            }
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(f"{API_BASE}/api/jobs", json=payload)
+                resp = await client.post(endpoint, json=payload)
             if resp.status_code in (200, 201):
                 job_id = resp.json()["job_id"]
                 async with self:

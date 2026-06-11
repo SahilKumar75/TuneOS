@@ -1699,7 +1699,23 @@ Write ONLY the summary, no other text."""
                 self.is_starting = False
 
     async def _poll_job_loop(self, job_id: str):
+        import asyncio
+
         import redis.asyncio as aioredis
+
+        # #16 — poll REST status while GPU is provisioning (Modal cold-start can take 30-120s)
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as _c:
+                for _ in range(90):
+                    _r = await _c.get(f"{API_BASE}/api/jobs/{job_id}")
+                    _s = _r.json().get("status") if _r.status_code == 200 else None
+                    if _s != "provisioning":
+                        break
+                    async with self:
+                        self.training_status = "provisioning"
+                    await asyncio.sleep(2)
+        except Exception:
+            pass
 
         r = aioredis.from_url(REDIS_URL)
         pubsub = r.pubsub()
@@ -1785,6 +1801,32 @@ Write ONLY the summary, no other text."""
                 self.current_step = 6
             # Trigger eval
             await self._auto_eval()
+
+    @rx.event(background=True)
+    async def resume_in_progress_job(self):
+        """#14 — on page load, resume polling for any in-progress job.
+
+        HF Spaces App restarts lose Reflex in-memory state. This finds the most
+        recent running/provisioning job and re-enters the poll loop so the UI
+        stays in sync without the user having to refresh.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{API_BASE}/api/jobs", params={"limit": 10})
+            if resp.status_code != 200:
+                return
+            for job in resp.json():
+                if job.get("status") in ("running", "provisioning"):
+                    job_id = job.get("job_id", "")
+                    if not job_id:
+                        continue
+                    async with self:
+                        self.job_id = job_id
+                        self.training_status = job["status"]
+                    await self._poll_job_loop(job_id)
+                    return
+        except Exception:
+            pass
 
     async def _refresh_commentary(self, current_loss: float, drop_pct: float, epoch: int):
         try:

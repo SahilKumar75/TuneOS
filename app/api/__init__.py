@@ -23,4 +23,11 @@ app_api.include_router(datasets_routes.router)
 app_api.include_router(jobs_routes.router)
 app_api.include_router(experiments_routes.router)
 
+
+@app_api.on_event("startup")
+async def _startup():
+    # #11 — recover jobs stuck at 'running' from a prior worker crash
+    system.recover_stale_jobs()
+
+
 __all__ = ["app_api"]

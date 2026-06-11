@@ -7,12 +7,18 @@ import torch
 from transformers import TrainerCallback
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+_FLUSH_EVERY = 10  # #12 — batch rpush every N steps to cut Redis round-trips
 
 
 class RedisLossCallback(TrainerCallback):
     """
     Publishes training progress to Redis channel 'job:<job_id>:progress'
     after every logging step so the frontend can stream live metrics.
+
+    Step payloads are batched into a local buffer and flushed to the
+    loss_history list key every _FLUSH_EVERY steps (and on train end) to
+    reduce Redis I/O for long runs. Per-step publish() is kept fire-and-forget
+    for the real-time UI channel — it does not block training.
     """
 
     def __init__(self, job_id: str):
@@ -20,9 +26,15 @@ class RedisLossCallback(TrainerCallback):
         self.redis = redis.from_url(REDIS_URL)
         self.channel = f"job:{job_id}:progress"
         self._start_time: float = 0.0
+        self._buffer: list[str] = []
 
     def on_train_begin(self, args, state, control, **kwargs):
         self._start_time = time.time()
+
+    def _flush_buffer(self):
+        if self._buffer:
+            self.redis.rpush(f"job:{self.job_id}:loss_history", *self._buffer)
+            self._buffer = []
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         if not logs or "loss" not in logs:
@@ -41,18 +53,21 @@ class RedisLossCallback(TrainerCallback):
             "epoch": round(state.epoch, 2) if state.epoch else 0,
             "learning_rate": logs.get("learning_rate", 0),
             "eval_loss": logs.get("eval_loss"),
+            "grad_norm": logs.get("grad_norm"),
             "total_steps": state.max_steps or 0,
             "elapsed_seconds": int(time.time() - self._start_time),
             "gpu_memory_used_gb": gpu_mem,
             "status": "running",
         }
-        self.redis.publish(self.channel, json.dumps(payload))
-        # Also accumulate in a list key so the worker can persist to run_metrics
-        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
+        encoded = json.dumps(payload)
+        # Fire-and-forget publish for real-time UI — does not block training
+        self.redis.publish(self.channel, encoded)
+        # Buffer for batched persistence
+        self._buffer.append(encoded)
+        if state.global_step % _FLUSH_EVERY == 0:
+            self._flush_buffer()
 
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
-        """Publish the validation loss at each eval step so the live chart can
-        overlay it against the training curve."""
         if not metrics or "eval_loss" not in metrics:
             return
         payload = {
@@ -62,10 +77,12 @@ class RedisLossCallback(TrainerCallback):
             "elapsed_seconds": int(time.time() - self._start_time),
             "status": "running",
         }
-        self.redis.publish(self.channel, json.dumps(payload))
-        self.redis.rpush(f"job:{self.job_id}:loss_history", json.dumps(payload))
+        encoded = json.dumps(payload)
+        self.redis.publish(self.channel, encoded)
+        self._buffer.append(encoded)
 
     def on_train_end(self, args, state, control, **kwargs):
+        self._flush_buffer()
         payload = {
             "status": "done",
             "step": state.global_step,

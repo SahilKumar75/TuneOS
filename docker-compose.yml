@@ -7,7 +7,8 @@ services:
 
   worker:
     build: .
-    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1
+    # #20 — consume all three queues; KD runs isolated from SFT so an OOM doesn't kill SFT jobs
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=1 --queues sft,dpo,kd
     volumes:
       - .:/app
       - ./models_cache:/app/models_cache
@@ -17,6 +18,9 @@ services:
       - HF_HOME=/app/models_cache
     depends_on:
       - redis
+    # #21 — cap memory so a runaway rank-256 LoRA job can't OOM-kill the container
+    mem_limit: 20g
+    memswap_limit: 20g
     deploy:
       resources:
         reservations:

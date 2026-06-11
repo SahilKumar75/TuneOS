@@ -46,7 +46,7 @@ def _run_finetune_impl(
     output_col: str = "output",
 ):
     """Core logic, separated so it can be unit-tested without a live Celery broker."""
-    from app.state.experiments_db import save_run_metrics, write_job_status
+    from db.experiments_db import save_run_metrics, write_job_status
 
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"
@@ -75,6 +75,7 @@ def _run_finetune_impl(
         # Durable record so GET /jobs works even if Redis is unavailable
         write_job_status(job_id, "running", started_at=started_at)
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))
+        r.expire(status_key, 21600)  # 6h — covers Modal max job time
 
         backend = train_cfg.get("compute_backend", "local")
         output_path = os.path.join(train_cfg["output_dir"], job_id)
@@ -93,6 +94,14 @@ def _run_finetune_impl(
             # eval metrics; we write the adapter to local disk and persist
             # metrics through the same path as a local run.
             from workers.modal_runner import run_on_modal
+
+            # #16 — signal GPU provisioning so UI shows a banner instead of spinner
+            r.set(
+                status_key,
+                json.dumps({"status": "provisioning", "job_id": job_id,
+                            "message": "Provisioning GPU on Modal..."}),
+            )
+            r.expire(status_key, 21600)
 
             result = run_on_modal(
                 job_id=job_id,
@@ -148,7 +157,7 @@ def _run_finetune_impl(
         # Persist eval to SQLite as well, so GET /jobs/{id}/eval survives a Redis
         # restart / TTL expiry (durable fallback alongside the Redis copy).
         try:
-            from app.state.experiments_db import save_final_metrics
+            from db.experiments_db import save_final_metrics
 
             save_final_metrics(
                 job_id,
@@ -170,6 +179,8 @@ def _run_finetune_impl(
                 }
             ),
         )
+        r.expire(status_key, 172800)  # 48h
+        r.expire(f"job:{job_id}:eval", 172800)  # 48h
         return output_path
 
     except Exception as e:
@@ -186,6 +197,7 @@ def _run_finetune_impl(
         if suggestion:
             payload["suggestion"] = suggestion
         r.set(status_key, json.dumps(payload))
+        r.expire(status_key, 172800)  # 48h
         raise
 
     finally:
@@ -202,7 +214,7 @@ def _run_finetune_impl(
             pass
 
 
-@celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200)
+@celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200, queue="sft")
 def run_finetune(
     self,
     job_id: str,

@@ -303,6 +303,8 @@ class FinetuneState(rx.State):
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
     prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
     packing: bool = False
+    compose_adapters: bool = False
+    overlay_technique: str = "lora"
 
     # ── Computed vars ─────────────────────────────────────────────
     @rx.var
@@ -1647,6 +1649,15 @@ Write ONLY the summary, no other text."""
     @rx.event
     def set_packing(self, value: bool):
         self.packing = value
+
+    @rx.event
+    def set_compose_adapters(self, value: bool):
+        self.compose_adapters = value
+
+    @rx.event
+    def set_overlay_technique(self, value: str):
+        if value in ("lora", "adalora", "ia3"):
+            self.overlay_technique = value
 
     @rx.event
     def set_learning_rate(self, value: str):

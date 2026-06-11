@@ -12,10 +12,14 @@ adalora — AdaLoRA: adaptive rank allocation per-layer
 ia3     — IA³: scales activations with learned vectors (very few params)
 prefix  — Prefix Tuning: learned prefix tokens prepended to the input
 prompt  — Prompt Tuning: soft prompt tokens only (even fewer params)
+
+Also exports ``stack_adapter()`` for researcher workflows that layer multiple
+adapter types via ``PeftMixedModel`` (gated behind ``ui_mode == "advanced"``).
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -227,3 +231,72 @@ def get_strategy(technique: str) -> AdapterStrategy:
         supported = ", ".join(REGISTRY)
         raise ValueError(f"Unknown adapter technique {technique!r}. Supported: {supported}")
     return strategy
+
+
+# ── Adapter composition (advanced / researcher workflows) ─────────────────────
+
+_logger = logging.getLogger(__name__)
+
+_OVERLAY_CONFIGS: dict[str, type] = {}  # populated lazily below
+
+
+def stack_adapter(
+    model,
+    technique: str = "lora",
+    r: int = 8,
+    lora_alpha: int = 16,
+    lora_dropout: float = 0.05,
+    adapter_name: str = "overlay",
+):
+    """Stack a second PEFT adapter on top of an already-adapted model.
+
+    Args:
+        model: A model that already has a primary PEFT adapter applied.
+        technique: One of "lora", "adalora", "ia3".
+        r: LoRA/AdaLoRA rank for the overlay adapter.
+        lora_alpha: Scaling factor (LoRA/AdaLoRA only).
+        lora_dropout: Dropout rate (LoRA/AdaLoRA only).
+        adapter_name: Name used to identify the overlay adapter in PeftMixedModel.
+
+    Returns:
+        A ``PeftMixedModel`` wrapping both adapters.
+    """
+    from peft import AdaLoraConfig, IA3Config, LoraConfig, PeftMixedModel, TaskType
+
+    from trainer.config import get_target_modules
+
+    _valid = {"lora", "adalora", "ia3"}
+    if technique not in _valid:
+        raise ValueError(f"overlay_technique must be one of {sorted(_valid)}; got {technique!r}")
+
+    model_type = getattr(getattr(model, "config", None), "model_type", "")
+    target_modules = get_target_modules(model_type)
+
+    if technique == "lora":
+        peft_cfg = LoraConfig(
+            r=r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+            target_modules=target_modules,
+        )
+    elif technique == "adalora":
+        peft_cfg = AdaLoraConfig(
+            init_r=r * 2,
+            target_r=r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+            target_modules=target_modules,
+        )
+    else:  # ia3
+        peft_cfg = IA3Config(
+            task_type=TaskType.CAUSAL_LM,
+            target_modules=target_modules,
+            feedforward_modules=target_modules,
+        )
+
+    _logger.info("Stacking %r overlay adapter on %s backbone", technique, model_type or "unknown")
+    return PeftMixedModel(model, peft_cfg, adapter_name=adapter_name)

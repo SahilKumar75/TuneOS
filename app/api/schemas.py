@@ -75,6 +75,8 @@ class JobConfig(BaseModel):
     user_intent: str = ""
     experiment_name: str = ""
     experiment_id: str = ""
+    compose_adapters: bool = False
+    overlay_technique: str = "lora"
 
 
 class DPOJobConfig(BaseModel):

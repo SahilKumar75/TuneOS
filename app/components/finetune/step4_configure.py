@@ -598,10 +598,118 @@ def _step4() -> rx.Component:
                             spacing="4",
                             width="100%",
                         ),
-                        spacing="0",
-                    )
+                        rx.vstack(
+                            _label("Experiment name"),
+                            rx.input(
+                                placeholder="my-run-1",
+                                value=FinetuneState.experiment_name,
+                                on_change=FinetuneState.set_experiment_name,
+                                width="100%",
+                            ),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Eval split ratio"),
+                            rx.slider(
+                                min=0.0,
+                                max=0.3,
+                                step=0.05,
+                                default_value=[FinetuneState.eval_split_ratio],
+                                on_value_commit=FinetuneState.set_eval_split_ratio,
+                            ),
+                            rx.text(
+                                FinetuneState.eval_split_ratio.to_string(),
+                                font_size="0.82rem",
+                                color=c("text_secondary"),
+                            ),
+                            rx.text(
+                                "Fraction held out for validation",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        rx.vstack(
+                            _label("Early stopping patience"),
+                            rx.input(
+                                value=FinetuneState.early_stopping_patience.to_string(),
+                                on_change=FinetuneState.set_early_stopping_patience,
+                                type="number",
+                                width="100%",
+                            ),
+                            rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
+                            spacing="1",
+                        ),
+                        columns="3",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    # Section 4 — Adapter Composition (researcher feature)
+                    rx.text(
+                        "Adapter Composition",
+                        font_size="0.78rem",
+                        font_weight="600",
+                        color=c("text_secondary"),
+                        margin_top="16px",
+                    ),
+                    rx.divider(margin_y="6px"),
+                    rx.vstack(
+                        rx.hstack(
+                            rx.switch(
+                                checked=FinetuneState.compose_adapters,
+                                on_change=FinetuneState.set_compose_adapters,
+                                size="2",
+                            ),
+                            rx.vstack(
+                                rx.text(
+                                    "Stack a second adapter (PeftMixedModel)",
+                                    font_size="0.84rem",
+                                    font_weight="500",
+                                    color=c("text_primary"),
+                                ),
+                                rx.text(
+                                    "Trains a second LoRA on top of the first using PEFT's PeftMixedModel. "
+                                    "Both adapters are saved together and loaded at inference time.",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
+                                ),
+                                spacing="0",
+                                align_items="flex-start",
+                            ),
+                            spacing="3",
+                            align="start",
+                            width="100%",
+                        ),
+                        rx.cond(
+                            FinetuneState.compose_adapters,
+                            rx.vstack(
+                                _label("Overlay adapter technique"),
+                                rx.select.root(
+                                    rx.select.trigger(width="100%"),
+                                    rx.select.content(
+                                        *[
+                                            rx.select.item(v, value=v)
+                                            for v in ["lora", "adalora", "ia3"]
+                                        ],
+                                    ),
+                                    value=FinetuneState.overlay_technique,
+                                    on_change=FinetuneState.set_overlay_technique,
+                                ),
+                                rx.text(
+                                    "ia3 adds the fewest parameters; adalora adapts rank dynamically",
+                                    font_size="0.72rem",
+                                    color=c("text_muted"),
+                                ),
+                                spacing="1",
+                                width="100%",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="3",
+                        width="100%",
+                    ),
+                    spacing="0",
                 ),
-                rx.fragment(),
             ),
             rx.fragment(),  # is_sft else-branch
         ),

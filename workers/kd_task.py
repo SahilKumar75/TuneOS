@@ -34,7 +34,7 @@ def _run_distill_impl(
     instruction_col: str = "instruction",
     output_col: str = "output",
 ):
-    from app.state.experiments_db import save_run_metrics, write_job_status
+    from db.experiments_db import save_run_metrics, write_job_status
 
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"
@@ -49,6 +49,7 @@ def _run_distill_impl(
     try:
         write_job_status(job_id, "running", started_at=started_at)
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))
+        r.expire(status_key, 21600)
 
         output_path, _, _ = distill(
             ModelConfig(**model_cfg),
@@ -68,6 +69,7 @@ def _run_distill_impl(
             status_key,
             json.dumps({"status": "done", "job_id": job_id, "output_path": output_path}),
         )
+        r.expire(status_key, 172800)
         return output_path
 
     except Exception as e:
@@ -84,6 +86,7 @@ def _run_distill_impl(
                 }
             ),
         )
+        r.expire(status_key, 172800)
         raise
 
     finally:
@@ -97,7 +100,7 @@ def _run_distill_impl(
             pass
 
 
-@celery_app.task(bind=True, name="workers.kd_task.run_distill", time_limit=7200)
+@celery_app.task(bind=True, name="workers.kd_task.run_distill", time_limit=7200, queue="kd")
 def run_distill(
     self,
     job_id: str,

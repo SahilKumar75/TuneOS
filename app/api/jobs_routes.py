@@ -585,17 +585,11 @@ async def get_eval(job_id: str):
     return {"status": "not_ready", "perplexity": None, "bleu": None}
 
 
-@router.post("/jobs/{job_id}/infer")
-async def infer(job_id: str, req: InferRequest):
+def _do_infer(
+    job_id: str, adapter_dir: str, prompt: str, max_new_tokens: int, temperature: float
+) -> str:
+    """Sync inference logic — runs in a threadpool so the event loop stays free."""
     import torch
-
-    state = _get_job_status_from_redis(job_id)
-    if state.get("status") != "done":
-        raise HTTPException(status_code=400, detail="Job not complete")
-
-    adapter_dir = state.get("output_path") or _resolve_job_dir(job_id)
-    if not os.path.isdir(adapter_dir):
-        raise HTTPException(status_code=404, detail="Adapter directory not found")
 
     with _INFER_CACHE_LOCK:
         if job_id not in _INFER_CACHE:
@@ -623,20 +617,36 @@ async def infer(job_id: str, req: InferRequest):
                 raise HTTPException(status_code=500, detail=f"Failed to load model: {exc}") from exc
 
         model, tokenizer = _INFER_CACHE[job_id]
+
     try:
-        inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
             out = model.generate(
                 **inputs,
-                max_new_tokens=req.max_new_tokens,
-                temperature=req.temperature,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        response = tokenizer.decode(
-            out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
-        )
+        return tokenizer.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
 
+
+@router.post("/jobs/{job_id}/infer")
+async def infer(job_id: str, req: InferRequest):
+    # #17 — model load + generate are sync/blocking; run off the event loop
+    from starlette.concurrency import run_in_threadpool
+
+    state = _get_job_status_from_redis(job_id)
+    if state.get("status") != "done":
+        raise HTTPException(status_code=400, detail="Job not complete")
+
+    adapter_dir = state.get("output_path") or _resolve_job_dir(job_id)
+    if not os.path.isdir(adapter_dir):
+        raise HTTPException(status_code=404, detail="Adapter directory not found")
+
+    response = await run_in_threadpool(
+        _do_infer, job_id, adapter_dir, req.prompt, req.max_new_tokens, req.temperature
+    )
     return {"response": response}

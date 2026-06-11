@@ -41,7 +41,7 @@ def _run_dpo_impl(
     rejected_col: str = "rejected",
 ):
     """Core logic, separated so it can be unit-tested without a live broker."""
-    from app.state.experiments_db import save_run_metrics, write_job_status
+    from db.experiments_db import save_run_metrics, write_job_status
 
     r = redis.from_url(REDIS_URL)
     status_key = f"job:{job_id}:status"
@@ -56,6 +56,7 @@ def _run_dpo_impl(
     try:
         write_job_status(job_id, "running", started_at=started_at)
         r.set(status_key, json.dumps({"status": "running", "job_id": job_id}))
+        r.expire(status_key, 21600)
 
         output_path, _, _ = train_dpo(
             ModelConfig(**model_cfg),
@@ -76,6 +77,7 @@ def _run_dpo_impl(
             status_key,
             json.dumps({"status": "done", "job_id": job_id, "output_path": output_path}),
         )
+        r.expire(status_key, 172800)
         return output_path
 
     except Exception as e:
@@ -92,6 +94,7 @@ def _run_dpo_impl(
                 }
             ),
         )
+        r.expire(status_key, 172800)
         raise
 
     finally:
@@ -105,7 +108,7 @@ def _run_dpo_impl(
             pass
 
 
-@celery_app.task(bind=True, name="workers.dpo_task.run_dpo", time_limit=7200)
+@celery_app.task(bind=True, name="workers.dpo_task.run_dpo", time_limit=7200, queue="dpo")
 def run_dpo(
     self,
     job_id: str,

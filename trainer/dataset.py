@@ -187,6 +187,28 @@ def load_raw_text(
     )
 
 
+def load_raw_dataset(
+    file_path: str,
+    hub_dataset_id: str = "",
+    hub_split: str = "train",
+    instruction_col: str = "instruction",
+    output_col: str = "output",
+    template: str = "alpaca",
+) -> Dataset:
+    """Return the raw dataset with instruction/output columns (not yet tokenized).
+
+    Used by finetune.py to split before tokenizing (#23) so we don't waste
+    compute tokenizing examples that end up in the eval set.
+    """
+    return _load_raw(
+        file_path,
+        hub_dataset_id=hub_dataset_id,
+        hub_split=hub_split,
+        instruction_col=instruction_col,
+        output_col=output_col,
+    )
+
+
 def load_and_tokenize(
     file_path: str,
     tokenizer: PreTrainedTokenizer,
@@ -196,17 +218,23 @@ def load_and_tokenize(
     instruction_col: str = "instruction",
     output_col: str = "output",
     template: str = "alpaca",
+    preloaded: Dataset | None = None,
 ) -> Dataset:
+    """Load, format, and tokenize a dataset.
+
+    If ``preloaded`` is given (a pre-split raw Dataset) the load step is
+    skipped, avoiding redundant I/O when split-before-tokenize is active.
     """
-    Load from a local file or HF Hub dataset, apply column mapping,
-    format as instruction prompts, and tokenize.
-    """
-    raw = _load_raw(
-        file_path,
-        hub_dataset_id=hub_dataset_id,
-        hub_split=hub_split,
-        instruction_col=instruction_col,
-        output_col=output_col,
+    raw = (
+        preloaded
+        if preloaded is not None
+        else _load_raw(
+            file_path,
+            hub_dataset_id=hub_dataset_id,
+            hub_split=hub_split,
+            instruction_col=instruction_col,
+            output_col=output_col,
+        )
     )
 
     raw = raw.map(lambda x: {"text": format_prompt(x, template=template)})

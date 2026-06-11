@@ -56,9 +56,12 @@ def finetune(
     # 1. Prepare model — technique routing expanded in P3 (adapters.py strategy registry)
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
-    # 2. Load dataset (optionally splitting off a validation set below). With
-    # packing the trainer tokenizes raw text itself; otherwise we pre-tokenize.
-    # Both honor the selected prompt template.
+    # 2. Load dataset. #23 — when a validation split is requested and we're NOT
+    # packing, split the raw dataset first so we only tokenize what we train on.
+    eval_dataset = None
+    ratio = train_cfg.eval_split_ratio
+    _do_split = ratio and 0.0 < ratio < 1.0
+
     if train_cfg.packing:
         from trainer.dataset import load_raw_text
 
@@ -70,24 +73,69 @@ def finetune(
             output_col=output_col,
             template=train_cfg.prompt_template,
         )
+        # Packing trainer handles tokenisation internally — split on raw text.
+        if _do_split and len(dataset) >= 2 and int(len(dataset) * ratio) >= 1:
+            raw_split = dataset.train_test_split(test_size=ratio, seed=train_cfg.seed)
+            dataset, eval_dataset = raw_split["train"], raw_split["test"]
     else:
-        dataset = load_and_tokenize(
-            dataset_path,
-            tokenizer,
-            model_cfg.max_seq_length,
-            hub_dataset_id=hub_dataset_id,
-            hub_split=hub_split,
-            instruction_col=instruction_col,
-            output_col=output_col,
-            template=train_cfg.prompt_template,
-        )
+        if _do_split:
+            # #23 — split raw dataset before tokenising so eval tokens are never computed.
+            from trainer.dataset import load_raw_dataset
 
-    eval_dataset = None
-    ratio = train_cfg.eval_split_ratio
-    # Only split if a meaningful validation set (>=1 example) can be carved out.
-    if ratio and 0.0 < ratio < 1.0 and len(dataset) >= 2 and int(len(dataset) * ratio) >= 1:
-        split = dataset.train_test_split(test_size=ratio, seed=train_cfg.seed)
-        dataset, eval_dataset = split["train"], split["test"]
+            raw = load_raw_dataset(
+                dataset_path,
+                hub_dataset_id=hub_dataset_id,
+                hub_split=hub_split,
+                instruction_col=instruction_col,
+                output_col=output_col,
+                template=train_cfg.prompt_template,
+            )
+            if len(raw) >= 2 and int(len(raw) * ratio) >= 1:
+                raw_split = raw.train_test_split(test_size=ratio, seed=train_cfg.seed)
+                dataset = load_and_tokenize(
+                    dataset_path,
+                    tokenizer,
+                    model_cfg.max_seq_length,
+                    hub_dataset_id=hub_dataset_id,
+                    hub_split=hub_split,
+                    instruction_col=instruction_col,
+                    output_col=output_col,
+                    template=train_cfg.prompt_template,
+                    preloaded=raw_split["train"],
+                )
+                eval_dataset = load_and_tokenize(
+                    dataset_path,
+                    tokenizer,
+                    model_cfg.max_seq_length,
+                    hub_dataset_id=hub_dataset_id,
+                    hub_split=hub_split,
+                    instruction_col=instruction_col,
+                    output_col=output_col,
+                    template=train_cfg.prompt_template,
+                    preloaded=raw_split["test"],
+                )
+            else:
+                dataset = load_and_tokenize(
+                    dataset_path,
+                    tokenizer,
+                    model_cfg.max_seq_length,
+                    hub_dataset_id=hub_dataset_id,
+                    hub_split=hub_split,
+                    instruction_col=instruction_col,
+                    output_col=output_col,
+                    template=train_cfg.prompt_template,
+                )
+        else:
+            dataset = load_and_tokenize(
+                dataset_path,
+                tokenizer,
+                model_cfg.max_seq_length,
+                hub_dataset_id=hub_dataset_id,
+                hub_split=hub_split,
+                instruction_col=instruction_col,
+                output_col=output_col,
+                template=train_cfg.prompt_template,
+            )
 
     use_early_stopping = bool(train_cfg.early_stopping_patience) and eval_dataset is not None
     # Step-level eval (denser eval_loss curve) when eval_steps>0 and a split exists.
@@ -168,4 +216,13 @@ def finetune(
         raise
 
     save_adapter(model, output_path)
+    # #15 — offload model from VRAM before post-training eval to avoid OOM on 16GB GPUs
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            model.cpu()
+    except Exception:
+        pass
     return output_path, model, tokenizer

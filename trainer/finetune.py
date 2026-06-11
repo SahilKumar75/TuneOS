@@ -38,6 +38,7 @@ def finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
+    technique: str = "qlora",
 ):
     """
     Full fine-tuning pipeline:
@@ -52,7 +53,7 @@ def finetune(
     # Seed every source of randomness up front so the run is reproducible.
     set_seed(train_cfg.seed)
 
-    # 1. Prepare model
+    # 1. Prepare model — technique routing expanded in P3 (adapters.py strategy registry)
     model, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
 
     # 2. Load dataset (optionally splitting off a validation set below). With
@@ -126,6 +127,7 @@ def finetune(
         max_grad_norm=train_cfg.max_grad_norm,
         report_to=train_cfg.report_to,  # external tracker(s); "none" by default
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         seed=train_cfg.seed,
         data_seed=train_cfg.seed,
         torch_compile=train_cfg.use_torch_compile,

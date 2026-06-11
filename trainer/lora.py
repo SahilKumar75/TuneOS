@@ -19,7 +19,9 @@ def inject_lora(model, lora_cfg: LoraConfig):
     """
     model = prepare_model_for_kbit_training(model)
 
-    if lora_cfg.target_modules is None:
+    if lora_cfg.use_all_linear:
+        target_modules = "all-linear"
+    elif lora_cfg.target_modules is None:
         # Coerce to str — custom configs may carry a non-string model_type.
         model_type = str(getattr(getattr(model, "config", None), "model_type", "") or "")
         target_modules = get_target_modules(model_type)
@@ -31,7 +33,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
         lora_alpha=lora_cfg.lora_alpha,
         lora_dropout=lora_cfg.lora_dropout,
         bias=lora_cfg.bias,
-        task_type=TaskType.CAUSAL_LM,
+        task_type=getattr(TaskType, lora_cfg.task_type),
         target_modules=target_modules,
         init_lora_weights=lora_cfg.init_lora_weights,
     )

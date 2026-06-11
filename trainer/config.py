@@ -76,6 +76,8 @@ class LoraConfig:
     task_type: str = "CAUSAL_LM"
     # None → auto-detected from model.config.model_type in inject_lora()
     target_modules: list[str] | None = None
+    # True → pass target_modules="all-linear" to PEFT, skipping arch-map lookup
+    use_all_linear: bool = False
     # PEFT adapter init strategy: True (default), "gaussian", or "pissa" etc.
     init_lora_weights: str | bool = True
 

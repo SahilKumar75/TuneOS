@@ -5,10 +5,12 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import threading
 import uuid
 import zipfile
 
+import redis as _redis
 from cachetools import LRUCache
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -30,6 +32,30 @@ from app.api.schemas import (
 )
 
 router = APIRouter()
+
+_T5_FAMILIES = ("t5", "mt5")
+_MODEL_ID_RE = re.compile(r"^[a-zA-Z0-9_.'\-/]+$")
+_MODEL_ID_MAX_LEN = 200
+
+
+def _validate_model_id(model_id: str) -> None:
+    """Raise HTTP 400 if model_id contains unsafe characters or is too long."""
+    if not model_id or len(model_id) > _MODEL_ID_MAX_LEN:
+        raise HTTPException(status_code=400, detail="model_id must be 1–200 characters")
+    if not _MODEL_ID_RE.match(model_id):
+        raise HTTPException(
+            status_code=400,
+            detail="model_id may only contain letters, digits, dots, dashes, underscores, and slashes",
+        )
+
+
+def _detect_task_type(model_id: str) -> str:
+    """Return PEFT TaskType string based on model ID. T5/mT5 need SEQ_2_SEQ_LM."""
+    name = model_id.lower()
+    if any(f in name for f in _T5_FAMILIES):
+        return "SEQ_2_SEQ_LM"
+    return "CAUSAL_LM"
+
 
 # Bounded LRU of loaded inference models — each is GBs, so cap how many stay
 # resident; the least-recently-used is evicted when full. A single lock
@@ -59,6 +85,7 @@ async def list_jobs(limit: int = 50, offset: int = 0):
 
 def _build_finetune_kwargs(config: JobConfig) -> dict:
     """Translate a JobConfig into the run_finetune task kwargs."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
     model_cfg = {
         "model_name": config.model_id,
@@ -66,18 +93,14 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
-    lora_cfg = {
-        "r": config.lora_rank,
-        "lora_alpha": config.lora_alpha,
-        "lora_dropout": config.lora_dropout,
-        "bias": "none",
-        "task_type": "CAUSAL_LM",
-        "target_modules": None,  # auto-detected from model architecture in trainer/lora.py
-    }
+    from trainer.adapter_config import AdapterConfig
+
+    _adapter = AdapterConfig.from_job_config(config)
+    _adapter.task_type = _detect_task_type(config.model_id)
+    lora_cfg = _adapter.to_lora_cfg_dict()
     train_cfg = {
         "output_dir": OUTPUT_DIR,
         "num_train_epochs": config.epochs,
@@ -90,7 +113,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "save_steps": 100,
         "warmup_ratio": config.warmup_ratio,
         "lr_scheduler_type": config.lr_scheduler_type,
-        "optim": "paged_adamw_32bit",
+        "optim": config.optim,
         "max_grad_norm": 0.3,
         "eval_split_ratio": config.eval_split_ratio,
         "early_stopping_patience": config.early_stopping_patience,
@@ -102,6 +125,7 @@ def _build_finetune_kwargs(config: JobConfig) -> dict:
         "prompt_template": config.prompt_template,
         "packing": config.packing,
         "fsdp": config.fsdp,
+        "technique": config.technique,
     }
     return {
         "job_id": job_id,
@@ -120,6 +144,8 @@ def _enqueue_finetune(config: JobConfig) -> str:
     """Enqueue one SFT job (worker-alive guarded); returns its job_id."""
     kwargs = _build_finetune_kwargs(config)
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60)
     try:
         from workers.train_task import run_finetune
 
@@ -159,6 +185,7 @@ def _ensure_worker_alive() -> None:
 @router.post("/jobs/dpo", response_model=JobCreated, status_code=201)
 async def create_dpo_job(config: DPOJobConfig):
     """Create and enqueue a DPO (preference) fine-tuning job."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
 
     model_cfg = {
@@ -167,7 +194,6 @@ async def create_dpo_job(config: DPOJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
@@ -176,7 +202,7 @@ async def create_dpo_job(config: DPOJobConfig):
         "lora_alpha": config.lora_alpha,
         "lora_dropout": config.lora_dropout,
         "bias": "none",
-        "task_type": "CAUSAL_LM",
+        "task_type": _detect_task_type(config.model_id),
         "target_modules": None,
     }
     dpo_cfg = {
@@ -194,6 +220,8 @@ async def create_dpo_job(config: DPOJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
 
     try:
         from workers.dpo_task import run_dpo
@@ -222,6 +250,7 @@ async def create_dpo_job(config: DPOJobConfig):
 @router.post("/jobs/distill", response_model=JobCreated, status_code=201)
 async def create_distill_job(config: DistillJobConfig):
     """Create and enqueue a knowledge-distillation job (teacher → LoRA student)."""
+    _validate_model_id(config.model_id)
     job_id = config.experiment_id or str(uuid.uuid4())
 
     model_cfg = {
@@ -230,7 +259,6 @@ async def create_distill_job(config: DistillJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
     }
@@ -239,7 +267,7 @@ async def create_distill_job(config: DistillJobConfig):
         "lora_alpha": config.lora_alpha,
         "lora_dropout": config.lora_dropout,
         "bias": "none",
-        "task_type": "CAUSAL_LM",
+        "task_type": _detect_task_type(config.model_id),
         "target_modules": None,
     }
     distill_cfg = {
@@ -259,6 +287,8 @@ async def create_distill_job(config: DistillJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
     try:
         from workers.kd_task import run_distill
 

@@ -144,6 +144,7 @@ class TestRunFinetuneTask:
     def test_sets_running_status_on_start(self):
         model_cfg, lora_cfg, train_cfg = self._base_configs()
         mock_redis = MagicMock()
+        mock_redis.getdel.return_value = None
         mock_finetune = MagicMock(return_value=("/outputs/job1", MagicMock(), MagicMock()))
 
         with (
@@ -161,6 +162,7 @@ class TestRunFinetuneTask:
     def test_sets_done_status_on_success(self):
         model_cfg, lora_cfg, train_cfg = self._base_configs()
         mock_redis = MagicMock()
+        mock_redis.getdel.return_value = None
         mock_finetune = MagicMock(return_value=("/outputs/job2", MagicMock(), MagicMock()))
 
         with (
@@ -180,6 +182,7 @@ class TestRunFinetuneTask:
     def test_sets_failed_status_on_exception(self):
         model_cfg, lora_cfg, train_cfg = self._base_configs()
         mock_redis = MagicMock()
+        mock_redis.getdel.return_value = None
 
         with (
             patch("workers.train_task.redis.from_url", return_value=mock_redis),

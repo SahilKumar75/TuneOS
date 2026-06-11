@@ -356,7 +356,21 @@ def _step4() -> rx.Component:
                             ),
                             spacing="1",
                         ),
-                        columns="2",
+                        rx.vstack(
+                            _label("Auto-detect all linear layers (recommended)"),
+                            rx.switch(
+                                checked=FinetuneState.use_all_linear,
+                                on_change=FinetuneState.set_use_all_linear,
+                                size="2",
+                            ),
+                            rx.text(
+                                "Passes target_modules='all-linear' to PEFT — no architecture map needed",
+                                font_size="0.72rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="1",
+                        ),
+                        columns="3",
                         spacing="4",
                         width="100%",
                     ),

@@ -173,6 +173,11 @@ class SweepRequest(BaseModel):
     grid: dict[str, list] = {}
 
 
+class SweepResponse(BaseModel):
+    count: int
+    job_ids: list[str]
+
+
 class JobStatus(BaseModel):
     job_id: str
     status: str

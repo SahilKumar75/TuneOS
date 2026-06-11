@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import re
+import tempfile
 import threading
 import uuid
 import zipfile
@@ -29,10 +29,33 @@ from app.api.schemas import (
     MergeRequest,
     PushHubRequest,
     SweepRequest,
+    SweepResponse,
     VisionJobConfig,
 )
 
 router = APIRouter()
+
+_ZIP_CHUNK = 65536  # 64 KiB
+
+
+def _stream_dir_as_zip(src_dir: str):
+    """Write src_dir into a temp file zip and yield it in chunks, then delete the temp file."""
+    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, _, files in os.walk(src_dir):
+                for fname in files:
+                    full = os.path.join(root, fname)
+                    zf.write(full, os.path.relpath(full, src_dir))
+        tmp.seek(0)
+        while True:
+            chunk = tmp.read(_ZIP_CHUNK)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        tmp.close()
+        os.unlink(tmp.name)
 
 _T5_FAMILIES = ("t5", "mt5")
 _MODEL_ID_RE = re.compile(r"^[a-zA-Z0-9_.'\-/]+$")
@@ -380,7 +403,7 @@ async def create_vision_job(config: VisionJobConfig):
     return JobCreated(job_id=job_id)
 
 
-@router.post("/jobs/sweep")
+@router.post("/jobs/sweep", response_model=SweepResponse)
 async def create_sweep(req: SweepRequest):
     """Expand a hyperparameter grid over the base config and enqueue one SFT job
     per combination. Returns the list of job ids (visualize them on /compare)."""
@@ -392,7 +415,7 @@ async def create_sweep(req: SweepRequest):
     for cfg in configs:
         cfg["experiment_id"] = ""  # each combination gets a fresh id
         job_ids.append(_enqueue_finetune(JobConfig(**cfg)))
-    return {"count": len(job_ids), "job_ids": job_ids}
+    return SweepResponse(count=len(job_ids), job_ids=job_ids)
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
@@ -437,16 +460,8 @@ async def download_adapter(job_id: str):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(adapter_dir):
-            for fname in files:
-                full = os.path.join(root, fname)
-                arcname = os.path.relpath(full, adapter_dir)
-                zf.write(full, arcname)
-    buf.seek(0)
     return StreamingResponse(
-        buf,
+        _stream_dir_as_zip(adapter_dir),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=adapter_{job_id[:8]}.zip"},
     )
@@ -516,16 +531,8 @@ async def download_merged(job_id: str):
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=404, detail="Merged model not found — run merge first")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(merged_dir):
-            for fname in files:
-                full = os.path.join(root, fname)
-                arcname = os.path.relpath(full, merged_dir)
-                zf.write(full, arcname)
-    buf.seek(0)
     return StreamingResponse(
-        buf,
+        _stream_dir_as_zip(merged_dir),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=merged_{job_id[:8]}.zip"},
     )

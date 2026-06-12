@@ -47,4 +47,7 @@ def mock_redis(monkeypatch):
     client.get.return_value = None
     client.getdel.return_value = None
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    import redis
+
+    monkeypatch.setattr(redis, "from_url", MagicMock(return_value=client))
     return client

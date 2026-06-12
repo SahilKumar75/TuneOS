@@ -223,17 +223,28 @@ def test_infer_temperature_out_of_range_fails():
 
 
 def test_datasets_search_returns_200():
-    # q is optional — omitting returns trending datasets
-    resp = client.get("/datasets/search")
-    assert resp.status_code in (200, 503)  # 503 when HF Hub unreachable
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    fake = SimpleNamespace(id="fake/dataset", downloads=42, tags=["text"])
+    with patch("huggingface_hub.list_datasets", return_value=iter([fake])):
+        resp = client.get("/datasets/search")
+    assert resp.status_code == 200
 
 
 def test_datasets_search_response_has_results_key():
-    resp = client.get("/datasets/search")
-    if resp.status_code == 200:
-        data = resp.json()
-        assert "results" in data
-        assert isinstance(data["results"], list)
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    fake = SimpleNamespace(id="fake/dataset", downloads=42, tags=["text"])
+    with patch("huggingface_hub.list_datasets", return_value=iter([fake])):
+        resp = client.get("/datasets/search")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "results" in data
+    assert data["results"] == [
+        {"id": "fake/dataset", "downloads": 42, "tags": ["text"], "description": ""}
+    ]
 
 
 # ── /experiments ─────────────────────────────────────────────────

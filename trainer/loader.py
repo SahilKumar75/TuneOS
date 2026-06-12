@@ -17,7 +17,7 @@ def _resolve_model_path(cfg: ModelConfig) -> str:
     return cfg.model_name
 
 
-def load_model_and_tokenizer(cfg: ModelConfig):
+def load_model_and_tokenizer(cfg: ModelConfig, device_map: str | dict | None = None):
     """
     Load any Transformers-compatible model with optional 4-bit/8-bit quantization.
     Supports HF Hub IDs, local paths, and any string from_pretrained accepts.
@@ -27,7 +27,7 @@ def load_model_and_tokenizer(cfg: ModelConfig):
     token = cfg.hf_token or os.getenv("HF_TOKEN") or None
     local_only = cfg.model_source == "local" and os.path.exists(model_path)
 
-    torch_dtype = torch.bfloat16 if cfg.bf16 else torch.float16
+    torch_dtype = torch.bfloat16 if cfg.bf16 else torch.float16 if cfg.fp16 else torch.float32
 
     bnb_config = None
     if cfg.use_4bit:
@@ -50,7 +50,7 @@ def load_model_and_tokenizer(cfg: ModelConfig):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map=device_map if device_map is not None else "auto",
         trust_remote_code=cfg.trust_remote_code,
         torch_dtype=torch_dtype,
         token=token,

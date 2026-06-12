@@ -178,6 +178,8 @@ def _enqueue_finetune(config: JobConfig) -> str:
 
         run_finetune.apply_async(kwargs=kwargs, task_id=kwargs["job_id"])
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{kwargs['job_id']}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}") from exc
     return kwargs["job_id"]
 
@@ -271,6 +273,8 @@ async def create_dpo_job(config: DPOJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue DPO job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
@@ -336,6 +340,8 @@ async def create_distill_job(config: DistillJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(
             status_code=503, detail=f"Could not enqueue distillation job: {exc}"
         ) from exc
@@ -400,6 +406,8 @@ async def create_vision_job(config: VisionJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue vision job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
@@ -523,6 +531,8 @@ async def merge_adapter(job_id: str, req: MergeRequest):
             task_id=f"{job_id}-merge",
         )
     except Exception as exc:
+        if _token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}-merge:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue merge: {exc}") from exc
 
     return {"status": "merging", "job_id": job_id}
@@ -574,6 +584,9 @@ async def export_gguf(job_id: str, req: GgufRequest):
 
 @router.post("/jobs/{job_id}/push-github")
 async def push_github(job_id: str, req: GitHubPushRequest):
+    if not req.github_token:
+        raise HTTPException(status_code=400, detail="GitHub token required")
+
     adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
@@ -591,6 +604,7 @@ async def push_github(job_id: str, req: GitHubPushRequest):
             task_id=f"{job_id}-github",
         )
     except Exception as exc:
+        _redis.from_url(REDIS_URL).delete(f"job:{job_id}-github:github_token")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {"status": "pushing"}

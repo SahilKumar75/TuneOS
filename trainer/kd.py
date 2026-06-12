@@ -43,6 +43,14 @@ def distill(
     set_seed(distill_cfg.seed)
 
     # Student gets the LoRA adapter; teacher is loaded frozen (4-bit to save VRAM).
+    # Place teacher on a secondary GPU when available to avoid competing with the
+    # student for VRAM on the primary device.  Load directly onto the target device
+    # via device_map — calling .to() on a quantized model raises ValueError.
+    import torch as _torch
+
+    _teacher_device = (
+        "cuda:1" if _torch.cuda.is_available() and _torch.cuda.device_count() > 1 else "cpu"
+    )
     student, tokenizer = prepare_qlora_model(model_cfg, lora_cfg)
     teacher, _ = load_model_and_tokenizer(
         ModelConfig(
@@ -50,23 +58,12 @@ def distill(
             use_4bit=True,
             max_seq_length=distill_cfg.max_seq_length,
             hf_token=model_cfg.hf_token,
-        )
+        ),
+        device_map={"": _teacher_device},
     )
     teacher.eval()
     for p in teacher.parameters():
         p.requires_grad_(False)
-
-    # Put teacher on a secondary GPU when available to avoid competing with the
-    # student for VRAM on the primary device. Falls back to CPU so training still
-    # works on single-GPU setups (at the cost of host↔device transfer overhead).
-    import torch as _torch
-
-    if _torch.cuda.is_available() and _torch.cuda.device_count() > 1:
-        teacher = teacher.to("cuda:1")
-        _teacher_device = "cuda:1"
-    else:
-        teacher = teacher.to("cpu")
-        _teacher_device = "cpu"
 
     dataset = load_and_tokenize(
         dataset_path,

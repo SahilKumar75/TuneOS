@@ -39,7 +39,8 @@ RUN mkdir -p /app/models_cache /app/outputs /app/storage/datasets /app/uploaded_
 
 # ── Non-root user (P6-2) ─────────────────────────────────────────
 RUN useradd -m appuser \
-    && chown -R appuser:appuser /app /entrypoint.sh 2>/dev/null || true
+    && mkdir -p /run/nginx /var/log/nginx /var/lib/redis /run/redis /var/log/redis \
+    && chown -R appuser:appuser /app /run/nginx /var/log/nginx /var/lib/redis /run/redis /var/log/redis
 
 # ── Environment defaults (override via Space secrets) ────────────
 ENV REDIS_URL=redis://localhost:6379/0 \

@@ -329,8 +329,19 @@ def load_and_tokenize(
             full_enc["input_ids"], prefix_enc["input_ids"], strict=False
         ):
             lbl = list(input_ids)
-            prompt_len = min(len(prefix_ids), len(lbl))
-            lbl[:prompt_len] = [-100] * prompt_len
+            # full_enc uses add_special_tokens=True (may prepend BOS); prefix_enc
+            # does not, so prefix_ids is shorter by exactly 1 when BOS is present.
+            # Shift the mask start past BOS so it stays in the loss, and the last
+            # instruction token is not accidentally included.
+            bos_offset = (
+                1
+                if tokenizer.bos_token_id is not None
+                and len(input_ids) > 0
+                and input_ids[0] == tokenizer.bos_token_id
+                else 0
+            )
+            prompt_len = min(len(prefix_ids), len(lbl) - bos_offset)
+            lbl[bos_offset : bos_offset + prompt_len] = [-100] * prompt_len
             labels.append(lbl)
         full_enc["labels"] = labels
         return full_enc

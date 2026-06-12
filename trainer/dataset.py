@@ -325,7 +325,9 @@ def load_and_tokenize(
             add_special_tokens=False,
         )
         labels = []
-        for input_ids, prefix_ids in zip(full_enc["input_ids"], prefix_enc["input_ids"], strict=False):
+        for input_ids, prefix_ids in zip(
+            full_enc["input_ids"], prefix_enc["input_ids"], strict=False
+        ):
             lbl = list(input_ids)
             prompt_len = min(len(prefix_ids), len(lbl))
             lbl[:prompt_len] = [-100] * prompt_len

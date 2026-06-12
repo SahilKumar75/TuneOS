@@ -159,7 +159,6 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
     if not rows:
         return
     try:
-
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
@@ -182,7 +181,6 @@ def save_final_metrics(run_id: str, metrics: dict[str, Any]) -> None:
     if not rows:
         return
     try:
-
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
@@ -201,7 +199,6 @@ def save_run_params(run_id: str, params: dict[str, Any]) -> None:
         return
     rows = [(run_id, str(k), str(v)) for k, v in params.items()]
     try:
-
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_params (run_id, key, value) VALUES (?, ?, ?) "
@@ -223,7 +220,6 @@ def write_job_status(
     output_path: str = "",
 ) -> None:
     try:
-
         with _get_conn() as conn:
             conn.execute(
                 """
@@ -242,7 +238,6 @@ def write_job_status(
 
 def list_runs(limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
     try:
-
         sql = "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
         params: tuple = ()
         if limit is not None:
@@ -269,7 +264,6 @@ def list_stale_running_jobs(max_age_seconds: int = 7200) -> list[str]:
     Used by the startup sweep to recover from worker crashes.
     """
     try:
-
         cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
         with _get_conn() as conn:
             rows = conn.execute(
@@ -284,7 +278,6 @@ def list_stale_running_jobs(max_age_seconds: int = 7200) -> list[str]:
 
 def get_final_metrics(run_id: str) -> dict[str, float]:
     try:
-
         with _get_conn() as conn:
             rows = conn.execute(
                 "SELECT key, value FROM run_metrics WHERE run_id = ? AND step = -1",
@@ -302,7 +295,6 @@ def get_run_metrics(
     if not run_ids:
         return {}
     try:
-
         placeholders = ",".join("?" * len(run_ids))
         with _get_conn() as conn:
             rows = conn.execute(
@@ -328,7 +320,6 @@ def register_model(
     metric_snapshot: dict[str, Any] | None = None,
 ) -> None:
     try:
-
         with _get_conn() as conn:
             conn.execute(
                 """
@@ -354,7 +345,6 @@ def register_model(
 
 def list_registered_models() -> list[dict[str, Any]]:
     try:
-
         with _get_conn() as conn:
             rows = conn.execute(
                 "SELECT name, run_id, alias, metric_snapshot, registered_at "
@@ -377,7 +367,6 @@ def list_registered_models() -> list[dict[str, Any]]:
 
 def save_experiment_run(run_data: dict[str, Any]):
     try:
-
         with _get_conn() as conn:
             conn.execute(
                 """

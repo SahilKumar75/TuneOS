@@ -57,6 +57,7 @@ def _stream_dir_as_zip(src_dir: str):
         tmp.close()
         os.unlink(tmp.name)
 
+
 _T5_FAMILIES = ("t5", "mt5")
 _MODEL_ID_RE = re.compile(r"^[a-zA-Z0-9_.'\-/]+$")
 _MODEL_ID_MAX_LEN = 200
@@ -206,6 +207,7 @@ def _ensure_worker_alive() -> None:
         raise
     except Exception:
         import logging as _logging
+
         _logging.getLogger(__name__).debug("Worker ping failed — assuming alive", exc_info=True)
 
 

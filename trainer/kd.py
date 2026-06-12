@@ -60,6 +60,7 @@ def distill(
     # student for VRAM on the primary device. Falls back to CPU so training still
     # works on single-GPU setups (at the cost of host↔device transfer overhead).
     import torch as _torch
+
     if _torch.cuda.is_available() and _torch.cuda.device_count() > 1:
         teacher = teacher.to("cuda:1")
         _teacher_device = "cuda:1"

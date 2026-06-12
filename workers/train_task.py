@@ -187,7 +187,9 @@ def _run_finetune_impl(
                 {k: v for k, v in eval_results.items() if isinstance(v, int | float)},
             )
         except Exception:
-            _logger.warning("Failed to persist final eval metrics for job %s", job_id, exc_info=True)
+            _logger.warning(
+                "Failed to persist final eval metrics for job %s", job_id, exc_info=True
+            )
 
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart

@@ -58,7 +58,7 @@ def finetune_vision(
         device_map="auto",
     )
 
-    model = inject_lora(model, model_cfg, lora_cfg)
+    model = inject_lora(model, lora_cfg)
 
     dataset = load_multimodal(
         dataset_path,

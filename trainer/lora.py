@@ -19,6 +19,7 @@ def inject_lora(model, lora_cfg: LoraConfig):
     """
     model = prepare_model_for_kbit_training(model)
 
+    target_modules: str | list[str]
     if lora_cfg.use_all_linear:
         target_modules = "all-linear"
     elif lora_cfg.target_modules is None:

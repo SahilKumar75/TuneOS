@@ -27,7 +27,7 @@ def load_model_and_tokenizer(cfg: ModelConfig, device_map: str | dict | None = N
     token = cfg.hf_token or os.getenv("HF_TOKEN") or None
     local_only = cfg.model_source == "local" and os.path.exists(model_path)
 
-    torch_dtype = torch.bfloat16 if cfg.bf16 else torch.float16 if cfg.fp16 else torch.float32
+    torch_dtype = torch.bfloat16 if cfg.bf16 else torch.float32
 
     bnb_config = None
     if cfg.use_4bit:

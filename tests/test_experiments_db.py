@@ -2,27 +2,9 @@
 
 from __future__ import annotations
 
-import sys
+import importlib
 
 import pytest
-
-# Stub heavy deps before importing anything from the app package.
-for _mod in [
-    "reflex",
-    "torch",
-    "transformers",
-    "peft",
-    "datasets",
-    "accelerate",
-    "trl",
-    "bitsandbytes",
-    "celery",
-    "redis",
-    "httpx",
-]:
-    sys.modules.setdefault(_mod, type(sys)(_mod))
-
-import importlib
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -87,6 +69,7 @@ def test_init_db_creates_tables(tmp_path, monkeypatch):
 
 def test_save_run_metrics_roundtrip(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("run-abc", "running")
     history = [
         {"step": 0, "loss": 2.5, "epoch": 1.0, "learning_rate": 2e-4},
         {"step": 1, "loss": 2.1, "epoch": 1.0, "learning_rate": 2e-4},
@@ -102,6 +85,7 @@ def test_save_run_metrics_roundtrip(tmp_path, monkeypatch):
 
 def test_save_run_metrics_idempotent(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("run-idem", "running")
     history = [{"step": 0, "loss": 1.9}]
     db.save_run_metrics("run-idem", history)
     db.save_run_metrics("run-idem", history)  # second write must not duplicate
@@ -114,6 +98,7 @@ def test_save_run_metrics_idempotent(tmp_path, monkeypatch):
 
 def test_save_run_params_roundtrip(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("run-p1", "running")
     db.save_run_params("run-p1", {"lr": "2e-4", "epochs": 3, "lora_r": 16})
     with db._get_conn() as conn:
         rows = conn.execute(
@@ -185,6 +170,7 @@ def test_write_job_status_insert_and_update(tmp_path, monkeypatch):
 
 def test_register_model_roundtrip(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("run-abc", "running")
     db.register_model("prod-v1", "run-abc", alias="latest", metric_snapshot={"perplexity": 3.2})
     models = db.list_registered_models()
     assert len(models) == 1
@@ -195,6 +181,8 @@ def test_register_model_roundtrip(tmp_path, monkeypatch):
 
 def test_register_model_upsert(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("run-old", "running")
+    db.write_job_status("run-new", "running")
     db.register_model("prod-v1", "run-old", alias="latest")
     db.register_model("prod-v1", "run-new", alias="champion")
     models = db.list_registered_models()
@@ -208,6 +196,8 @@ def test_register_model_upsert(tmp_path, monkeypatch):
 
 def test_get_run_metrics_multiple_runs(tmp_path, monkeypatch):
     db = _reload_db_module(tmp_path, monkeypatch)
+    db.write_job_status("r1", "running")
+    db.write_job_status("r2", "running")
     db.save_run_metrics("r1", [{"step": 0, "loss": 2.0}, {"step": 1, "loss": 1.8}])
     db.save_run_metrics("r2", [{"step": 0, "loss": 2.5}])
     result = db.get_run_metrics(["r1", "r2"], metric_key="loss")

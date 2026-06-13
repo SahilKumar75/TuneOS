@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from app.state.experiments_db import (
     _get_conn,
-    _init_db,
     get_run_metrics,
     list_registered_models,
     register_model,
@@ -23,22 +22,14 @@ router = APIRouter()
 async def list_experiments():
     """List all recorded runs, most-recent first."""
     try:
-        _init_db()
         with _get_conn() as conn:
-            rows = conn.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
+            rows = conn.execute(
+                "SELECT id, name, model_id, model_source, technique, epochs, learning_rate, "
+                "lora_r, batch_size, dataset_name, user_intent, final_loss, perplexity, "
+                "started_at, finished_at, status, output_path "
+                "FROM runs ORDER BY started_at DESC"
+            ).fetchall()
         return {"runs": [dict(r) for r in rows]}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.delete("/experiments/{experiment_id}")
-async def delete_experiment(experiment_id: str):
-    """Delete a run record by id."""
-    try:
-        _init_db()
-        with _get_conn() as conn:
-            conn.execute("DELETE FROM runs WHERE id = ?", (experiment_id,))
-        return {"status": "deleted"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -68,6 +59,21 @@ async def compare_runs(ids: str, metric: str = "loss"):
         raise HTTPException(status_code=422, detail="At most 10 runs can be compared at once")
     data = get_run_metrics(run_ids, metric_key=metric)
     return {"metric": metric, "runs": data}
+
+
+@router.delete("/experiments/{experiment_id}")
+async def delete_experiment(experiment_id: str):
+    """Delete a run record by id."""
+    try:
+        with _get_conn() as conn:
+            result = conn.execute("DELETE FROM runs WHERE id = ?", (experiment_id,))
+            if hasattr(result, "rowcount") and result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Experiment not found")
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ── Model registry ────────────────────────────────────────────────
@@ -108,7 +114,6 @@ async def register_model_endpoint(req: RegisterModelRequest):
 async def delete_registered_model(name: str):
     """Remove a named model from the registry."""
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.execute("DELETE FROM registered_models WHERE name = ?", (name,))
         return {"status": "deleted"}

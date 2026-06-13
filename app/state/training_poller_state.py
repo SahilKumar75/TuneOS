@@ -416,6 +416,10 @@ class TrainingPollerState(FinetuneState):
         await self._auto_eval()
 
     @rx.event
+    def set_show_grad_norm(self, value: bool):
+        self.show_grad_norm = value
+
+    @rx.event
     def set_chat_input(self, value: str):
         self.chat_input = value
 

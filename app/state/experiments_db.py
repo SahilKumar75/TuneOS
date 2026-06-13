@@ -2,23 +2,13 @@
 
 Workers import directly from db.experiments_db to avoid pulling in app/.
 App-side code and existing tests continue to use this path unchanged.
-
-Reloading this module (e.g. in tests via importlib.reload) also reloads the
-underlying db module so env-var overrides (EXPERIMENT_DB) take effect.
 """
 
 from __future__ import annotations
 
-import importlib
 import sys
 
-import db.experiments_db as _db_module
-
-# Re-run the underlying module so env-var overrides applied by test fixtures
-# (monkeypatch.setenv) take effect when THIS shim is reloaded.
-importlib.reload(_db_module)
-
-from db.experiments_db import (  # noqa: E402, F401
+from db.experiments_db import (  # noqa: F401
     _USE_POSTGRES,
     DB_PATH,
     _get_conn,

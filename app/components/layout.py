@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from app.components.brand import metaball_loader
 from app.components.chat_panel import chat_panel
 from app.components.settings_panel import settings_panel
 from app.components.sidebar import sidebar
@@ -14,13 +15,14 @@ from app.styles import c
 def _models_placeholder() -> rx.Component:
     return rx.box(
         rx.vstack(
+            metaball_loader(96),
             rx.heading("Models", font_size="1.4rem", font_weight="600", color=c("text_primary")),
             rx.text(
                 "Browse models from Hugging Face and GitHub — coming soon.",
                 font_size="0.95rem",
                 color=c("text_secondary"),
             ),
-            spacing="3",
+            spacing="4",
             align="center",
             justify="center",
             height="100%",

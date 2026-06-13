@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from app.components.brand import metaball_loader
 from app.components.workspace_tabs import workspace_tab_bar
 from app.pages.finetune import finetune_page
 from app.state.app_state import AppState
@@ -680,6 +681,7 @@ def _workspace_content() -> rx.Component:
 def _start_content() -> rx.Component:
     return rx.box(
         rx.vstack(
+            metaball_loader(72),
             rx.heading(
                 "What should we work on in TuneOS?",
                 font_size="2.15rem",

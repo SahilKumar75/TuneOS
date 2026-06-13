@@ -7,6 +7,8 @@ import reflex as rx
 
 STYLESHEETS = [
     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+    # Wordmark face (see docs/brand/BRAND_SPEC.md §2c).
+    "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap",
     "/streaming.css",
 ]
 
@@ -31,6 +33,14 @@ COLORS = {
     "input_bg": {"dark": "#202020", "light": "#ffffff"},
     "input_border": {"dark": "rgba(255,255,255,0.14)", "light": "rgba(0,0,0,0.12)"},
     "menu_bg": {"dark": "#242424", "light": "#ffffff"},
+    # ── Brand liquid accents (docs/brand/BRAND_SPEC.md §4) ──────────
+    # Same hues both modes; the off-black surface makes them glow in dark.
+    "accent_blue": {"dark": "#5b8cff", "light": "#5b8cff"},
+    "accent_teal": {"dark": "#33d6c8", "light": "#33d6c8"},
+    "accent_purple": {"dark": "#a06bff", "light": "#a06bff"},
+    # Skeleton shimmer base/highlight.
+    "skeleton_base": {"dark": "#232323", "light": "#eceae4"},
+    "skeleton_shine": {"dark": "#2e2e2e", "light": "#f6f5f1"},
 }
 
 
@@ -66,6 +76,30 @@ GLOBAL_STYLES = {
     "@keyframes pulse": {
         "0%, 100%": {"opacity": "1"},
         "50%": {"opacity": "0.5"},
+    },
+    # Skeleton loaders — sweeping highlight (docs/brand/BRAND_SPEC.md §5).
+    "@keyframes tune-shimmer": {
+        "0%": {"background_position": "-200% 0"},
+        "100%": {"background_position": "200% 0"},
+    },
+    ".tune-skeleton": {
+        "background_size": "200% 100%",
+        "animation": "tune-shimmer 1.4s ease-in-out infinite",
+        "border_radius": "6px",
+    },
+    # Indeterminate liquid progress sweep.
+    "@keyframes tune-indeterminate": {
+        "0%": {"transform": "translateX(-120%)"},
+        "100%": {"transform": "translateX(320%)"},
+    },
+    ".tune-indeterminate": {
+        "animation": "tune-indeterminate 1.3s cubic-bezier(0.65,0,0.35,1) infinite",
+    },
+    # Respect users who opt out of motion.
+    "@media (prefers-reduced-motion: reduce)": {
+        ".tune-skeleton": {"animation": "none"},
+        ".tune-indeterminate": {"animation": "none"},
+        "svg [class*='tune']": {"animation": "none"},
     },
     # Benchmark card — make tables fit the fixed-width column
     ".bench-card table": {

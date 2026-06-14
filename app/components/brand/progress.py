@@ -40,7 +40,9 @@ def liquid_progress(
     if not label and not show_pct:
         return bar
     head = rx.hstack(
-        rx.text(label or "", font_size="0.8rem", color=c("text_secondary"), font_weight="500"),
+        rx.text(label, font_size="0.8rem", color=c("text_secondary"), font_weight="500")
+        if label
+        else rx.fragment(),
         rx.spacer(),
         rx.cond(
             show_pct,

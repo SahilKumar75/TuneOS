@@ -20,8 +20,8 @@ from pathlib import Path
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 N = 12
-C = 240          # canvas centre (480x480 box)
-EASE = "0.65 0 0.35 1"   # cubic ease-in-out — slows to a near-pause at each state
+C = 240  # canvas centre (480x480 box)
+EASE = "0.65 0 0.35 1"  # cubic ease-in-out — slows to a near-pause at each state
 
 
 # ── State generators: each returns 12 (x, y, r) tuples ────────────────────────
@@ -67,16 +67,28 @@ def diagonal():
 
 def cluster():
     return [
-        (C + 10 * math.sqrt(i) * math.cos(i * 2.399),
-         C + 10 * math.sqrt(i) * math.sin(i * 2.399), 25)
+        (
+            C + 10 * math.sqrt(i) * math.cos(i * 2.399),
+            C + 10 * math.sqrt(i) * math.sin(i * 2.399),
+            25,
+        )
         for i in range(N)
     ]
 
 
 SCATTER = [
-    (120, 90, 22), (220, 70, 13), (350, 100, 25), (410, 200, 12),
-    (340, 300, 22), (240, 250, 16), (150, 320, 25), (80, 230, 13),
-    (200, 180, 11), (300, 175, 19), (100, 150, 10), (380, 360, 12),
+    (120, 90, 22),
+    (220, 70, 13),
+    (350, 100, 25),
+    (410, 200, 12),
+    (340, 300, 22),
+    (240, 250, 16),
+    (150, 320, 25),
+    (80, 230, 13),
+    (200, 180, 11),
+    (300, 175, 19),
+    (100, 150, 10),
+    (380, 360, 12),
 ]
 
 # Resting "mark" arrangement = chosen logo (option 5): two big blobs joined by a
@@ -84,11 +96,18 @@ SCATTER = [
 # the line between the pair; seven filler blobs tuck inside the pair (hidden at
 # rest, they fan out during the other morph states).
 BRAND = [
-    (176, 184, 78), (304, 288, 78),        # pair
-    (224, 219, 34), (256, 253, 34),        # neck (thin waist between the pair)
-    (400, 104, 44), (104, 400, 48), (408, 408, 40),   # satellites
-    (176, 184, 30), (158, 168, 26), (304, 288, 30),   # tucked into pair
-    (322, 304, 26), (196, 208, 24),
+    (176, 184, 78),
+    (304, 288, 78),  # pair
+    (224, 219, 34),
+    (256, 253, 34),  # neck (thin waist between the pair)
+    (400, 104, 44),
+    (104, 400, 48),
+    (408, 408, 40),  # satellites
+    (176, 184, 30),
+    (158, 168, 26),
+    (304, 288, 30),  # tucked into pair
+    (322, 304, 26),
+    (196, 208, 24),
 ]
 
 # Static mark (option 5) drawn with an explicit thin neck line — crisper than the
@@ -96,19 +115,20 @@ BRAND = [
 MARK_BLOBS = [(176, 184, 80), (304, 288, 80), (400, 104, 44), (104, 400, 48), (408, 408, 40)]
 MARK_NECKS = [(176, 184, 304, 288, 36)]
 
+# Order matches the BRAND_SPEC §5 state names: the spec's "mark" = BRAND,
+# "stream" = diagonal(), "merge" = cluster(). The generator keeps the geometric
+# function names; the spec keeps the semantic loading names.
 STATES = [BRAND, grid(), SCATTER, wave(), columns(), rows(), diagonal(), cluster()]
 
 
 def _seq(i, idx):
     """SMIL values list for blob i, attribute idx (0=x,1=y,2=r), looping home."""
-    return ";".join(
-        [f"{s[i][idx]:.1f}" for s in STATES] + [f"{STATES[0][i][idx]:.1f}"]
-    )
+    return ";".join([f"{s[i][idx]:.1f}" for s in STATES] + [f"{STATES[0][i][idx]:.1f}"])
 
 
 def _loader(color: bool) -> str:
     splines = ";".join([EASE] * len(STATES))
-    keytimes = ";".join(f"{k/len(STATES):.4f}" for k in range(len(STATES) + 1))
+    keytimes = ";".join(f"{k / len(STATES):.4f}" for k in range(len(STATES) + 1))
     fill = "url(#lg)" if color else "currentColor"
     grad = ""
     if color:
@@ -171,9 +191,7 @@ def _static(positions, *, label, necks=(), vbox=480, blob="currentColor", goo=Tr
         f'stroke-width="{w}" stroke-linecap="round"/>'
         for (x1, y1, x2, y2, w) in necks
     )
-    circles = "".join(
-        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}"/>' for (x, y, r) in positions
-    )
+    circles = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}"/>' for (x, y, r) in positions)
     if goo:
         defs = (
             "<defs>"
@@ -199,14 +217,11 @@ FAVICON = [(186, 206, 100), (300, 300, 100), (404, 110, 50)]
 
 
 def main():
+    ASSETS.mkdir(parents=True, exist_ok=True)
     (ASSETS / "tuneos-loader.svg").write_text(_loader(color=False))
     (ASSETS / "tuneos-loader-color.svg").write_text(_loader(color=True))
-    (ASSETS / "tuneos-mark.svg").write_text(
-        _static(MARK_BLOBS, label="TuneOS", necks=MARK_NECKS)
-    )
-    (ASSETS / "tuneos-favicon.svg").write_text(
-        _static(FAVICON, label="TuneOS", goo=False)
-    )
+    (ASSETS / "tuneos-mark.svg").write_text(_static(MARK_BLOBS, label="TuneOS", necks=MARK_NECKS))
+    (ASSETS / "tuneos-favicon.svg").write_text(_static(FAVICON, label="TuneOS", goo=False))
     print("wrote 4 assets to", ASSETS)
 
 

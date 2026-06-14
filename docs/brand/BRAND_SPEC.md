@@ -83,6 +83,8 @@ Developer-friendly names. Use as CSS custom properties / Reflex theme tokens. Ma
 
 **Rule:** the mark is `--tune-ink` by default in both modes. Accent hues only appear when liquid-color mode is intentionally on.
 
+> **Implementation status:** `app/styles.py` currently ships the accent hues (`accent_blue/teal/purple`) and the existing surface/ink/border tokens it already used (`bg_primary`, `text_primary`, `border`, …). The `--tune-*` names above are the canonical design vocabulary; the in-app `c("…")` tokens are the live mapping. The remaining `--tune-surface*` / `--tune-ink*` / `*-tint` names are not yet emitted as CSS custom properties — adopt them when the theme layer is refactored to the `--tune-*` namespace.
+
 ---
 
 ## 5. Motion principles

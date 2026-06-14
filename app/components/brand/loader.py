@@ -97,11 +97,11 @@ def metaball_overlay(
         position="fixed",
         inset="0",
         z_index="3000",
-        background=rx.color_mode_cond(
-            light="rgba(255,255,255,0.72)", dark="rgba(10,10,10,0.72)"
-        ),
+        background=rx.color_mode_cond(light="rgba(255,255,255,0.72)", dark="rgba(10,10,10,0.72)"),
         backdrop_filter="blur(6px)",
     )
     if visible is True:
         return panel
+    if visible is False:
+        return rx.fragment()
     return rx.cond(visible, panel, rx.fragment())

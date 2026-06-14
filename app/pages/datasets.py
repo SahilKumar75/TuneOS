@@ -498,21 +498,26 @@ def datasets_page() -> rx.Component:
                         spacing="2",
                         width="100%",
                     ),
-                    # Starter curated cards (default view)
-                    rx.vstack(
-                        rx.text(
-                            "Curated datasets for fine-tuning",
-                            font_size="0.82rem",
-                            color=c("text_muted"),
-                        ),
-                        rx.grid(
-                            *[_dataset_card(ds) for ds in STARTER_DATASETS],
-                            columns="3",
-                            spacing="3",
+                    # Starter curated cards — hidden while a search is in flight
+                    # (the skeleton list above covers that state instead).
+                    rx.cond(
+                        DatasetState.is_searching,
+                        rx.fragment(),
+                        rx.vstack(
+                            rx.text(
+                                "Curated datasets for fine-tuning",
+                                font_size="0.82rem",
+                                color=c("text_muted"),
+                            ),
+                            rx.grid(
+                                *[_dataset_card(ds) for ds in STARTER_DATASETS],
+                                columns="3",
+                                spacing="3",
+                                width="100%",
+                            ),
+                            spacing="2",
                             width="100%",
                         ),
-                        spacing="2",
-                        width="100%",
                     ),
                 ),
                 # Preview panel (shown below list when a dataset is selected)

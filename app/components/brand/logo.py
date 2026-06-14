@@ -64,7 +64,6 @@ def tune_mark(size: str | int = 40, *, color: rx.Var | str | None = None) -> rx.
         height=dim,
         color=color if color is not None else c("text_primary"),
         flex_shrink="0",
-        aria_label="TuneOS",
     )
 
 

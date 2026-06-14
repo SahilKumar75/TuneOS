@@ -96,6 +96,7 @@ def skeleton_card() -> rx.Component:
 
 def skeleton_table(rows: int = 5, cols: int = 4) -> rx.Component:
     """Header + body rows of shimmering cells."""
+
     def _row(is_header: bool) -> rx.Component:
         return rx.hstack(
             *[

@@ -3,6 +3,7 @@ Tests for trainer/evaluate.py.
 torch, transformers, and the evaluate library are mocked.
 """
 
+import importlib.machinery as _im
 import sys
 from unittest.mock import MagicMock
 
@@ -12,9 +13,27 @@ import pytest
 # torch sub-modules must be registered individually so Python's import
 # machinery doesn't try to traverse the MagicMock as a real package.
 _torch_mock = MagicMock()
+# importlib.util.find_spec("torch") reads module.__spec__; MagicMock stores the
+# constructor's spec arg as None, so the attribute returns None and find_spec
+# raises ValueError.  Inject it via __dict__ to bypass Mock's internal storage.
+_torch_mock.__dict__["__spec__"] = _im.ModuleSpec("torch", None)
+# datasets._dill uses issubclass(obj_type, torch.Tensor / torch.nn.Module).
+# MagicMock children aren't real types, so issubclass raises TypeError.
+# Give them real empty classes so the check simply returns False.
+_MockTensor = type("_MockTensor", (), {})
+_MockModule = type("_MockModule", (), {})
+_torch_mock.Tensor = _MockTensor
+# sys.modules["torch.nn"] == _torch_mock, so `import torch.nn as nn; nn.Module`
+# resolves to _torch_mock.Module; attribute access `torch.nn.Module` resolves to
+# _torch_mock.nn.Module (a child mock).  Fix both paths.
+_torch_mock.Module = _MockModule
+_torch_mock.nn.Module = _MockModule
 for _mod in ["torch", "torch.utils", "torch.utils.data", "torch.nn", "torch.cuda"]:
     sys.modules.setdefault(_mod, _torch_mock)
-sys.modules.setdefault("transformers", MagicMock())
+# datasets._dill also guards `issubclass(obj_type, transformers.PreTrainedTokenizerBase)`.
+_transformers_mock = MagicMock()
+_transformers_mock.PreTrainedTokenizerBase = type("_MockPTTBase", (), {})
+sys.modules.setdefault("transformers", _transformers_mock)
 sys.modules.setdefault("evaluate", MagicMock())
 
 # Pre-import so patch() can resolve dotted paths

@@ -63,6 +63,7 @@ class ModelConfig:
     # Attention kernel passed to from_pretrained, e.g. "flash_attention_2",
     # "sdpa", "eager". Empty lets Transformers pick its default.
     attn_implementation: str = ""
+    bf16: bool = False  # controls model load dtype; set from TrainingConfig before prepare()
     # Optional RoPE scaling to extend context, e.g. {"type": "linear", "factor": 2.0}.
     rope_scaling: dict | None = None
     modality: Literal["text", "vision"] = "text"
@@ -136,6 +137,10 @@ class TrainingConfig:
     fsdp: str = ""
     fsdp_config: dict | None = None
 
+    def __post_init__(self):
+        if self.fp16 and self.bf16:
+            raise ValueError("fp16 and bf16 are mutually exclusive — set at most one to True")
+
 
 @dataclass
 class DistillConfig:
@@ -157,6 +162,10 @@ class DistillConfig:
     bf16: bool = False
     seed: int = 42
     prompt_template: str = "alpaca"
+
+    def __post_init__(self):
+        if self.fp16 and self.bf16:
+            raise ValueError("fp16 and bf16 are mutually exclusive — set at most one to True")
 
 
 @dataclass

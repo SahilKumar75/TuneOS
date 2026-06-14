@@ -80,6 +80,7 @@ def _get_conn() -> Generator[Any, None, None]:
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             with conn:
                 yield conn
@@ -89,6 +90,8 @@ def _get_conn() -> Generator[Any, None, None]:
 
 def _init_db():
     with _get_conn() as conn:
+        if not _USE_POSTGRES:
+            conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS runs (
                 id TEXT PRIMARY KEY,
@@ -97,7 +100,7 @@ def _init_db():
                 model_source TEXT,
                 technique TEXT,
                 epochs INTEGER,
-                learning_rate TEXT,
+                learning_rate REAL,
                 lora_r INTEGER,
                 batch_size INTEGER,
                 dataset_name TEXT,
@@ -113,7 +116,7 @@ def _init_db():
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS run_metrics (
-                run_id TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
                 key TEXT NOT NULL,
                 value REAL NOT NULL,
                 step INTEGER NOT NULL DEFAULT 0,
@@ -123,7 +126,7 @@ def _init_db():
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS run_params (
-                run_id TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
                 key TEXT NOT NULL,
                 value TEXT NOT NULL,
                 PRIMARY KEY (run_id, key)
@@ -132,13 +135,12 @@ def _init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS registered_models (
                 name TEXT PRIMARY KEY,
-                run_id TEXT NOT NULL,
+                run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
                 alias TEXT NOT NULL DEFAULT 'latest',
                 metric_snapshot TEXT NOT NULL DEFAULT '{}',
                 registered_at TEXT NOT NULL
             )
         """)
-        # #18 — index for ORDER BY created_at DESC in list_runs
         conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(started_at DESC)")
 
 
@@ -157,7 +159,6 @@ def save_run_metrics(run_id: str, loss_history: list[dict[str, Any]]) -> None:
     if not rows:
         return
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
@@ -180,7 +181,6 @@ def save_final_metrics(run_id: str, metrics: dict[str, Any]) -> None:
     if not rows:
         return
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_metrics (run_id, key, value, step, timestamp) "
@@ -199,7 +199,6 @@ def save_run_params(run_id: str, params: dict[str, Any]) -> None:
         return
     rows = [(run_id, str(k), str(v)) for k, v in params.items()]
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.executemany(
                 "INSERT INTO run_params (run_id, key, value) VALUES (?, ?, ?) "
@@ -221,7 +220,6 @@ def write_job_status(
     output_path: str = "",
 ) -> None:
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.execute(
                 """
@@ -240,7 +238,6 @@ def write_job_status(
 
 def list_runs(limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
     try:
-        _init_db()
         sql = "SELECT id, status, output_path FROM runs ORDER BY started_at DESC"
         params: tuple = ()
         if limit is not None:
@@ -267,7 +264,6 @@ def list_stale_running_jobs(max_age_seconds: int = 7200) -> list[str]:
     Used by the startup sweep to recover from worker crashes.
     """
     try:
-        _init_db()
         cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
         with _get_conn() as conn:
             rows = conn.execute(
@@ -282,7 +278,6 @@ def list_stale_running_jobs(max_age_seconds: int = 7200) -> list[str]:
 
 def get_final_metrics(run_id: str) -> dict[str, float]:
     try:
-        _init_db()
         with _get_conn() as conn:
             rows = conn.execute(
                 "SELECT key, value FROM run_metrics WHERE run_id = ? AND step = -1",
@@ -300,7 +295,6 @@ def get_run_metrics(
     if not run_ids:
         return {}
     try:
-        _init_db()
         placeholders = ",".join("?" * len(run_ids))
         with _get_conn() as conn:
             rows = conn.execute(
@@ -326,7 +320,6 @@ def register_model(
     metric_snapshot: dict[str, Any] | None = None,
 ) -> None:
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.execute(
                 """
@@ -352,7 +345,6 @@ def register_model(
 
 def list_registered_models() -> list[dict[str, Any]]:
     try:
-        _init_db()
         with _get_conn() as conn:
             rows = conn.execute(
                 "SELECT name, run_id, alias, metric_snapshot, registered_at "
@@ -375,7 +367,6 @@ def list_registered_models() -> list[dict[str, Any]]:
 
 def save_experiment_run(run_data: dict[str, Any]):
     try:
-        _init_db()
         with _get_conn() as conn:
             conn.execute(
                 """
@@ -426,3 +417,6 @@ def save_experiment_run(run_data: dict[str, Any]):
             )
     except Exception:
         _logger.exception("Failed to save experiment run %s", run_data.get("id", ""))
+
+
+_init_db()

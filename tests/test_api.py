@@ -182,6 +182,80 @@ def test_cancel_job_returns_200():
 
 
 def test_cancel_job_payload_shape():
-    data = client.delete("/jobs/some-job-id").json()
-    assert data["job_id"] == "some-job-id"
+    data = client.delete("/jobs/cancel-shape-job-id").json()
+    assert data["job_id"] == "cancel-shape-job-id"
     assert "status" in data
+
+
+# ── /jobs/{job_id}/infer ─────────────────────────────────────────
+
+
+def test_infer_missing_prompt_fails():
+    resp = client.post("/jobs/test-job/infer", json={})
+    assert resp.status_code == 422
+
+
+def test_infer_prompt_too_long_fails():
+    resp = client.post(
+        "/jobs/test-job/infer",
+        json={"prompt": "x" * 8193},
+    )
+    assert resp.status_code == 422
+
+
+def test_infer_max_new_tokens_out_of_range_fails():
+    resp = client.post(
+        "/jobs/test-job/infer",
+        json={"prompt": "hello", "max_new_tokens": 9999},
+    )
+    assert resp.status_code == 422
+
+
+def test_infer_temperature_out_of_range_fails():
+    resp = client.post(
+        "/jobs/test-job/infer",
+        json={"prompt": "hello", "temperature": 5.0},
+    )
+    assert resp.status_code == 422
+
+
+# ── /datasets ────────────────────────────────────────────────────
+
+
+def test_datasets_search_returns_200():
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    fake = SimpleNamespace(id="fake/dataset", downloads=42, tags=["text"])
+    with patch("huggingface_hub.list_datasets", return_value=iter([fake])):
+        resp = client.get("/datasets/search")
+    assert resp.status_code == 200
+
+
+def test_datasets_search_response_has_results_key():
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    fake = SimpleNamespace(id="fake/dataset", downloads=42, tags=["text"])
+    with patch("huggingface_hub.list_datasets", return_value=iter([fake])):
+        resp = client.get("/datasets/search")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "results" in data
+    assert data["results"] == [
+        {"id": "fake/dataset", "downloads": 42, "tags": ["text"], "description": ""}
+    ]
+
+
+# ── /experiments ─────────────────────────────────────────────────
+
+
+def test_list_experiments_returns_200():
+    resp = client.get("/experiments")
+    assert resp.status_code == 200
+
+
+def test_list_experiments_has_runs_key():
+    data = client.get("/experiments").json()
+    assert "runs" in data
+    assert isinstance(data["runs"], list)

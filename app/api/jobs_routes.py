@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import re
+import tempfile
 import threading
 import uuid
 import zipfile
@@ -29,10 +29,34 @@ from app.api.schemas import (
     MergeRequest,
     PushHubRequest,
     SweepRequest,
+    SweepResponse,
     VisionJobConfig,
 )
 
 router = APIRouter()
+
+_ZIP_CHUNK = 65536  # 64 KiB
+
+
+def _stream_dir_as_zip(src_dir: str):
+    """Write src_dir into a temp file zip and yield it in chunks, then delete the temp file."""
+    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, _, files in os.walk(src_dir):
+                for fname in files:
+                    full = os.path.join(root, fname)
+                    zf.write(full, os.path.relpath(full, src_dir))
+        tmp.seek(0)
+        while True:
+            chunk = tmp.read(_ZIP_CHUNK)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        tmp.close()
+        os.unlink(tmp.name)
+
 
 _T5_FAMILIES = ("t5", "mt5")
 _MODEL_ID_RE = re.compile(r"^[a-zA-Z0-9_.'\-/]+$")
@@ -148,12 +172,14 @@ def _enqueue_finetune(config: JobConfig) -> str:
     kwargs = _build_finetune_kwargs(config)
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{kwargs['job_id']}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.train_task import run_finetune
 
         run_finetune.apply_async(kwargs=kwargs, task_id=kwargs["job_id"])
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{kwargs['job_id']}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue job: {exc}") from exc
     return kwargs["job_id"]
 
@@ -182,7 +208,9 @@ def _ensure_worker_alive() -> None:
     except HTTPException:
         raise
     except Exception:
-        pass
+        import logging as _logging
+
+        _logging.getLogger(__name__).debug("Worker ping failed — assuming alive", exc_info=True)
 
 
 @router.post("/jobs/dpo", response_model=JobCreated, status_code=201)
@@ -224,7 +252,7 @@ async def create_dpo_job(config: DPOJobConfig):
 
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
 
     try:
         from workers.dpo_task import run_dpo
@@ -245,6 +273,8 @@ async def create_dpo_job(config: DPOJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue DPO job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
@@ -291,7 +321,7 @@ async def create_distill_job(config: DistillJobConfig):
 
     _ensure_worker_alive()
     if config.hf_token:
-        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=60)
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.kd_task import run_distill
 
@@ -310,6 +340,8 @@ async def create_distill_job(config: DistillJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(
             status_code=503, detail=f"Could not enqueue distillation job: {exc}"
         ) from exc
@@ -328,7 +360,6 @@ async def create_vision_job(config: VisionJobConfig):
         "use_8bit": False,
         "trust_remote_code": False,
         "max_seq_length": config.max_seq_length,
-        "hf_token": config.hf_token,
         "local_model_path": config.local_model_path,
         "model_source": config.model_source,
         "modality": "vision",
@@ -354,6 +385,8 @@ async def create_vision_job(config: VisionJobConfig):
     }
 
     _ensure_worker_alive()
+    if config.hf_token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}:hf_token", config.hf_token, ex=3600)
     try:
         from workers.vision_task import run_vision_finetune
 
@@ -373,12 +406,14 @@ async def create_vision_job(config: VisionJobConfig):
             task_id=job_id,
         )
     except Exception as exc:
+        if config.hf_token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue vision job: {exc}") from exc
 
     return JobCreated(job_id=job_id)
 
 
-@router.post("/jobs/sweep")
+@router.post("/jobs/sweep", response_model=SweepResponse)
 async def create_sweep(req: SweepRequest):
     """Expand a hyperparameter grid over the base config and enqueue one SFT job
     per combination. Returns the list of job ids (visualize them on /compare)."""
@@ -390,7 +425,7 @@ async def create_sweep(req: SweepRequest):
     for cfg in configs:
         cfg["experiment_id"] = ""  # each combination gets a fresh id
         job_ids.append(_enqueue_finetune(JobConfig(**cfg)))
-    return {"count": len(job_ids), "job_ids": job_ids}
+    return SweepResponse(count=len(job_ids), job_ids=job_ids)
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
@@ -408,12 +443,25 @@ async def get_job(job_id: str):
 
 @router.delete("/jobs/{job_id}", response_model=JobStatus)
 async def cancel_job(job_id: str):
+    import logging as _logging
+
+    state = _get_job_status_from_redis(job_id)
+    if state.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    if state.get("status") in ("done", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=409, detail=f"Job already in terminal state: {state['status']}"
+        )
     try:
         from workers.celery_app import celery_app
 
         celery_app.control.revoke(job_id, terminate=True, signal="SIGTERM")
     except Exception:
-        pass
+        _logging.getLogger(__name__).warning("revoke failed for job %s", job_id, exc_info=True)
+        raise HTTPException(status_code=503, detail="Failed to cancel job") from None
+    from app.state.experiments_db import write_job_status
+
+    write_job_status(job_id, "cancelled")
     return JobStatus(job_id=job_id, status="cancelled")
 
 
@@ -423,16 +471,8 @@ async def download_adapter(job_id: str):
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(adapter_dir):
-            for fname in files:
-                full = os.path.join(root, fname)
-                arcname = os.path.relpath(full, adapter_dir)
-                zf.write(full, arcname)
-    buf.seek(0)
     return StreamingResponse(
-        buf,
+        _stream_dir_as_zip(adapter_dir),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=adapter_{job_id[:8]}.zip"},
     )
@@ -476,6 +516,9 @@ async def merge_adapter(job_id: str, req: MergeRequest):
     if not base_model_id:
         raise HTTPException(status_code=500, detail="base_model_name_or_path missing")
 
+    _token = req.hf_token or os.getenv("HF_TOKEN", "")
+    if _token:
+        _redis.from_url(REDIS_URL).set(f"job:{job_id}-merge:hf_token", _token, ex=3600)
     try:
         from workers.merge_task import merge_adapter_task
 
@@ -484,11 +527,12 @@ async def merge_adapter(job_id: str, req: MergeRequest):
                 "job_id": job_id,
                 "base_model_id": base_model_id,
                 "adapter_path": adapter_dir,
-                "hf_token": req.hf_token or os.getenv("HF_TOKEN", ""),
             },
             task_id=f"{job_id}-merge",
         )
     except Exception as exc:
+        if _token:
+            _redis.from_url(REDIS_URL).delete(f"job:{job_id}-merge:hf_token")
         raise HTTPException(status_code=503, detail=f"Could not enqueue merge: {exc}") from exc
 
     return {"status": "merging", "job_id": job_id}
@@ -500,23 +544,23 @@ async def download_merged(job_id: str):
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=404, detail="Merged model not found — run merge first")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(merged_dir):
-            for fname in files:
-                full = os.path.join(root, fname)
-                arcname = os.path.relpath(full, merged_dir)
-                zf.write(full, arcname)
-    buf.seek(0)
     return StreamingResponse(
-        buf,
+        _stream_dir_as_zip(merged_dir),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=merged_{job_id[:8]}.zip"},
     )
 
 
+_ALLOWED_QUANT_TYPES = {"Q4_K_M", "Q5_K_M", "Q8_0", "Q4_0", "Q5_0", "Q2_K", "Q3_K_M", "F16"}
+
+
 @router.post("/jobs/{job_id}/export-gguf", status_code=202)
 async def export_gguf(job_id: str, req: GgufRequest):
+    if req.quant_type not in _ALLOWED_QUANT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"quant_type must be one of {sorted(_ALLOWED_QUANT_TYPES)}",
+        )
     merged_dir = os.path.join(_resolve_job_dir(job_id), "merged")
     if not os.path.isdir(merged_dir):
         raise HTTPException(status_code=400, detail="Merge the model first before exporting GGUF")
@@ -540,10 +584,14 @@ async def export_gguf(job_id: str, req: GgufRequest):
 
 @router.post("/jobs/{job_id}/push-github")
 async def push_github(job_id: str, req: GitHubPushRequest):
+    if not req.github_token:
+        raise HTTPException(status_code=400, detail="GitHub token required")
+
     adapter_dir = _resolve_job_dir(job_id)
     if not os.path.isdir(adapter_dir):
         raise HTTPException(status_code=404, detail="Adapter not found")
 
+    _redis.from_url(REDIS_URL).set(f"job:{job_id}-github:github_token", req.github_token, ex=3600)
     try:
         from workers.merge_task import push_github_task
 
@@ -552,11 +600,11 @@ async def push_github(job_id: str, req: GitHubPushRequest):
                 "job_id": job_id,
                 "adapter_path": adapter_dir,
                 "repo_url": req.repo_url,
-                "github_token": req.github_token,
             },
             task_id=f"{job_id}-github",
         )
     except Exception as exc:
+        _redis.from_url(REDIS_URL).delete(f"job:{job_id}-github:github_token")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {"status": "pushing"}

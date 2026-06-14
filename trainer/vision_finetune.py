@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import os
 
-from transformers import AutoModelForVision2Seq, AutoProcessor, TrainingArguments
+import torch
+from transformers import (
+    AutoModelForVision2Seq,
+    AutoProcessor,
+    BitsAndBytesConfig,
+    TrainingArguments,
+)
 from trl import SFTTrainer
 
 from trainer.callbacks import RedisLossCallback
@@ -36,15 +42,23 @@ def finetune_vision(
         trust_remote_code=False,
     )
 
+    _bnb_cfg = None
+    if model_cfg.use_4bit:
+        _bnb_cfg = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16 if train_cfg.bf16 else torch.float16,
+            bnb_4bit_use_double_quant=True,
+        )
     model = AutoModelForVision2Seq.from_pretrained(
         model_cfg.model_name,
         token=model_cfg.hf_token or None,
         trust_remote_code=False,
-        load_in_4bit=model_cfg.use_4bit,
+        quantization_config=_bnb_cfg,
         device_map="auto",
     )
 
-    model = inject_lora(model, model_cfg, lora_cfg)
+    model = inject_lora(model, lora_cfg)
 
     dataset = load_multimodal(
         dataset_path,

@@ -38,7 +38,7 @@ def finetune(
     hub_split: str = "train",
     instruction_col: str = "instruction",
     output_col: str = "output",
-    technique: str = "qlora",
+    redis_client=None,
 ):
     """
     Full fine-tuning pipeline:
@@ -52,6 +52,10 @@ def finetune(
     """
     # Seed every source of randomness up front so the run is reproducible.
     set_seed(train_cfg.seed)
+
+    # Mirror the training dtype into ModelConfig so loader uses the same dtype for
+    # weights and BnB compute — prevents float16/bfloat16 mismatches at runtime.
+    model_cfg.bf16 = train_cfg.bf16
 
     # 1. Prepare model via the adapter strategy registry
     model, tokenizer = get_strategy(train_cfg.technique).prepare(model_cfg, lora_cfg)
@@ -189,7 +193,7 @@ def finetune(
         greater_is_better=False if use_early_stopping else None,
     )
 
-    callbacks = [RedisLossCallback(job_id=job_id)]
+    callbacks = [RedisLossCallback(job_id=job_id, redis_client=redis_client)]
     if use_early_stopping:
         callbacks.append(
             EarlyStoppingCallback(early_stopping_patience=train_cfg.early_stopping_patience)

@@ -62,15 +62,25 @@ ignore = ["E501", "B008"]
 "tests/**" = ["E402"]
 
 [tool.mypy]
-# Scoped to pure-logic, framework-light modules where static typing is
-# meaningful. Excluded: the Reflex UI layer (dynamic Var typing) and the thin
-# wrappers around torch/trl/peft, whose third-party stubs are incomplete and
-# produce false positives that aren't real bugs.
-files = ["trainer/config.py", "trainer/metrics.py", "trainer/evaluate.py", "app/state/experiments_db.py"]
+# Excluded: the Reflex UI layer (dynamic Var typing). The ML framework wrappers
+# (trl, transformers, peft) have incomplete stubs so false positives are silenced
+# per-module below rather than by dropping the files entirely.
+files = [
+    "trainer/config.py",
+    "trainer/metrics.py",
+    "trainer/evaluate.py",
+    "app/state/experiments_db.py",
+    "app/api/",
+    "workers/",
+]
 python_version = "3.10"
 ignore_missing_imports = true
 warn_unused_ignores = false
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["trl.*", "transformers.*", "peft.*", "torch.*", "bitsandbytes.*", "datasets.*", "accelerate.*"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

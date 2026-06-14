@@ -15,6 +15,7 @@ class IntentQuestion(BaseModel):
     heading: str = ""
     options: list[str] = []
 
+
 _PRESET_META: dict[str, dict[str, str]] = {
     "mistralai/Mistral-7B-v0.1": {
         "name": "Mistral 7B",

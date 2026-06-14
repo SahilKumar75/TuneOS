@@ -66,7 +66,6 @@ async def preview_dataset(dataset_id: str):
 @router.post("/datasets/generate")
 async def generate_dataset(req: DatasetGenRequest):
     """Generate synthetic training data from a plain-English use-case description."""
-    import asyncio
 
     async def _generate():
         hf_token = req.hf_token or os.getenv("HF_TOKEN", "")
@@ -131,9 +130,6 @@ async def generate_dataset(req: DatasetGenRequest):
 
     # Run the async generation
     result = await _generate()
-    return result
-
-    result = await asyncio.get_event_loop().run_in_executor(None, _generate)
     return result
 
 

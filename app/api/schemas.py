@@ -66,7 +66,9 @@ class JobConfig(BaseModel):
     # Compute backend for training execution.
     compute_backend: Literal["local", "modal", "hf_spaces"] = "local"
     # Prompt formatting + sample packing.
-    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr", "gemma", "mistral"] = (
+        "alpaca"
+    )
     packing: bool = False
     # Multi-GPU FSDP option string (empty = off), e.g. "full_shard auto_wrap".
     fsdp: str = ""
@@ -134,7 +136,9 @@ class DistillJobConfig(BaseModel):
     max_seq_length: int = Field(default=512, ge=64)
     bf16: bool = False
     seed: int = Field(default=42, ge=0)
-    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr", "gemma", "mistral"] = (
+        "alpaca"
+    )
     experiment_id: str = ""
 
 

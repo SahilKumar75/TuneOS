@@ -92,7 +92,12 @@ def evaluate_run(
             ref_sample = raw_split["test"].select(range(n_ref))
             instructions = [row["instruction"] for row in ref_sample]
             references = [row["output"] for row in ref_sample]
-            predictions = generate_predictions(model, tokenizer, instructions)
+            # Generate predictions in the SAME prompt format the model trained
+            # with — otherwise ROUGE/BLEU measure the model in a format it never
+            # saw and the scores are meaningless.
+            predictions = generate_predictions(
+                model, tokenizer, instructions, template=t_cfg.prompt_template
+            )
             eval_results.update(
                 evaluate_references(
                     predictions,
@@ -119,16 +124,25 @@ def generate_predictions(
     max_new_tokens: int = 128,
     batch_size: int = 8,
     generation_config: dict | None = None,
+    template: str = "alpaca",
 ) -> list[str]:
     """Generate a response for each instruction (batched), returning only the
     text after the prompt. Used to obtain predictions for reference metrics.
 
+    ``template`` must match the prompt format the model was trained with.
     Batched generation is much faster than one-by-one on GPU. ``generation_config``
     overrides the defaults (greedy) — e.g. ``{"do_sample": True, "temperature": 0.7}``.
     """
     import torch
 
-    from trainer.dataset import PROMPT_TEMPLATE
+    from trainer.prompt_templates import PROMPT_TEMPLATES
+
+    # Use only the prompt PREFIX (everything before {output}). Templates with a
+    # closing tag after {output} — chatml/llama3/phi3/zephyr/gemma — would
+    # otherwise emit that tag before the model has generated anything, producing
+    # a malformed prompt. The model is expected to write the response and its own
+    # closing tag.
+    prompt_prefix = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"]).split("{output}")[0]
 
     gen_kwargs = {
         "max_new_tokens": max_new_tokens,
@@ -147,7 +161,7 @@ def generate_predictions(
     try:
         for i in range(0, len(instructions), batch_size):
             chunk = instructions[i : i + batch_size]
-            prompts = [PROMPT_TEMPLATE.format(instruction=ins, output="") for ins in chunk]
+            prompts = [prompt_prefix.format(instruction=ins) for ins in chunk]
             inputs = tokenizer(prompts, return_tensors="pt", truncation=True, padding=True).to(
                 device
             )

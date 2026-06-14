@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import reflex as rx
 
+from app.components.brand import liquid_progress, metaball_loader
 from app.components.finetune.shared import _badge_status, _card
 from app.components.loss_chart import loss_chart
 from app.state.training_poller_state import TrainingPollerState
@@ -98,11 +99,9 @@ def step5_train() -> rx.Component:
                     color=c("text_secondary"),
                 ),
             ),
-            rx.progress(
-                value=TrainingPollerState.epoch_progress_pct,
-                max=100,
-                width="100%",
-                color_scheme="blue",
+            liquid_progress(
+                TrainingPollerState.epoch_progress_pct,
+                show_pct=False,
             ),
             width="100%",
             spacing="1",
@@ -269,7 +268,7 @@ def step5_panel() -> rx.Component:
             rx.cond(
                 TrainingPollerState.is_starting,
                 rx.vstack(
-                    rx.spinner(size="3"),
+                    metaball_loader(72, color=True),
                     rx.text(
                         "Initializing training job…",
                         font_size="0.86rem",
@@ -312,11 +311,9 @@ def step5_panel() -> rx.Component:
                                 color=c("text_secondary"),
                             ),
                         ),
-                        rx.progress(
-                            value=TrainingPollerState.epoch_progress_pct,
-                            max=100,
-                            width="100%",
-                            color_scheme="blue",
+                        liquid_progress(
+                            TrainingPollerState.epoch_progress_pct,
+                            show_pct=False,
                         ),
                         width="100%",
                         spacing="1",

@@ -137,7 +137,12 @@ def generate_predictions(
 
     from trainer.prompt_templates import PROMPT_TEMPLATES
 
-    prompt_tmpl = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"])
+    # Use only the prompt PREFIX (everything before {output}). Templates with a
+    # closing tag after {output} — chatml/llama3/phi3/zephyr/gemma — would
+    # otherwise emit that tag before the model has generated anything, producing
+    # a malformed prompt. The model is expected to write the response and its own
+    # closing tag.
+    prompt_prefix = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"]).split("{output}")[0]
 
     gen_kwargs = {
         "max_new_tokens": max_new_tokens,
@@ -156,7 +161,7 @@ def generate_predictions(
     try:
         for i in range(0, len(instructions), batch_size):
             chunk = instructions[i : i + batch_size]
-            prompts = [prompt_tmpl.format(instruction=ins, output="") for ins in chunk]
+            prompts = [prompt_prefix.format(instruction=ins) for ins in chunk]
             inputs = tokenizer(prompts, return_tensors="pt", truncation=True, padding=True).to(
                 device
             )

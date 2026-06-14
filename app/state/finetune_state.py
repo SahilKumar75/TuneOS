@@ -1514,8 +1514,6 @@ Write ONLY the summary, no other text."""
         import csv as _csv
         import json as _json
 
-        from trainer.dataset import PROMPT_TEMPLATES
-
         path = self.dataset_path
         if not path or not os.path.exists(path):
             self.dataset_template_preview = []

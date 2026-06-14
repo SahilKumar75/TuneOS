@@ -2,21 +2,9 @@ import pandas as pd
 from datasets import Dataset, load_dataset
 from transformers import PreTrainedTokenizer
 
-# Prompt templates keyed by name. Each must contain {instruction} and {output}.
-PROMPT_TEMPLATES: dict[str, str] = {
-    "alpaca": "### Instruction:\n{instruction}\n\n### Response:\n{output}",
-    "chatml": (
-        "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n{output}<|im_end|>"
-    ),
-    "llama3": (
-        "<|start_header_id|>user<|end_header_id|>\n\n{instruction}<|eot_id|>"
-        "<|start_header_id|>assistant<|end_header_id|>\n\n{output}<|eot_id|>"
-    ),
-    "phi3": "<|user|>\n{instruction}<|end|>\n<|assistant|>\n{output}<|end|>",
-    "zephyr": "<|user|>\n{instruction}</s>\n<|assistant|>\n{output}</s>",
-}
-# Back-compat: callers importing PROMPT_TEMPLATE get the default (alpaca).
-PROMPT_TEMPLATE = PROMPT_TEMPLATES["alpaca"]
+# Templates live in a dependency-free module shared with the Reflex app
+# (single source of truth — see trainer/prompt_templates.py).
+from trainer.prompt_templates import PROMPT_TEMPLATE, PROMPT_TEMPLATES  # noqa: F401
 
 
 def _format_prompt_prefix(row: dict, template: str = "alpaca") -> str:

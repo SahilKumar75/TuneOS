@@ -10,6 +10,9 @@ import httpx
 import reflex as rx
 from pydantic import BaseModel
 
+# Dependency-free template helpers (no transformers/torch pulled into the app).
+from trainer.prompt_templates import PROMPT_TEMPLATES, auto_prompt_template_for
+
 
 class IntentQuestion(BaseModel):
     heading: str = ""
@@ -307,7 +310,8 @@ class FinetuneState(rx.State):
     eval_split_ratio: float = 0.1
     early_stopping_patience: int = 0
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
-    prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
+    prompt_template: str = "alpaca"  # auto-set from the model; see auto_prompt_template_for
+    prompt_template_user_set: bool = False  # True once the user overrides the auto choice
     packing: bool = False
     compose_adapters: bool = False
     overlay_technique: str = "lora"
@@ -875,6 +879,11 @@ class FinetuneState(rx.State):
                 self.model_pipeline = pipeline
                 self.model_hf_tags = tags
                 self.model_type_hf = model_type_raw.title() if model_type_raw else ""
+                # Auto-tether the prompt template to the model's native chat
+                # format (unless the user has manually overridden it). Training
+                # with the wrong template silently degrades the adapter.
+                if not self.prompt_template_user_set:
+                    self.prompt_template = auto_prompt_template_for(model_type_raw, model_id, tags)
                 self.model_context_window = f"{ctx:,} tokens" if ctx else ""
                 self.model_languages = lang_str
                 self.model_last_updated = last_mod
@@ -1655,8 +1664,17 @@ Write ONLY the summary, no other text."""
 
     @rx.event
     def set_prompt_template(self, value: str):
-        if value in ("alpaca", "chatml", "llama3", "phi3", "zephyr"):
+        if value in PROMPT_TEMPLATES:
             self.prompt_template = value
+            self.prompt_template_user_set = True
+
+    @rx.event
+    def reset_prompt_template_auto(self):
+        """Re-enable auto-detection and re-derive from the current model."""
+        self.prompt_template_user_set = False
+        self.prompt_template = auto_prompt_template_for(
+            self.model_type_hf, self.selected_model_id, self.model_hf_tags
+        )
 
     @rx.event
     def set_packing(self, value: bool):

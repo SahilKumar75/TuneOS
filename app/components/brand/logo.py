@@ -11,33 +11,34 @@ import reflex as rx
 
 from app.styles import c
 
-# Resting "mark" arrangement — must match BRAND in scripts/build_brand_assets.py.
-_MARK_BLOBS = [
-    (300, 90, 31), (360, 150, 31), (300, 210, 31), (240, 150, 31),
-    (240, 210, 29), (185, 255, 29), (140, 315, 29), (240, 315, 29),
-    (360, 255, 29), (95, 200, 12), (395, 95, 12), (395, 320, 12),
-]
-# Favicon reduction — 4 blobs + neck + satellite, no hole (§2b).
-_FAVI_BLOBS = [
-    (170, 170, 70), (310, 170, 70), (170, 310, 70), (310, 310, 70),
-    (240, 240, 44), (400, 90, 30),
-]
+# Chosen mark (option 5): two big blobs joined by a thin neck + three satellites.
+# Must match MARK_BLOBS/MARK_NECKS in scripts/build_brand_assets.py.
+_MARK_BLOBS = [(176, 184, 80), (304, 288, 80), (400, 104, 44), (104, 400, 48), (408, 408, 40)]
+_MARK_NECKS = [(176, 184, 304, 288, 36)]
+# Favicon reduction — the pair overlapping into a peanut + one satellite (§2b).
+_FAVI_BLOBS = [(186, 206, 100), (300, 300, 100), (404, 110, 50)]
 
 _GOO = (
     '<filter id="tune-goo" x="-30%" y="-30%" width="160%" height="160%">'
-    '<feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>'
+    '<feGaussianBlur in="SourceGraphic" stdDeviation="11" result="b"/>'
     '<feColorMatrix in="b" mode="matrix" '
-    'values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter>'
+    'values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"/></filter>'
 )
 
 
-def _mark_svg(blobs, *, goo: bool) -> str:
+def _mark_svg(blobs, *, goo: bool, necks=()) -> str:
+    lines = "".join(
+        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="currentColor" '
+        f'stroke-width="{w}" stroke-linecap="round"/>'
+        for (x1, y1, x2, y2, w) in necks
+    )
     circles = "".join(f'<circle cx="{x}" cy="{y}" r="{r}"/>' for x, y, r in blobs)
     defs = f"<defs>{_GOO}</defs>" if goo else ""
+    body = lines + circles
     grp = (
-        f'<g filter="url(#tune-goo)" fill="currentColor">{circles}</g>'
+        f'<g filter="url(#tune-goo)" fill="currentColor">{body}</g>'
         if goo
-        else f'<g fill="currentColor">{circles}</g>'
+        else f'<g fill="currentColor">{body}</g>'
     )
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" '
@@ -53,7 +54,10 @@ def tune_mark(size: str | int = 40, *, color: rx.Var | str | None = None) -> rx.
     """
     dim = f"{size}px" if isinstance(size, int) else size
     use_favicon = isinstance(size, int) and size < 32
-    svg = _mark_svg(_FAVI_BLOBS if use_favicon else _MARK_BLOBS, goo=not use_favicon)
+    if use_favicon:
+        svg = _mark_svg(_FAVI_BLOBS, goo=False)
+    else:
+        svg = _mark_svg(_MARK_BLOBS, goo=True, necks=_MARK_NECKS)
     return rx.box(
         rx.html(svg),
         width=dim,

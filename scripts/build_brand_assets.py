@@ -79,11 +79,22 @@ SCATTER = [
     (200, 180, 11), (300, 175, 19), (100, 150, 10), (380, 360, 12),
 ]
 
+# Resting "mark" arrangement = chosen logo (option 5): two big blobs joined by a
+# thin neck + three satellite dots. The neck is formed by two medium blobs riding
+# the line between the pair; seven filler blobs tuck inside the pair (hidden at
+# rest, they fan out during the other morph states).
 BRAND = [
-    (300, 90, 31), (360, 150, 31), (300, 210, 31), (240, 150, 31),
-    (240, 210, 29), (185, 255, 29), (140, 315, 29), (240, 315, 29),
-    (360, 255, 29), (95, 200, 12), (395, 95, 12), (395, 320, 12),
+    (176, 184, 78), (304, 288, 78),        # pair
+    (224, 219, 34), (256, 253, 34),        # neck (thin waist between the pair)
+    (400, 104, 44), (104, 400, 48), (408, 408, 40),   # satellites
+    (176, 184, 30), (158, 168, 26), (304, 288, 30),   # tucked into pair
+    (322, 304, 26), (196, 208, 24),
 ]
+
+# Static mark (option 5) drawn with an explicit thin neck line — crisper than the
+# blob-chain the animation uses. Coords in the 480 box.
+MARK_BLOBS = [(176, 184, 80), (304, 288, 80), (400, 104, 44), (104, 400, 48), (408, 408, 40)]
+MARK_NECKS = [(176, 184, 304, 288, 36)]
 
 STATES = [BRAND, grid(), SCATTER, wave(), columns(), rows(), diagonal(), cluster()]
 
@@ -154,7 +165,12 @@ def _loader(color: bool) -> str:
     )
 
 
-def _static(positions, *, label, vbox=480, blob="currentColor", goo=True) -> str:
+def _static(positions, *, label, necks=(), vbox=480, blob="currentColor", goo=True) -> str:
+    lines = "".join(
+        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{blob}" '
+        f'stroke-width="{w}" stroke-linecap="round"/>'
+        for (x1, y1, x2, y2, w) in necks
+    )
     circles = "".join(
         f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}"/>' for (x, y, r) in positions
     )
@@ -162,33 +178,32 @@ def _static(positions, *, label, vbox=480, blob="currentColor", goo=True) -> str
         defs = (
             "<defs>"
             '<filter id="goo" x="-30%" y="-30%" width="160%" height="160%">'
-            '<feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>'
+            '<feGaussianBlur in="SourceGraphic" stdDeviation="11" result="b"/>'
             '<feColorMatrix in="b" mode="matrix" '
-            'values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/>'
+            'values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"/>'
             "</filter></defs>"
         )
-        grp = f'<g filter="url(#goo)" fill="{blob}" color="#1c1c1c">{circles}</g>'
+        grp = f'<g filter="url(#goo)" fill="{blob}" color="#1c1c1c">{lines}{circles}</g>'
     else:
         # Hard union of overlapping circles — survives tiny favicon sizes (§2b).
         defs = ""
-        grp = f'<g fill="{blob}" color="#1c1c1c">{circles}</g>'
+        grp = f'<g fill="{blob}" color="#1c1c1c">{lines}{circles}</g>'
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {vbox} {vbox}" '
         f'role="img" aria-label="{label}">{defs}{grp}</svg>'
     )
 
 
-# Favicon: simplest legible reduction — 2x2 block + neck + one satellite.
-FAVICON = [
-    (170, 170, 70), (310, 170, 70), (170, 310, 70), (310, 310, 70),
-    (240, 240, 44), (400, 90, 30),
-]
+# Favicon: option-5 reduction — the pair overlapping into a peanut + one satellite.
+FAVICON = [(186, 206, 100), (300, 300, 100), (404, 110, 50)]
 
 
 def main():
     (ASSETS / "tuneos-loader.svg").write_text(_loader(color=False))
     (ASSETS / "tuneos-loader-color.svg").write_text(_loader(color=True))
-    (ASSETS / "tuneos-mark.svg").write_text(_static(BRAND, label="TuneOS"))
+    (ASSETS / "tuneos-mark.svg").write_text(
+        _static(MARK_BLOBS, label="TuneOS", necks=MARK_NECKS)
+    )
     (ASSETS / "tuneos-favicon.svg").write_text(
         _static(FAVICON, label="TuneOS", goo=False)
     )

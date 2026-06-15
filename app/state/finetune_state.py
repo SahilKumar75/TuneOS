@@ -218,6 +218,9 @@ class FinetuneState(rx.State):
     model_library: str = ""  # e.g. "Transformers"
     model_safetensors: bool = False
     model_requires_token: bool = False  # True when HF API reports model is gated
+    model_params: str = ""  # e.g. "2.5B"
+    model_formats: str = ""  # e.g. "GGUF, Safetensors"
+    model_architecture: str = ""  # e.g. "GemmaForCausalLM"
     # Model search
     model_search_query: str = ""
     model_search_source: str = "hf"  # "hf" | "github"
@@ -690,6 +693,9 @@ class FinetuneState(rx.State):
         self.model_library = ""
         self.model_safetensors = False
         self.model_requires_token = False
+        self.model_params = ""
+        self.model_formats = ""
+        self.model_architecture = ""
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -1048,11 +1054,38 @@ class FinetuneState(rx.State):
             raw_tags = data.get("tags") or []
             tags = [t for t in raw_tags if t.lower() in keep][:4]
 
-            # Library, license, safetensors from HF API
+            # Library, license from HF API
             lib = (data.get("library_name") or "").replace("-", " ").title()
             license_tag = next((t for t in raw_tags if t.startswith("license:")), "")
             lic = license_tag.replace("license:", "").replace("-", " ").title() if license_tag else ""
-            has_safetensors = "safetensors" in raw_tags
+
+            # File formats from siblings (SafeTensors / GGUF / PyTorch)
+            siblings = data.get("siblings") or []
+            file_types: set[str] = set()
+            for s in siblings:
+                fname = s.get("rfilename", "")
+                if fname.endswith(".safetensors"):
+                    file_types.add("SafeTensors")
+                elif fname.endswith(".gguf"):
+                    file_types.add("GGUF")
+                elif fname.endswith(".bin"):
+                    file_types.add("PyTorch")
+            has_safetensors = "SafeTensors" in file_types
+            formats_str = ", ".join(sorted(file_types)) if file_types else ""
+
+            # Architecture (architectures list is more specific than model_type)
+            arch_list = cfg.get("architectures") or []
+            architecture = arch_list[0] if arch_list else ""
+
+            # Parameter count from safetensors metadata
+            st_info = data.get("safetensors") or {}
+            params_total = st_info.get("total") or 0
+            if params_total > 1_000_000_000:
+                params_str = f"{params_total / 1_000_000_000:.1f}B params"
+            elif params_total > 1_000_000:
+                params_str = f"{params_total / 1_000_000:.0f}M params"
+            else:
+                params_str = ""
 
             # Architecture / config details
             cfg = data.get("config") or {}
@@ -1098,6 +1131,9 @@ class FinetuneState(rx.State):
                 self.model_license = lic
                 self.model_library = lib
                 self.model_safetensors = has_safetensors
+                self.model_formats = formats_str
+                self.model_architecture = architecture
+                self.model_params = params_str
                 self.model_requires_token = bool(data.get("gated") or data.get("private"))
                 self.model_fetch_error = ""
                 self.is_fetching_model_info = False

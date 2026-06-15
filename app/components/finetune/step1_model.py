@@ -111,7 +111,42 @@ def _selected_model_panel() -> rx.Component:
                         align="center",
                         width="100%",
                     ),
-                    # ── Stats row: downloads · likes · context · pipeline ──
+                    # ── Params + pipeline ─────────────────────────────────
+                    rx.cond(
+                        ~FinetuneState.is_fetching_model_info,
+                        rx.hstack(
+                            rx.cond(
+                                FinetuneState.model_params != "",
+                                rx.badge(
+                                    FinetuneState.model_params,
+                                    color_scheme="indigo",
+                                    size="2",
+                                    variant="solid",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_pipeline != "",
+                                rx.badge(FinetuneState.model_pipeline, color_scheme="blue", size="1"),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_architecture != "",
+                                rx.badge(
+                                    FinetuneState.model_architecture,
+                                    color_scheme="gray",
+                                    size="1",
+                                    variant="outline",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="2",
+                            wrap="wrap",
+                            align="center",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # ── Stats row: downloads · likes · context window ───────
                     rx.cond(
                         ~FinetuneState.is_fetching_model_info,
                         rx.hstack(
@@ -130,18 +165,13 @@ def _selected_model_panel() -> rx.Component:
                                 _stat_item("layers", FinetuneState.model_context_window),
                                 rx.fragment(),
                             ),
-                            rx.cond(
-                                FinetuneState.model_pipeline != "",
-                                rx.badge(FinetuneState.model_pipeline, color_scheme="blue", size="1"),
-                                rx.fragment(),
-                            ),
                             spacing="3",
                             wrap="wrap",
                             align="center",
                         ),
                         rx.fragment(),
                     ),
-                    # ── Meta row: library · safetensors · arch · license ──
+                    # ── Meta row: library · formats · license ──────────────
                     rx.cond(
                         ~FinetuneState.is_fetching_model_info,
                         rx.hstack(
@@ -156,17 +186,12 @@ def _selected_model_panel() -> rx.Component:
                                 rx.fragment(),
                             ),
                             rx.cond(
-                                FinetuneState.model_safetensors,
-                                rx.badge("Safetensors", color_scheme="green", size="1", variant="soft"),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_type_hf != "",
+                                FinetuneState.model_formats != "",
                                 rx.badge(
-                                    FinetuneState.model_type_hf,
-                                    color_scheme="gray",
+                                    FinetuneState.model_formats,
+                                    color_scheme="green",
                                     size="1",
-                                    variant="outline",
+                                    variant="soft",
                                 ),
                                 rx.fragment(),
                             ),
@@ -298,14 +323,14 @@ def _unified_card() -> rx.Component:
                 # Source segmented picker (icon-only)
                 rx.hstack(
                     rx.button(
-                        rx.image(src=_HF_ICON, width="20px", height="20px"),
+                        rx.image(src=_HF_ICON, width="22px", height="22px"),
                         on_click=FinetuneState.set_model_search_source("hf"),
                         variant=rx.cond(
                             FinetuneState.model_search_source == "hf", "soft", "ghost"
                         ),
                         color_scheme="orange",
-                        size="2",
-                        padding="8px",
+                        size="3",
+                        padding="10px 14px",
                         border_top_right_radius="0",
                         border_bottom_right_radius="0",
                     ),
@@ -315,16 +340,16 @@ def _unified_card() -> rx.Component:
                                 light=_GH_ICON_LIGHT_MODE,
                                 dark=_GH_ICON_DARK_MODE,
                             ),
-                            width="20px",
-                            height="20px",
+                            width="22px",
+                            height="22px",
                         ),
                         on_click=FinetuneState.set_model_search_source("github"),
                         variant=rx.cond(
                             FinetuneState.model_search_source == "github", "soft", "ghost"
                         ),
                         color_scheme="gray",
-                        size="2",
-                        padding="8px",
+                        size="3",
+                        padding="10px 14px",
                         border_top_left_radius="0",
                         border_bottom_left_radius="0",
                     ),
@@ -344,6 +369,7 @@ def _unified_card() -> rx.Component:
                     value=FinetuneState.model_search_query,
                     on_change=FinetuneState.set_model_search_query,
                     flex="1",
+                    max_width="480px",
                 ),
                 # Local import toggle
                 rx.button(

@@ -740,8 +740,8 @@ class FinetuneState(rx.State):
         self.seed_examples = [s for s in self.seed_examples if s.id != seed_id]
 
     @rx.event
-    def set_quality_threshold(self, v: float):
-        self.generation_quality_threshold = v
+    def set_quality_threshold(self, v: list[float]):
+        self.generation_quality_threshold = v[0] if v else 0.0
 
     @rx.event
     def set_export_format(self, v: str):

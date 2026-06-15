@@ -229,10 +229,13 @@ def _quick_chip(model_id: str, name: str, token_required: bool) -> rx.Component:
     )
 
 
-def _source_tab(source: str, label: str, icon: str) -> rx.Component:
+def _source_tab(source: str, label: str, icon: str, img_src: str = "") -> rx.Component:
     is_active = FinetuneState.model_source == source
+    icon_el = (
+        rx.image(src=img_src, width="15px", height="15px") if img_src else rx.icon(icon, size=14)
+    )
     return rx.button(
-        rx.hstack(rx.icon(icon, size=14), rx.text(label), spacing="2", align="center"),
+        rx.hstack(icon_el, rx.text(label), spacing="2", align="center"),
         on_click=FinetuneState.set_model_source(source),
         variant=rx.cond(is_active, "solid", "soft"),
         color_scheme="blue",
@@ -254,7 +257,7 @@ def _step1() -> rx.Component:
         _selected_model_panel(),
         # Source tabs
         rx.hstack(
-            _source_tab("hub", "HF Hub", "globe"),
+            _source_tab("hub", "HF Hub", "", img_src=_HF_LOGO),
             _source_tab("custom_string", "Any Model ID", "terminal"),
             _source_tab("local", "Local File", "folder-open"),
             spacing="2",

@@ -214,6 +214,15 @@ class FinetuneState(rx.State):
     model_bio: str = ""  # first paragraph from model README
     model_fetch_error: str = ""  # debug: last error from fetch_model_info
     is_fetching_model_info: bool = False
+    model_license: str = ""  # e.g. "Apache 2.0"
+    model_library: str = ""  # e.g. "Transformers"
+    model_safetensors: bool = False
+    # Model search
+    model_search_query: str = ""
+    model_search_source: str = "hf"  # "hf" | "github"
+    model_search_results: list[dict] = []
+    is_searching_models: bool = False
+    show_local_upload: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""  # written by approve_intent() for API compat
@@ -576,8 +585,94 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
+        self.model_search_query = ""
+        self.model_search_results = []
         self._clear_model_preview()
         return FinetuneState.fetch_model_info
+
+    @rx.event
+    def set_model_search_source(self, v: str):
+        self.model_search_source = v
+        self.model_search_results = []
+        if self.model_search_query.strip():
+            return FinetuneState.do_model_search
+
+    @rx.event
+    def set_model_search_query(self, v: str):
+        self.model_search_query = v
+        if not v.strip():
+            self.model_search_results = []
+            self.is_searching_models = False
+            return
+        return FinetuneState.do_model_search
+
+    @rx.event
+    def toggle_local_upload(self):
+        self.show_local_upload = not self.show_local_upload
+
+    @rx.event(background=True)
+    async def do_model_search(self):
+        async with self:
+            query = self.model_search_query
+            source = self.model_search_source
+            if not query.strip():
+                self.is_searching_models = False
+                return
+            self.is_searching_models = True
+
+        try:
+            import httpx
+
+            results: list[dict] = []
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                if source == "hf":
+                    resp = await client.get(
+                        "https://huggingface.co/api/models",
+                        params={
+                            "search": query,
+                            "limit": 8,
+                            "sort": "downloads",
+                            "direction": -1,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        for m in resp.json()[:8]:
+                            mid = m.get("modelId") or m.get("id", "")
+                            if not mid:
+                                continue
+                            dl = m.get("downloads", 0) or 0
+                            dl_str = (
+                                f"{dl / 1_000_000:.1f}M"
+                                if dl >= 1_000_000
+                                else f"{dl // 1_000}k"
+                                if dl >= 1_000
+                                else str(dl)
+                            ) if dl else ""
+                            results.append({
+                                "id": mid,
+                                "downloads": dl_str,
+                                "pipeline": (m.get("pipeline_tag") or "").replace("-", " ").title(),
+                            })
+                elif source == "github":
+                    resp = await client.get(
+                        "https://api.github.com/search/repositories",
+                        params={"q": f"{query} topic:llm", "sort": "stars", "per_page": 8},
+                        headers={"Accept": "application/vnd.github+json"},
+                    )
+                    if resp.status_code == 200:
+                        for r in resp.json().get("items", [])[:8]:
+                            stars = r.get("stargazers_count", 0) or 0
+                            results.append({
+                                "id": r.get("full_name", ""),
+                                "downloads": f"{stars // 1_000}k" if stars >= 1_000 else str(stars),
+                                "pipeline": "GitHub",
+                            })
+        except Exception:
+            results = []
+
+        async with self:
+            self.model_search_results = results
+            self.is_searching_models = False
 
     def _clear_model_preview(self):
         self.model_downloads = ""
@@ -590,6 +685,9 @@ class FinetuneState(rx.State):
         self.model_last_updated = ""
         self.model_bio = ""
         self.model_fetch_error = ""
+        self.model_license = ""
+        self.model_library = ""
+        self.model_safetensors = False
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -948,6 +1046,12 @@ class FinetuneState(rx.State):
             raw_tags = data.get("tags") or []
             tags = [t for t in raw_tags if t.lower() in keep][:4]
 
+            # Library, license, safetensors from HF API
+            lib = (data.get("library_name") or "").replace("-", " ").title()
+            license_tag = next((t for t in raw_tags if t.startswith("license:")), "")
+            lic = license_tag.replace("license:", "").replace("-", " ").title() if license_tag else ""
+            has_safetensors = "safetensors" in raw_tags
+
             # Architecture / config details
             cfg = data.get("config") or {}
             model_type_raw = cfg.get("model_type") or ""
@@ -989,6 +1093,9 @@ class FinetuneState(rx.State):
                 self.model_languages = lang_str
                 self.model_last_updated = last_mod
                 self.model_bio = bio
+                self.model_license = lic
+                self.model_library = lib
+                self.model_safetensors = has_safetensors
                 self.model_fetch_error = ""
                 self.is_fetching_model_info = False
         except Exception as _exc:

@@ -209,7 +209,7 @@ class DatasetGenRequest(BaseModel):
     hf_token: str = ""
     quality_threshold: float = Field(default=0.0, ge=0.0, le=5.0)
     personas: list[str] = []
-    export_format: str = "jsonl"  # "jsonl" | "alpaca_json" | "sharegpt_json"
+    export_format: Literal["jsonl", "alpaca_json", "sharegpt_json"] = "jsonl"
 
 
 class CommentaryRequest(BaseModel):

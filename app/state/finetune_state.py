@@ -657,10 +657,27 @@ class FinetuneState(rx.State):
             self.dpo_column_error = ""
             return
         try:
-            with open(self.dataset_path, encoding="utf-8") as fh:
-                first_line = fh.readline().strip()
-            row = json.loads(first_line)
-            cols = set(row.keys())
+            path = self.dataset_path
+            cols: set[str] = set()
+            if path.endswith(".csv"):
+                import csv
+
+                with open(path, encoding="utf-8", newline="") as fh:
+                    reader = csv.DictReader(fh)
+                    cols = set(reader.fieldnames or [])
+            elif path.endswith(".json"):
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list) and data:
+                    cols = set(data[0].keys())
+                elif isinstance(data, dict):
+                    cols = set(data.keys())
+            else:
+                # JSONL (default)
+                with open(path, encoding="utf-8") as fh:
+                    first_line = fh.readline().strip()
+                cols = set(json.loads(first_line).keys())
+
             missing = [
                 c
                 for c in [self.dpo_prompt_col, self.dpo_chosen_col, self.dpo_rejected_col]
@@ -1779,8 +1796,9 @@ Write ONLY the summary, no other text."""
                     self.dataset_avg_tokens = (
                         round((total_words / len(samples)) * 1.3, 1) if samples else 0.0
                     )
+                    _alt_path = stats.get("alpaca_path") or stats.get("sharegpt_path") or ""
                     self.generation_alt_download_url = (
-                        stats.get("alpaca_path", stats.get("sharegpt_path", "")) or ""
+                        f"{API_BASE}/api/datasets/download?path={_alt_path}" if _alt_path else ""
                     )
                     self.is_generating = False
                     self.data_source = "generate"

@@ -8,6 +8,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from app.api.deps import DATASET_DIR
 from app.api.schemas import DatasetGenRequest
@@ -39,6 +40,24 @@ async def search_datasets(q: str = Query(default="", description="Search query")
         return {"results": results}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/datasets/download")
+async def download_dataset_file(
+    path: str = Query(..., description="Absolute filesystem path to the file"),
+):
+    """Serve an alternate-format export (alpaca_json / sharegpt_json) for download."""
+    import pathlib
+
+    p = pathlib.Path(path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    # Restrict to DATASET_DIR to prevent path traversal
+    try:
+        p.resolve().relative_to(pathlib.Path(DATASET_DIR).resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Access denied") from exc
+    return FileResponse(str(p), filename=p.name, media_type="application/octet-stream")
 
 
 @router.get("/datasets/{dataset_id:path}/preview")
@@ -473,12 +492,15 @@ async def _evol_instruct_generate(
                 content = re.sub(r"```json\s*|\s*```", "", content)
                 match = re.search(r"\[.*?\]", content, re.DOTALL)
                 if match:
-                    batch = json.loads(match.group())
-                    results.extend(
-                        s
-                        for s in batch
-                        if isinstance(s, dict) and "instruction" in s and "output" in s
-                    )
+                    try:
+                        batch = json.loads(match.group())
+                        results.extend(
+                            s
+                            for s in batch
+                            if isinstance(s, dict) and "instruction" in s and "output" in s
+                        )
+                    except json.JSONDecodeError:
+                        pass
 
     return results[:n]
 
@@ -529,12 +551,15 @@ async def _persona_generate(intent: str, n: int, personas: list[str], api_key: s
                 content = re.sub(r"```json\s*|\s*```", "", content)
                 match = re.search(r"\[.*?\]", content, re.DOTALL)
                 if match:
-                    batch = json.loads(match.group())
-                    results.extend(
-                        s
-                        for s in batch
-                        if isinstance(s, dict) and "instruction" in s and "output" in s
-                    )
+                    try:
+                        batch = json.loads(match.group())
+                        results.extend(
+                            s
+                            for s in batch
+                            if isinstance(s, dict) and "instruction" in s and "output" in s
+                        )
+                    except json.JSONDecodeError:
+                        pass
 
     return results[:n]
 
@@ -591,8 +616,18 @@ async def _quality_filter(samples: list[dict], threshold: float, api_key: str) -
                 scored.extend((s, 5.0) for s in chunk)
                 continue
 
-            scores = json.loads(match.group())
-            for s, score in zip(chunk, scores, strict=False):
+            try:
+                scores = json.loads(match.group())
+            except json.JSONDecodeError:
+                scored.extend((s, 5.0) for s in chunk)
+                continue
+
+            if not isinstance(scores, list) or len(scores) != len(chunk):
+                # LLM returned wrong number of scores — keep all samples
+                scored.extend((s, 5.0) for s in chunk)
+                continue
+
+            for s, score in zip(chunk, scores, strict=True):
                 try:
                     scored.append((s, float(score)))
                 except (TypeError, ValueError):

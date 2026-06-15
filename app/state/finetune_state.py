@@ -217,6 +217,7 @@ class FinetuneState(rx.State):
     model_license: str = ""  # e.g. "Apache 2.0"
     model_library: str = ""  # e.g. "Transformers"
     model_safetensors: bool = False
+    model_requires_token: bool = False  # True when HF API reports model is gated
     # Model search
     model_search_query: str = ""
     model_search_source: str = "hf"  # "hf" | "github"
@@ -688,6 +689,7 @@ class FinetuneState(rx.State):
         self.model_license = ""
         self.model_library = ""
         self.model_safetensors = False
+        self.model_requires_token = False
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -1096,6 +1098,7 @@ class FinetuneState(rx.State):
                 self.model_license = lic
                 self.model_library = lib
                 self.model_safetensors = has_safetensors
+                self.model_requires_token = bool(data.get("gated") or data.get("private"))
                 self.model_fetch_error = ""
                 self.is_fetching_model_info = False
         except Exception as _exc:

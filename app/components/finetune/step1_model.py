@@ -23,7 +23,7 @@ _VLM_QUICK = [
 ]
 
 _HF_LOGO = "https://huggingface.co/front/assets/huggingface_logo-noborder.svg"
-_GH_LOGO = "https://github.githubassets.com/favicons/favicon.png"
+_GH_LOGO = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
 
 
 def _stat_item(icon: str, value: rx.Component, icon_color: str = "") -> rx.Component:
@@ -293,25 +293,53 @@ def _unified_card() -> rx.Component:
         rx.vstack(
             # ── Search row ──────────────────────────────────────────────
             rx.hstack(
-                # Source toggle (HF / GitHub) with icon
+                # Source segmented picker
                 rx.hstack(
-                    rx.cond(
-                        FinetuneState.model_search_source == "hf",
-                        rx.image(src=_HF_LOGO, width="15px", height="15px"),
-                        rx.image(src=_GH_LOGO, width="15px", height="15px"),
-                    ),
-                    rx.select.root(
-                        rx.select.trigger(width="100px"),
-                        rx.select.content(
-                            rx.select.item("HF Hub", value="hf"),
-                            rx.select.item("GitHub", value="github"),
+                    rx.button(
+                        rx.hstack(
+                            rx.image(src=_HF_LOGO, width="14px", height="14px"),
+                            rx.text("HF Hub", font_size="0.8rem"),
+                            spacing="1",
+                            align="center",
                         ),
-                        value=FinetuneState.model_search_source,
-                        on_change=FinetuneState.set_model_search_source,
+                        on_click=FinetuneState.set_model_search_source("hf"),
+                        variant=rx.cond(
+                            FinetuneState.model_search_source == "hf", "soft", "ghost"
+                        ),
+                        color_scheme=rx.cond(
+                            FinetuneState.model_search_source == "hf", "orange", "gray"
+                        ),
                         size="2",
+                        border_right_radius="0",
                     ),
-                    spacing="1",
-                    align="center",
+                    rx.button(
+                        rx.hstack(
+                            rx.image(
+                                src=_GH_LOGO,
+                                width="14px",
+                                height="14px",
+                                filter=rx.color_mode_cond(
+                                    light="none",
+                                    dark="brightness(0) invert(1)",
+                                ),
+                            ),
+                            rx.text("GitHub", font_size="0.8rem"),
+                            spacing="1",
+                            align="center",
+                        ),
+                        on_click=FinetuneState.set_model_search_source("github"),
+                        variant=rx.cond(
+                            FinetuneState.model_search_source == "github", "soft", "ghost"
+                        ),
+                        color_scheme="gray",
+                        size="2",
+                        border_left_radius="0",
+                    ),
+                    spacing="0",
+                    border="1px solid",
+                    border_color=c("border"),
+                    border_radius="8px",
+                    overflow="hidden",
                 ),
                 # Live search input
                 rx.input(
@@ -433,15 +461,23 @@ def _unified_card() -> rx.Component:
                     gap="8px",
                 ),
             ),
-            rx.divider(),
-            # ── HF Token ────────────────────────────────────────────────
-            _label("HF Token (required for gated models like Llama)"),
-            rx.input(
-                placeholder="hf_xxxxxxxxxxxxx",
-                type="password",
-                value=FinetuneState.hf_token,
-                on_change=FinetuneState.set_hf_token,
-                width="100%",
+            # ── HF Token (only for gated models) ────────────────────────
+            rx.cond(
+                FinetuneState.model_requires_token,
+                rx.vstack(
+                    rx.divider(),
+                    _label("HF Token (this model is gated — token required)"),
+                    rx.input(
+                        placeholder="hf_xxxxxxxxxxxxx",
+                        type="password",
+                        value=FinetuneState.hf_token,
+                        on_change=FinetuneState.set_hf_token,
+                        width="100%",
+                    ),
+                    spacing="3",
+                    width="100%",
+                ),
+                rx.fragment(),
             ),
             spacing="3",
             width="100%",

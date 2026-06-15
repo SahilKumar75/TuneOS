@@ -181,6 +181,7 @@ def _composer() -> rx.Component:
 def _preview_panel() -> rx.Component:
     return rx.box(
         rx.vstack(
+            # ── Header: source badge + Change button ──────────────────
             rx.hstack(
                 rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
                 rx.spacer(),
@@ -196,20 +197,95 @@ def _preview_panel() -> rx.Component:
                 align="center",
                 width="100%",
             ),
+            # ── Model title ───────────────────────────────────────────
             rx.heading(
                 AppState.preview_title,
-                font_size="1.2rem",
-                font_weight="600",
+                font_size="1.15rem",
+                font_weight="700",
                 color=c("text_primary"),
             ),
-            rx.text(AppState.preview_meta, font_size="0.88rem", color=c("text_secondary")),
-            rx.text(
-                AppState.preview_summary,
-                font_size="0.95rem",
-                line_height="1.55",
-                color=c("text_primary"),
+            # ── Stats row: downloads · likes · pipeline badge ─────────
+            rx.hstack(
+                rx.cond(
+                    AppState.preview_downloads != "",
+                    rx.hstack(
+                        rx.icon("download", size=13, color=c("text_muted")),
+                        rx.text(AppState.preview_downloads, font_size="0.8rem", color=c("text_secondary")),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    AppState.preview_likes != "",
+                    rx.hstack(
+                        rx.icon("heart", size=13, color="#E53E3E"),
+                        rx.text(AppState.preview_likes, font_size="0.8rem", color=c("text_secondary")),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    AppState.preview_pipeline != "",
+                    rx.badge(AppState.preview_pipeline, color_scheme="blue", size="1"),
+                    rx.fragment(),
+                ),
+                spacing="3",
+                wrap="wrap",
+                align="center",
             ),
-            rx.text(AppState.preview_url, font_size="0.82rem", color=c("text_muted")),
+            # ── Meta row: library · formats · arch · license ──────────
+            rx.hstack(
+                rx.cond(
+                    AppState.preview_library != "",
+                    rx.badge(AppState.preview_library, color_scheme="purple", size="1", variant="soft"),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    AppState.preview_formats != "",
+                    rx.badge(AppState.preview_formats, color_scheme="green", size="1", variant="soft"),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    AppState.preview_architecture != "",
+                    rx.badge(AppState.preview_architecture, color_scheme="gray", size="1", variant="outline"),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    AppState.preview_license != "",
+                    rx.text(AppState.preview_license, font_size="0.72rem", color=c("text_muted")),
+                    rx.fragment(),
+                ),
+                spacing="2",
+                wrap="wrap",
+                align="center",
+            ),
+            # ── Capability tags ───────────────────────────────────────
+            rx.cond(
+                AppState.preview_tags.length() > 0,
+                rx.hstack(
+                    rx.foreach(
+                        AppState.preview_tags,
+                        lambda tag: rx.badge(tag, color_scheme="gray", size="1", variant="soft"),
+                    ),
+                    wrap="wrap",
+                    spacing="1",
+                ),
+                rx.fragment(),
+            ),
+            # ── Bio / summary ─────────────────────────────────────────
+            rx.cond(
+                AppState.preview_summary != "",
+                rx.text(
+                    AppState.preview_summary,
+                    font_size="0.88rem",
+                    line_height="1.6",
+                    color=c("text_secondary"),
+                ),
+                rx.fragment(),
+            ),
+            # ── Confirm buttons ───────────────────────────────────────
             rx.hstack(
                 rx.button(
                     "Yes, use this",

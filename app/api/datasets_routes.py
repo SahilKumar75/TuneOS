@@ -74,8 +74,27 @@ async def generate_dataset(req: DatasetGenRequest):
         generation_method = "none"
         error_log = []
 
-        # Try OpenRouter first (preferred method)
-        if openrouter_key and req.method in ("self_instruct", "few_shot", "auto"):
+        # Route to the requested method
+        if openrouter_key and req.method == "evol_instruct":
+            try:
+                samples = await _evol_instruct_generate(
+                    req.user_intent, req.n_samples, req.seed_examples, openrouter_key
+                )
+                generation_method = "evol_instruct"
+            except Exception as e:
+                error_log.append(f"Evol-Instruct failed: {str(e)}")
+
+        elif openrouter_key and req.method == "persona":
+            try:
+                samples = await _persona_generate(
+                    req.user_intent, req.n_samples, req.personas, openrouter_key
+                )
+                generation_method = "persona"
+            except Exception as e:
+                error_log.append(f"Persona generation failed: {str(e)}")
+
+        # Self-instruct / few-shot / auto — try OpenRouter first
+        if not samples and openrouter_key and req.method in ("self_instruct", "few_shot", "auto"):
             try:
                 samples = await _openrouter_generate(
                     req.user_intent, req.n_samples, req.seed_examples, openrouter_key
@@ -110,21 +129,60 @@ async def generate_dataset(req: DatasetGenRequest):
                 seen.add(key)
                 unique.append(s)
 
+        # Optional LLM-as-judge quality filter
+        quality_filtered = False
+        if req.quality_threshold > 0 and openrouter_key and unique:
+            try:
+                before = len(unique)
+                unique = await _quality_filter(unique, req.quality_threshold, openrouter_key)
+                quality_filtered = True
+                error_log_note = f"Quality filter: {before} → {len(unique)} samples"
+                error_log.append(error_log_note)
+            except Exception as e:
+                error_log.append(f"Quality filter failed (skipped): {e}")
+
         stats = {
             "total_generated": len(samples),
             "final_count": len(unique),
             "diversity_score": _diversity_score(unique),
             "generation_method": generation_method,
+            "quality_filtered": quality_filtered,
+            "after_quality_filter": len(unique) if quality_filtered else None,
             "errors": error_log if error_log else None,
         }
 
-        # Save to disk
+        # Save canonical JSONL
         os.makedirs(DATASET_DIR, exist_ok=True)
         fname = f"generated_{uuid.uuid4().hex[:8]}.jsonl"
         fpath = os.path.join(DATASET_DIR, fname)
         with open(fpath, "w") as f:
             for row in unique:
                 f.write(json.dumps(row) + "\n")
+
+        # Optional alternate format export
+        if req.export_format == "alpaca_json":
+            alpaca_path = fpath.replace(".jsonl", "_alpaca.json")
+            alpaca = [
+                {"instruction": r.get("instruction", ""), "input": "", "output": r.get("output", "")}
+                for r in unique
+            ]
+            with open(alpaca_path, "w") as f:
+                json.dump(alpaca, f, indent=2)
+            stats["alpaca_path"] = alpaca_path
+        elif req.export_format == "sharegpt_json":
+            sgpt_path = fpath.replace(".jsonl", "_sharegpt.json")
+            sgpt = [
+                {
+                    "conversations": [
+                        {"from": "human", "value": r.get("instruction", "")},
+                        {"from": "gpt", "value": r.get("output", "")},
+                    ]
+                }
+                for r in unique
+            ]
+            with open(sgpt_path, "w") as f:
+                json.dump(sgpt, f, indent=2)
+            stats["sharegpt_path"] = sgpt_path
 
         return {"samples": unique, "dataset_path": fpath, "stats": stats}
 
@@ -361,6 +419,182 @@ def _template_generate(intent: str, n: int) -> list[dict]:
         samples.append({"instruction": instruction, "output": output})
 
     return samples
+
+
+async def _evol_instruct_generate(
+    intent: str, n: int, seeds: list[dict], api_key: str
+) -> list[dict]:
+    """WizardLM-style evolution: rewrite seeds into more complex variants."""
+    import math
+
+    import httpx
+
+    seeds = seeds or _default_seeds(intent)
+    n_per_seed = math.ceil(n / len(seeds))
+    results = []
+
+    async with httpx.AsyncClient(timeout=90.0) as http:
+        for seed in seeds:
+            if len(results) >= n:
+                break
+            prompt = (
+                f"Original instruction: {seed['instruction']}\n"
+                f"Original output: {seed['output']}\n\n"
+                f"Produce {n_per_seed} more complex and diverse evolved variants as a JSON array. "
+                f"Each variant should be related to: {intent}\n"
+                f'Return ONLY JSON: [{{"instruction":"...","output":"..."}}]'
+            )
+            resp = await http.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "X-Title": "TuneOS Evol-Instruct",
+                },
+                json={
+                    "model": "deepseek/deepseek-v4-flash:free",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an instruction evolver. Output only JSON arrays, no markdown.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": n_per_seed * 200,
+                    "temperature": 0.9,
+                },
+            )
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"]
+                content = re.sub(r"```json\s*|\s*```", "", content)
+                match = re.search(r"\[.*?\]", content, re.DOTALL)
+                if match:
+                    batch = json.loads(match.group())
+                    results.extend(
+                        s for s in batch if isinstance(s, dict) and "instruction" in s and "output" in s
+                    )
+
+    return results[:n]
+
+
+async def _persona_generate(
+    intent: str, n: int, personas: list[str], api_key: str
+) -> list[dict]:
+    """Generate data from multiple persona viewpoints for diversity."""
+    import math
+
+    import httpx
+
+    default_personas = ["expert practitioner", "curious student", "skeptical professional"]
+    personas = personas or default_personas
+    n_per_persona = math.ceil(n / len(personas))
+    results = []
+
+    async with httpx.AsyncClient(timeout=90.0) as http:
+        for persona in personas:
+            if len(results) >= n:
+                break
+            prompt = (
+                f"You are a {persona} interacting with an AI assistant about: {intent}\n\n"
+                f"Generate {n_per_persona} realistic instruction/output pairs from this persona's "
+                f"perspective — use their vocabulary, expertise level, and concerns.\n"
+                f'Return ONLY JSON: [{{"instruction":"...","output":"..."}}]'
+            )
+            resp = await http.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "X-Title": "TuneOS Persona Generation",
+                },
+                json={
+                    "model": "deepseek/deepseek-v4-flash:free",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You generate JSON datasets only. Never use markdown formatting.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": n_per_persona * 200,
+                    "temperature": 0.85,
+                },
+            )
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"]
+                content = re.sub(r"```json\s*|\s*```", "", content)
+                match = re.search(r"\[.*?\]", content, re.DOTALL)
+                if match:
+                    batch = json.loads(match.group())
+                    results.extend(
+                        s for s in batch if isinstance(s, dict) and "instruction" in s and "output" in s
+                    )
+
+    return results[:n]
+
+
+async def _quality_filter(
+    samples: list[dict], threshold: float, api_key: str
+) -> list[dict]:
+    """Score samples 1-5 with LLM-as-judge; discard those below threshold."""
+    import httpx
+
+    # Chunk to avoid context overflow (max 100 per call)
+    chunk_size = 100
+    scored: list[tuple[dict, float]] = []
+
+    async with httpx.AsyncClient(timeout=60.0) as http:
+        for i in range(0, len(samples), chunk_size):
+            chunk = samples[i : i + chunk_size]
+            batch_prompt = (
+                "Score each instruction/output pair from 1 (poor) to 5 (excellent) "
+                "for clarity, relevance, and quality.\n"
+                "Return ONLY a JSON array of numbers, one per pair, in order.\n\n"
+                + "\n".join(
+                    f"{j + 1}. Instruction: {s['instruction'][:200]}\n"
+                    f"   Output: {s['output'][:200]}"
+                    for j, s in enumerate(chunk)
+                )
+            )
+            resp = await http.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "X-Title": "TuneOS Quality Filter",
+                },
+                json={
+                    "model": "deepseek/deepseek-v4-flash:free",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You rate dataset quality. Respond only with a JSON array of numbers.",
+                        },
+                        {"role": "user", "content": batch_prompt},
+                    ],
+                    "max_tokens": len(chunk) * 5,
+                    "temperature": 0.0,
+                },
+            )
+            if resp.status_code != 200:
+                # If scoring fails for this chunk, keep all samples
+                scored.extend((s, 5.0) for s in chunk)
+                continue
+
+            content = resp.json()["choices"][0]["message"]["content"]
+            match = re.search(r"\[.*?\]", content, re.DOTALL)
+            if not match:
+                scored.extend((s, 5.0) for s in chunk)
+                continue
+
+            scores = json.loads(match.group())
+            for s, score in zip(chunk, scores):
+                try:
+                    scored.append((s, float(score)))
+                except (TypeError, ValueError):
+                    scored.append((s, 5.0))
+
+    return [s for s, score in scored if score >= threshold]
 
 
 def _diversity_score(samples: list[dict]) -> float:

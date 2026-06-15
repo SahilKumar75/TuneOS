@@ -293,16 +293,25 @@ def _unified_card() -> rx.Component:
         rx.vstack(
             # ── Search row ──────────────────────────────────────────────
             rx.hstack(
-                # Source toggle (HF / GitHub)
-                rx.select.root(
-                    rx.select.trigger(width="120px"),
-                    rx.select.content(
-                        rx.select.item("HF Hub", value="hf"),
-                        rx.select.item("GitHub", value="github"),
+                # Source toggle (HF / GitHub) with icon
+                rx.hstack(
+                    rx.cond(
+                        FinetuneState.model_search_source == "hf",
+                        rx.image(src=_HF_LOGO, width="15px", height="15px"),
+                        rx.image(src=_GH_LOGO, width="15px", height="15px"),
                     ),
-                    value=FinetuneState.model_search_source,
-                    on_change=FinetuneState.set_model_search_source,
-                    size="2",
+                    rx.select.root(
+                        rx.select.trigger(width="100px"),
+                        rx.select.content(
+                            rx.select.item("HF Hub", value="hf"),
+                            rx.select.item("GitHub", value="github"),
+                        ),
+                        value=FinetuneState.model_search_source,
+                        on_change=FinetuneState.set_model_search_source,
+                        size="2",
+                    ),
+                    spacing="1",
+                    align="center",
                 ),
                 # Live search input
                 rx.input(
@@ -330,25 +339,6 @@ def _unified_card() -> rx.Component:
                 ),
                 spacing="2",
                 align="center",
-                width="100%",
-            ),
-            # ── Source icon badge (shows which source is active) ─────────
-            rx.hstack(
-                rx.cond(
-                    FinetuneState.model_search_source == "hf",
-                    rx.hstack(
-                        rx.image(src=_HF_LOGO, width="13px", height="13px"),
-                        rx.text("Hugging Face Hub", font_size="0.72rem", color="#FF9D00", font_weight="600"),
-                        spacing="1",
-                        align="center",
-                    ),
-                    rx.hstack(
-                        rx.image(src=_GH_LOGO, width="13px", height="13px"),
-                        rx.text("GitHub", font_size="0.72rem", color=c("text_muted"), font_weight="600"),
-                        spacing="1",
-                        align="center",
-                    ),
-                ),
                 width="100%",
             ),
             # ── Search results ───────────────────────────────────────────

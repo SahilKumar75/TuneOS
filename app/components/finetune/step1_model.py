@@ -23,7 +23,8 @@ _VLM_QUICK = [
 ]
 
 _HF_LOGO = "https://huggingface.co/front/assets/huggingface_logo-noborder.svg"
-_GH_LOGO = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+_GH_LOGO_DARK = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+_GH_LOGO_LIGHT = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark-Light.png"
 
 
 def _stat_item(icon: str, value: rx.Component, icon_color: str = "") -> rx.Component:
@@ -315,13 +316,12 @@ def _unified_card() -> rx.Component:
                     rx.button(
                         rx.hstack(
                             rx.image(
-                                src=_GH_LOGO,
+                                src=rx.color_mode_cond(
+                                    light=_GH_LOGO_DARK,
+                                    dark=_GH_LOGO_LIGHT,
+                                ),
                                 width="14px",
                                 height="14px",
-                                filter=rx.color_mode_cond(
-                                    light="none",
-                                    dark="brightness(0) invert(1)",
-                                ),
                             ),
                             rx.text("GitHub", font_size="0.8rem"),
                             spacing="1",

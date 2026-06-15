@@ -209,13 +209,12 @@ def _preview_panel() -> rx.Component:
                         AppState.preview_kind == "github",
                         rx.hstack(
                             rx.image(
-                                src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                                src=rx.color_mode_cond(
+                                    light="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                                    dark="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark-Light.png",
+                                ),
                                 width="15px",
                                 height="15px",
-                                filter=rx.color_mode_cond(
-                                    light="none",
-                                    dark="brightness(0) invert(1)",
-                                ),
                             ),
                             rx.text(
                                 "GitHub",

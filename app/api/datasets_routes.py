@@ -454,7 +454,7 @@ async def _evol_instruct_generate(
 
     seeds = seeds or _default_seeds(intent)
     n_per_seed = math.ceil(n / len(seeds))
-    results = []
+    results: list[dict] = []
 
     async with httpx.AsyncClient(timeout=90.0) as http:
         for seed in seeds:
@@ -514,7 +514,7 @@ async def _persona_generate(intent: str, n: int, personas: list[str], api_key: s
     default_personas = ["expert practitioner", "curious student", "skeptical professional"]
     personas = personas or default_personas
     n_per_persona = math.ceil(n / len(personas))
-    results = []
+    results: list[dict] = []
 
     async with httpx.AsyncClient(timeout=90.0) as http:
         for persona in personas:

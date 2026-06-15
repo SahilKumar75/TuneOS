@@ -207,6 +207,9 @@ class DatasetGenRequest(BaseModel):
     n_samples: int = Field(default=50, ge=5, le=500)
     seed_examples: list[dict] = []
     hf_token: str = ""
+    quality_threshold: float = Field(default=0.0, ge=0.0, le=5.0)
+    personas: list[str] = []
+    export_format: Literal["jsonl", "alpaca_json", "sharegpt_json"] = "jsonl"
 
 
 class CommentaryRequest(BaseModel):

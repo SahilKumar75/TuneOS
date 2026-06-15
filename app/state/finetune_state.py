@@ -595,8 +595,8 @@ class FinetuneState(rx.State):
         return FinetuneState.fetch_model_info
 
     @rx.event
-    def set_model_search_source(self, v: str):
-        self.model_search_source = v
+    def set_model_search_source(self, v: str | list[str]):
+        self.model_search_source = v if isinstance(v, str) else (v[0] if v else "hf")
         self.model_search_results = []
         if self.model_search_query.strip():
             return FinetuneState.do_model_search

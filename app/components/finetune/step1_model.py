@@ -321,23 +321,13 @@ def _unified_card() -> rx.Component:
             # ── Search row ──────────────────────────────────────────────
             rx.hstack(
                 # Source segmented picker (icon-only)
-                rx.hstack(
-                    rx.button(
+                rx.segmented_control.root(
+                    rx.segmented_control.item(
                         rx.image(src=_HF_ICON, width="20px", height="20px"),
-                        on_click=FinetuneState.set_model_search_source("hf"),
-                        variant="ghost",
-                        color_scheme="gray",
-                        size="2",
-                        padding_x="18px",
-                        background=rx.cond(
-                            FinetuneState.model_search_source == "hf",
-                            "rgba(255,157,0,0.15)",
-                            "transparent",
-                        ),
-                        border_top_right_radius="0",
-                        border_bottom_right_radius="0",
+                        value="hf",
+                        padding_x="16px",
                     ),
-                    rx.button(
+                    rx.segmented_control.item(
                         rx.image(
                             src=rx.color_mode_cond(
                                 light=_GH_ICON_LIGHT_MODE,
@@ -346,25 +336,12 @@ def _unified_card() -> rx.Component:
                             width="20px",
                             height="20px",
                         ),
-                        on_click=FinetuneState.set_model_search_source("github"),
-                        variant="ghost",
-                        color_scheme="gray",
-                        size="2",
-                        padding_x="18px",
-                        background=rx.cond(
-                            FinetuneState.model_search_source == "github",
-                            "rgba(150,150,150,0.15)",
-                            "transparent",
-                        ),
-                        border_top_left_radius="0",
-                        border_bottom_left_radius="0",
+                        value="github",
+                        padding_x="16px",
                     ),
-                    spacing="0",
-                    border="1px solid",
-                    border_color=c("border"),
-                    border_radius="8px",
-                    overflow="hidden",
-                    height="32px",
+                    value=FinetuneState.model_search_source,
+                    on_change=FinetuneState.set_model_search_source,
+                    size="2",
                 ),
                 # Live search input
                 rx.input(

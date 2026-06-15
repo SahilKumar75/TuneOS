@@ -1497,7 +1497,12 @@ Write ONLY the summary, no other text."""
                         total_words = sum(
                             len(
                                 (
-                                    str(r.get(self.hub_dataset_instruction_col, r.get("instruction", "")))
+                                    str(
+                                        r.get(
+                                            self.hub_dataset_instruction_col,
+                                            r.get("instruction", ""),
+                                        )
+                                    )
                                     + " "
                                     + str(r.get(self.hub_dataset_output_col, r.get("output", "")))
                                 ).split()
@@ -1761,10 +1766,10 @@ Write ONLY the summary, no other text."""
                     n = stats.get("final_count", len(samples))
                     div = stats.get("diversity_score", 0)
                     self.generation_diversity_score = div
-                    self.generation_status = f"Generated {n} examples" + (
-                        f" · diversity {div:.2f}" if div else ""
-                    ) + (
-                        f" · quality-filtered" if stats.get("quality_filtered") else ""
+                    self.generation_status = (
+                        f"Generated {n} examples"
+                        + (f" · diversity {div:.2f}" if div else "")
+                        + (" · quality-filtered" if stats.get("quality_filtered") else "")
                     )
                     self.dataset_row_count = n
                     total_words = sum(
@@ -1774,9 +1779,9 @@ Write ONLY the summary, no other text."""
                     self.dataset_avg_tokens = (
                         round((total_words / len(samples)) * 1.3, 1) if samples else 0.0
                     )
-                    self.generation_alt_download_url = stats.get(
-                        "alpaca_path", stats.get("sharegpt_path", "")
-                    ) or ""
+                    self.generation_alt_download_url = (
+                        stats.get("alpaca_path", stats.get("sharegpt_path", "")) or ""
+                    )
                     self.is_generating = False
                     self.data_source = "generate"
             else:

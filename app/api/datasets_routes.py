@@ -163,7 +163,11 @@ async def generate_dataset(req: DatasetGenRequest):
         if req.export_format == "alpaca_json":
             alpaca_path = fpath.replace(".jsonl", "_alpaca.json")
             alpaca = [
-                {"instruction": r.get("instruction", ""), "input": "", "output": r.get("output", "")}
+                {
+                    "instruction": r.get("instruction", ""),
+                    "input": "",
+                    "output": r.get("output", ""),
+                }
                 for r in unique
             ]
             with open(alpaca_path, "w") as f:
@@ -471,15 +475,15 @@ async def _evol_instruct_generate(
                 if match:
                     batch = json.loads(match.group())
                     results.extend(
-                        s for s in batch if isinstance(s, dict) and "instruction" in s and "output" in s
+                        s
+                        for s in batch
+                        if isinstance(s, dict) and "instruction" in s and "output" in s
                     )
 
     return results[:n]
 
 
-async def _persona_generate(
-    intent: str, n: int, personas: list[str], api_key: str
-) -> list[dict]:
+async def _persona_generate(intent: str, n: int, personas: list[str], api_key: str) -> list[dict]:
     """Generate data from multiple persona viewpoints for diversity."""
     import math
 
@@ -527,15 +531,15 @@ async def _persona_generate(
                 if match:
                     batch = json.loads(match.group())
                     results.extend(
-                        s for s in batch if isinstance(s, dict) and "instruction" in s and "output" in s
+                        s
+                        for s in batch
+                        if isinstance(s, dict) and "instruction" in s and "output" in s
                     )
 
     return results[:n]
 
 
-async def _quality_filter(
-    samples: list[dict], threshold: float, api_key: str
-) -> list[dict]:
+async def _quality_filter(samples: list[dict], threshold: float, api_key: str) -> list[dict]:
     """Score samples 1-5 with LLM-as-judge; discard those below threshold."""
     import httpx
 
@@ -588,7 +592,7 @@ async def _quality_filter(
                 continue
 
             scores = json.loads(match.group())
-            for s, score in zip(chunk, scores):
+            for s, score in zip(chunk, scores, strict=False):
                 try:
                     scored.append((s, float(score)))
                 except (TypeError, ValueError):

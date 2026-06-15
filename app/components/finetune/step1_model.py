@@ -266,47 +266,40 @@ def _step1() -> rx.Component:
         # ── HF Hub tab ────────────────────────────────────────────
         rx.cond(
             FinetuneState.model_source == "hub",
-            rx.vstack(
-                rx.text(
+            _card(
+                rx.vstack(
+                    _label(
+                        rx.cond(
+                            FinetuneState.intent_task_type == "vision",
+                            "Vision-Language Models",
+                            "Popular models",
+                        )
+                    ),
                     rx.cond(
                         FinetuneState.intent_task_type == "vision",
-                        "Vision-Language Models",
-                        "Popular models",
-                    ),
-                    font_size="0.78rem",
-                    font_weight="600",
-                    color=c("text_muted"),
-                    margin_bottom="8px",
-                ),
-                rx.cond(
-                    FinetuneState.intent_task_type == "vision",
-                    rx.flex(
-                        *[_quick_chip(mid, n, t) for mid, n, t in _VLM_QUICK],
-                        wrap="wrap",
-                        gap="8px",
-                    ),
-                    rx.flex(
-                        *[_quick_chip(mid, n, t) for mid, n, t in _QUICK_MODELS],
-                        wrap="wrap",
-                        gap="8px",
-                    ),
-                ),
-                rx.box(height="12px"),
-                _card(
-                    rx.vstack(
-                        _label("HF Token (required for gated models like Llama)"),
-                        rx.input(
-                            placeholder="hf_xxxxxxxxxxxxx",
-                            type="password",
-                            value=FinetuneState.hf_token,
-                            on_change=FinetuneState.set_hf_token,
-                            width="100%",
+                        rx.flex(
+                            *[_quick_chip(mid, n, t) for mid, n, t in _VLM_QUICK],
+                            wrap="wrap",
+                            gap="8px",
                         ),
-                        spacing="1",
-                    )
-                ),
-                width="100%",
-                spacing="0",
+                        rx.flex(
+                            *[_quick_chip(mid, n, t) for mid, n, t in _QUICK_MODELS],
+                            wrap="wrap",
+                            gap="8px",
+                        ),
+                    ),
+                    rx.divider(),
+                    _label("HF Token (required for gated models like Llama)"),
+                    rx.input(
+                        placeholder="hf_xxxxxxxxxxxxx",
+                        type="password",
+                        value=FinetuneState.hf_token,
+                        on_change=FinetuneState.set_hf_token,
+                        width="100%",
+                    ),
+                    spacing="3",
+                    width="100%",
+                )
             ),
             rx.fragment(),
         ),

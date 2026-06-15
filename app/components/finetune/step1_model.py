@@ -23,8 +23,9 @@ _VLM_QUICK = [
 ]
 
 _HF_LOGO = "https://huggingface.co/front/assets/huggingface_logo-noborder.svg"
-_GH_LOGO_DARK = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-_GH_LOGO_LIGHT = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark-Light.png"
+_HF_ICON = "https://cdn.simpleicons.org/huggingface/FF9D00"
+_GH_ICON_LIGHT_MODE = "https://cdn.simpleicons.org/github/24292f"
+_GH_ICON_DARK_MODE = "https://cdn.simpleicons.org/github/ffffff"
 
 
 def _stat_item(icon: str, value: rx.Component, icon_color: str = "") -> rx.Component:
@@ -294,38 +295,28 @@ def _unified_card() -> rx.Component:
         rx.vstack(
             # ── Search row ──────────────────────────────────────────────
             rx.hstack(
-                # Source segmented picker
+                # Source segmented picker (icon-only)
                 rx.hstack(
                     rx.button(
-                        rx.hstack(
-                            rx.image(src=_HF_LOGO, width="14px", height="14px"),
-                            rx.text("HF Hub", font_size="0.8rem"),
-                            spacing="1",
-                            align="center",
-                        ),
+                        rx.image(src=_HF_ICON, width="20px", height="20px"),
                         on_click=FinetuneState.set_model_search_source("hf"),
                         variant=rx.cond(
                             FinetuneState.model_search_source == "hf", "soft", "ghost"
                         ),
-                        color_scheme=rx.cond(
-                            FinetuneState.model_search_source == "hf", "orange", "gray"
-                        ),
+                        color_scheme="orange",
                         size="2",
-                        border_right_radius="0",
+                        padding="8px",
+                        border_top_right_radius="0",
+                        border_bottom_right_radius="0",
                     ),
                     rx.button(
-                        rx.hstack(
-                            rx.image(
-                                src=rx.color_mode_cond(
-                                    light=_GH_LOGO_DARK,
-                                    dark=_GH_LOGO_LIGHT,
-                                ),
-                                width="14px",
-                                height="14px",
+                        rx.image(
+                            src=rx.color_mode_cond(
+                                light=_GH_ICON_LIGHT_MODE,
+                                dark=_GH_ICON_DARK_MODE,
                             ),
-                            rx.text("GitHub", font_size="0.8rem"),
-                            spacing="1",
-                            align="center",
+                            width="20px",
+                            height="20px",
                         ),
                         on_click=FinetuneState.set_model_search_source("github"),
                         variant=rx.cond(
@@ -333,7 +324,9 @@ def _unified_card() -> rx.Component:
                         ),
                         color_scheme="gray",
                         size="2",
-                        border_left_radius="0",
+                        padding="8px",
+                        border_top_left_radius="0",
+                        border_bottom_left_radius="0",
                     ),
                     spacing="0",
                     border="1px solid",

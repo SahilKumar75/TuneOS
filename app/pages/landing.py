@@ -181,9 +181,60 @@ def _composer() -> rx.Component:
 def _preview_panel() -> rx.Component:
     return rx.box(
         rx.vstack(
-            # ── Header: source badge + Change button ──────────────────
+            # ── Header: source badge (with logo) + Change button ─────
             rx.hstack(
-                rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
+                rx.cond(
+                    AppState.preview_kind == "huggingface",
+                    rx.hstack(
+                        rx.image(
+                            src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg",
+                            width="15px",
+                            height="15px",
+                        ),
+                        rx.text(
+                            "Hugging Face model",
+                            font_size="0.8rem",
+                            font_weight="600",
+                            color="#FF9D00",
+                        ),
+                        spacing="1",
+                        align="center",
+                        background="rgba(255,157,0,0.1)",
+                        border="1px solid rgba(255,157,0,0.3)",
+                        border_radius="6px",
+                        padding_x="8px",
+                        padding_y="4px",
+                    ),
+                    rx.cond(
+                        AppState.preview_kind == "github",
+                        rx.hstack(
+                            rx.image(
+                                src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                                width="15px",
+                                height="15px",
+                                filter=rx.color_mode_cond(
+                                    light="none",
+                                    dark="brightness(0) invert(1)",
+                                ),
+                            ),
+                            rx.text(
+                                "GitHub",
+                                font_size="0.8rem",
+                                font_weight="600",
+                                color=c("text_secondary"),
+                            ),
+                            spacing="1",
+                            align="center",
+                            background=c("bg_input"),
+                            border="1px solid",
+                            border_color=c("border"),
+                            border_radius="6px",
+                            padding_x="8px",
+                            padding_y="4px",
+                        ),
+                        rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
+                    ),
+                ),
                 rx.spacer(),
                 rx.button(
                     "Change",

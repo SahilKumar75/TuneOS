@@ -364,6 +364,7 @@ def _unified_card() -> rx.Component:
                     border_color=c("border"),
                     border_radius="8px",
                     overflow="hidden",
+                    height="32px",
                 ),
                 # Live search input
                 rx.input(
@@ -376,6 +377,7 @@ def _unified_card() -> rx.Component:
                     on_change=FinetuneState.set_model_search_query,
                     flex="1",
                     size="2",
+                    height="32px",
                 ),
                 # Local import toggle
                 rx.button(

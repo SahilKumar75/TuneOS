@@ -782,11 +782,8 @@ class FinetuneState(rx.State):
             pass
 
     @rx.event
-    def set_kd_alpha(self, v: str):
-        try:
-            self.kd_alpha = float(v)
-        except ValueError:
-            pass
+    def set_kd_alpha(self, v: list[float]):
+        self.kd_alpha = v[0] if v else 0.5
 
     @rx.event
     def set_model_source(self, source: str):

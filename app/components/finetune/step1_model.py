@@ -1,4 +1,4 @@
-"""Fine-tune wizard — Step 1: Model selection and training technique."""
+"""Fine-tune wizard — Step 1: Model selection."""
 
 from __future__ import annotations
 
@@ -8,108 +8,224 @@ from app.components.finetune.shared import _card, _label, _nav_buttons, _section
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
-_MODELS = [
-    {
-        "id": "mistralai/Mistral-7B-v0.1",
-        "name": "Mistral 7B",
-        "size": "7B params",
-        "notes": "Well-tested with QLoRA, great all-rounder",
-        "token_required": False,
-        "modality": "text",
-    },
-    {
-        "id": "meta-llama/Meta-Llama-3-8B",
-        "name": "Llama 3 8B",
-        "size": "8B params",
-        "notes": "Strong general-purpose model",
-        "token_required": True,
-        "modality": "text",
-    },
-    {
-        "id": "microsoft/Phi-3-mini-4k-instruct",
-        "name": "Phi-3 Mini",
-        "size": "3.8B params",
-        "notes": "Fast, runs on smaller GPUs",
-        "token_required": False,
-        "modality": "text",
-    },
-    {
-        "id": "google/gemma-2b",
-        "name": "Gemma 2B",
-        "size": "2B params",
-        "notes": "Good for low-VRAM environments",
-        "token_required": False,
-        "modality": "text",
-    },
-    {
-        "id": "EleutherAI/pythia-410m",
-        "name": "Pythia 410M",
-        "size": "410M params",
-        "notes": "Tiny model — great for testing pipelines fast",
-        "token_required": False,
-        "modality": "text",
-    },
-    {
-        "id": "bigcode/starcoder2-3b",
-        "name": "StarCoder2 3B",
-        "size": "3B params",
-        "notes": "Excellent for code generation tasks",
-        "token_required": False,
-        "modality": "text",
-    },
+_QUICK_MODELS = [
+    ("mistralai/Mistral-7B-v0.1", "Mistral 7B", False),
+    ("meta-llama/Meta-Llama-3-8B", "Llama 3 8B", True),
+    ("microsoft/Phi-3-mini-4k-instruct", "Phi-3 Mini", False),
+    ("google/gemma-2b", "Gemma 2B", False),
+    ("EleutherAI/pythia-410m", "Pythia 410M", False),
+    ("bigcode/starcoder2-3b", "StarCoder2 3B", False),
 ]
 
-_VLM_MODELS = [
-    {
-        "id": "llava-hf/llava-1.5-7b-hf",
-        "name": "LLaVA-1.5 7B",
-        "size": "7B params",
-        "notes": "Strong image-text instruction following",
-        "token_required": False,
-        "modality": "vision",
-    },
-    {
-        "id": "Qwen/Qwen2-VL-2B-Instruct",
-        "name": "Qwen2-VL 2B",
-        "size": "2B params",
-        "notes": "Compact VLM, good for low-VRAM fine-tuning",
-        "token_required": False,
-        "modality": "vision",
-    },
+_VLM_QUICK = [
+    ("llava-hf/llava-1.5-7b-hf", "LLaVA-1.5 7B", False),
+    ("Qwen/Qwen2-VL-2B-Instruct", "Qwen2-VL 2B", False),
 ]
 
-_GGUF_QUANTS = ["Q4_K_M", "Q5_K_M", "Q8_0", "F16"]
+_HF_LOGO = "https://huggingface.co/front/assets/huggingface_logo-noborder.svg"
 
 
-def _model_card(m: dict) -> rx.Component:
-    is_selected = FinetuneState.selected_model_id == m["id"]
-    return rx.box(
+def _hf_source_badge() -> rx.Component:
+    return rx.hstack(
+        rx.image(src=_HF_LOGO, width="14px", height="14px"),
+        rx.text("Hugging Face", font_size="0.72rem", color="#FF9D00", font_weight="600"),
+        spacing="1",
+        align="center",
+    )
+
+
+def _selected_model_panel() -> rx.Component:
+    """Full info card shown as soon as a model is selected."""
+    return rx.cond(
+        FinetuneState.selected_model_id != "",
         rx.vstack(
+            # Label row
             rx.hstack(
-                rx.text(m["name"], font_size="0.92rem", font_weight="600", color=c("text_primary")),
+                rx.text(
+                    "Current model selected",
+                    font_size="0.72rem",
+                    font_weight="700",
+                    color=c("text_muted"),
+                    text_transform="uppercase",
+                    letter_spacing="0.06em",
+                ),
+                rx.spacer(),
                 rx.cond(
-                    m["token_required"],
-                    rx.badge("HF Token", color_scheme="orange", size="1"),
+                    FinetuneState.model_source == "hub",
+                    _hf_source_badge(),
                     rx.fragment(),
                 ),
-                justify="between",
+                width="100%",
+                align="center",
+            ),
+            # Card
+            rx.box(
+                rx.vstack(
+                    # Org avatar + model name + spinner
+                    rx.hstack(
+                        rx.cond(
+                            FinetuneState.selected_model_org_avatar != "",
+                            rx.avatar(
+                                src=FinetuneState.selected_model_org_avatar,
+                                fallback=FinetuneState.selected_model_org_initial,
+                                size="4",
+                                radius="full",
+                            ),
+                            rx.avatar(
+                                fallback=FinetuneState.selected_model_org_initial,
+                                size="4",
+                                radius="full",
+                                color_scheme="indigo",
+                            ),
+                        ),
+                        rx.vstack(
+                            rx.text(
+                                FinetuneState.selected_model_id,
+                                font_size="1rem",
+                                font_weight="700",
+                                color=c("text_primary"),
+                            ),
+                            rx.text(
+                                FinetuneState.selected_model_org,
+                                font_size="0.75rem",
+                                color=c("text_muted"),
+                            ),
+                            spacing="0",
+                            align_items="flex-start",
+                        ),
+                        rx.spacer(),
+                        rx.cond(
+                            FinetuneState.is_fetching_model_info,
+                            rx.spinner(size="2"),
+                            rx.fragment(),
+                        ),
+                        spacing="3",
+                        align="center",
+                        width="100%",
+                    ),
+                    # Stats row
+                    rx.cond(
+                        ~FinetuneState.is_fetching_model_info,
+                        rx.hstack(
+                            rx.cond(
+                                FinetuneState.model_downloads != "",
+                                rx.hstack(
+                                    rx.icon("download", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.model_downloads,
+                                        font_size="0.76rem",
+                                        color=c("text_secondary"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_likes != "",
+                                rx.hstack(
+                                    rx.icon("heart", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.model_likes,
+                                        font_size="0.76rem",
+                                        color=c("text_secondary"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_context_window != "",
+                                rx.hstack(
+                                    rx.icon("layers", size=12, color=c("text_muted")),
+                                    rx.text(
+                                        FinetuneState.model_context_window,
+                                        font_size="0.76rem",
+                                        color=c("text_secondary"),
+                                    ),
+                                    spacing="1",
+                                    align="center",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.model_pipeline != "",
+                                rx.badge(
+                                    FinetuneState.model_pipeline,
+                                    color_scheme="blue",
+                                    size="1",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="3",
+                            wrap="wrap",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # Tags
+                    rx.cond(
+                        FinetuneState.model_hf_tags.length() > 0,
+                        rx.hstack(
+                            rx.foreach(
+                                FinetuneState.model_hf_tags,
+                                lambda tag: rx.badge(
+                                    tag, color_scheme="gray", size="1", variant="soft"
+                                ),
+                            ),
+                            wrap="wrap",
+                            spacing="1",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # Bio
+                    rx.cond(
+                        FinetuneState.model_bio != "",
+                        rx.text(
+                            FinetuneState.model_bio,
+                            font_size="0.8rem",
+                            color=c("text_secondary"),
+                            line_height="1.6",
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="3",
+                    align_items="flex-start",
+                    width="100%",
+                ),
+                background=c("bg_card"),
+                border="2px solid",
+                border_color=c("accent"),
+                border_radius="12px",
+                padding="18px",
                 width="100%",
             ),
-            rx.text(m["size"], font_size="0.78rem", color=c("text_secondary")),
-            rx.text(m["notes"], font_size="0.78rem", color=c("text_muted")),
-            spacing="1",
-            align_items="flex-start",
+            spacing="2",
             width="100%",
+            margin_bottom="20px",
         ),
-        background=rx.cond(is_selected, c("accent_soft"), c("bg_card")),
-        border="2px solid",
-        border_color=rx.cond(is_selected, c("accent"), c("border")),
-        border_radius="10px",
-        padding="14px",
-        cursor="pointer",
-        width="100%",
-        on_click=FinetuneState.select_model(m["id"], m["name"]),
-        _hover={"border_color": c("accent"), "background": c("accent_soft")},
+        rx.fragment(),
+    )
+
+
+def _quick_chip(model_id: str, name: str, token_required: bool) -> rx.Component:
+    is_sel = FinetuneState.selected_model_id == model_id
+    return rx.button(
+        rx.hstack(
+            rx.text(name, font_size="0.8rem"),
+            rx.cond(
+                token_required,
+                rx.badge("HF Token", color_scheme="orange", size="1"),
+                rx.fragment(),
+            ),
+            spacing="2",
+            align="center",
+        ),
+        on_click=FinetuneState.select_model(model_id, name),
+        variant=rx.cond(is_sel, "solid", "soft"),
+        color_scheme=rx.cond(is_sel, "blue", "gray"),
+        size="2",
+        radius="full",
     )
 
 
@@ -128,54 +244,50 @@ def _step1() -> rx.Component:
     return rx.vstack(
         _section_heading("Choose your model"),
         rx.text(
-            "Pick from common models, paste any Hugging Face ID, load a local file, "
-            "or type any model string that Transformers accepts.",
+            "Pick a preset, paste any Hugging Face ID, or load a local file. "
+            "We'll recommend the best training technique once we know your goal.",
             font_size="0.86rem",
             color=c("text_secondary"),
-            margin_bottom="16px",
+            margin_bottom="20px",
         ),
-        # Source switcher
+        # Current model selected — shown immediately on pick
+        _selected_model_panel(),
+        # Source tabs
         rx.hstack(
             _source_tab("hub", "HF Hub", "globe"),
             _source_tab("custom_string", "Any Model ID", "terminal"),
             _source_tab("local", "Local File", "folder-open"),
             spacing="2",
-            margin_bottom="20px",
+            margin_bottom="16px",
         ),
-        # Hub tab
+        # ── HF Hub tab ────────────────────────────────────────────
         rx.cond(
             FinetuneState.model_source == "hub",
             rx.vstack(
-                # Vision models — only shown when user selected "vision" intent
+                rx.text(
+                    rx.cond(
+                        FinetuneState.intent_task_type == "vision",
+                        "Vision-Language Models",
+                        "Popular models",
+                    ),
+                    font_size="0.78rem",
+                    font_weight="600",
+                    color=c("text_muted"),
+                    margin_bottom="8px",
+                ),
                 rx.cond(
                     FinetuneState.intent_task_type == "vision",
-                    rx.vstack(
-                        rx.hstack(
-                            rx.icon("image", size=14),
-                            rx.text(
-                                "Vision-Language Models",
-                                font_size="0.8rem",
-                                font_weight="600",
-                                color=c("text_secondary"),
-                            ),
-                            spacing="1",
-                            align="center",
-                            margin_bottom="8px",
-                        ),
-                        rx.grid(
-                            *[_model_card(m) for m in _VLM_MODELS],
-                            columns="2",
-                            spacing="3",
-                            width="100%",
-                        ),
-                        width="100%",
-                        spacing="0",
-                        margin_bottom="12px",
+                    rx.flex(
+                        *[_quick_chip(mid, n, t) for mid, n, t in _VLM_QUICK],
+                        wrap="wrap",
+                        gap="8px",
                     ),
-                    rx.fragment(),
+                    rx.flex(
+                        *[_quick_chip(mid, n, t) for mid, n, t in _QUICK_MODELS],
+                        wrap="wrap",
+                        gap="8px",
+                    ),
                 ),
-                rx.grid(*[_model_card(m) for m in _MODELS], columns="2", spacing="3", width="100%"),
-                # HF token field for gated models
                 rx.box(height="12px"),
                 _card(
                     rx.vstack(
@@ -195,7 +307,7 @@ def _step1() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Custom string tab
+        # ── Any Model ID tab ──────────────────────────────────────
         rx.cond(
             FinetuneState.model_source == "custom_string",
             _card(
@@ -214,7 +326,9 @@ def _step1() -> rx.Component:
                             rx.cond(
                                 FinetuneState.is_validating_model,
                                 rx.hstack(
-                                    rx.spinner(size="1"), rx.text("Checking..."), spacing="2"
+                                    rx.spinner(size="1"),
+                                    rx.text("Checking..."),
+                                    spacing="2",
                                 ),
                                 rx.text("Validate"),
                             ),
@@ -228,19 +342,6 @@ def _step1() -> rx.Component:
                     rx.cond(
                         FinetuneState.model_url_error != "",
                         rx.callout(FinetuneState.model_url_error, color_scheme="red", size="1"),
-                        rx.fragment(),
-                    ),
-                    rx.cond(
-                        FinetuneState.selected_model_id != "",
-                        rx.callout(
-                            rx.hstack(
-                                rx.icon("circle-check", size=14),
-                                rx.text(f"Model ready: {FinetuneState.selected_model_id}"),
-                                spacing="2",
-                            ),
-                            color_scheme="green",
-                            size="1",
-                        ),
                         rx.fragment(),
                     ),
                     _label("HF Token (for gated or private models)"),
@@ -261,7 +362,7 @@ def _step1() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Local file tab
+        # ── Local File tab ────────────────────────────────────────
         rx.cond(
             FinetuneState.model_source == "local",
             _card(
@@ -304,73 +405,6 @@ def _step1() -> rx.Component:
                 )
             ),
             rx.fragment(),
-        ),
-        # Technique selector (always visible)
-        rx.box(height="20px"),
-        _section_heading("Training technique"),
-        rx.flex(
-            *[
-                rx.box(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.text(
-                                label,
-                                font_size="0.88rem",
-                                font_weight="500",
-                                color=rx.cond(
-                                    FinetuneState.selected_technique == tech,
-                                    c("accent"),
-                                    c("text_primary"),
-                                ),
-                            ),
-                            rx.cond(
-                                FinetuneState.selected_technique == tech,
-                                rx.icon("circle-check", size=14, color=c("accent")),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                coming_soon,
-                                rx.badge("Soon", color_scheme="gray", size="1"),
-                                rx.fragment(),
-                            ),
-                            spacing="2",
-                            align="center",
-                        ),
-                        rx.text(desc, font_size="0.76rem", color=c("text_muted")),
-                        spacing="1",
-                        align_items="flex-start",
-                    ),
-                    background=rx.cond(
-                        FinetuneState.selected_technique == tech,
-                        c("accent_soft"),
-                        c("bg_input"),
-                    ),
-                    border="1px solid",
-                    border_color=rx.cond(
-                        FinetuneState.selected_technique == tech,
-                        c("accent"),
-                        c("border"),
-                    ),
-                    border_radius="8px",
-                    padding="12px 14px",
-                    cursor=rx.cond(coming_soon, "not-allowed", "pointer"),
-                    opacity=rx.cond(coming_soon, "0.5", "1"),
-                    on_click=rx.cond(
-                        coming_soon, rx.prevent_default, FinetuneState.select_technique(tech)
-                    ),
-                    flex="1",
-                    min_width="140px",
-                )
-                for tech, label, desc, coming_soon in [
-                    ("qlora", "QLoRA", "4-bit compressed. Runs on 12 GB+ GPU. Recommended.", False),
-                    ("lora", "LoRA", "Float16. Needs ~16 GB GPU for 7B models.", False),
-                    ("full", "Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", True),
-                    ("dpo", "DPO", "Preference tuning on chosen/rejected pairs.", False),
-                ]
-            ],
-            wrap="wrap",
-            gap="10px",
-            width="100%",
         ),
         _nav_buttons(
             next_label="Next: Intent →",

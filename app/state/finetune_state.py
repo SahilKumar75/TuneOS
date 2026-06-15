@@ -1073,7 +1073,12 @@ class FinetuneState(rx.State):
             has_safetensors = "SafeTensors" in file_types
             formats_str = ", ".join(sorted(file_types)) if file_types else ""
 
-            # Architecture (architectures list is more specific than model_type)
+            # Architecture / config details (moved up — needed below)
+            cfg = data.get("config") or {}
+            model_type_raw = cfg.get("model_type") or ""
+            ctx = cfg.get("max_position_embeddings") or cfg.get("max_seq_len") or 0
+
+            # Architecture class (more specific than model_type)
             arch_list = cfg.get("architectures") or []
             architecture = arch_list[0] if arch_list else ""
 
@@ -1086,11 +1091,6 @@ class FinetuneState(rx.State):
                 params_str = f"{params_total / 1_000_000:.0f}M params"
             else:
                 params_str = ""
-
-            # Architecture / config details
-            cfg = data.get("config") or {}
-            model_type_raw = cfg.get("model_type") or ""
-            ctx = cfg.get("max_position_embeddings") or cfg.get("max_seq_len") or 0
 
             # Languages from card metadata
             card = data.get("cardData") or {}

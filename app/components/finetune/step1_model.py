@@ -325,12 +325,15 @@ def _unified_card() -> rx.Component:
                     rx.button(
                         rx.image(src=_HF_ICON, width="20px", height="20px"),
                         on_click=FinetuneState.set_model_search_source("hf"),
-                        variant=rx.cond(
-                            FinetuneState.model_search_source == "hf", "soft", "ghost"
-                        ),
-                        color_scheme="orange",
+                        variant="ghost",
+                        color_scheme="gray",
                         size="2",
                         padding_x="18px",
+                        background=rx.cond(
+                            FinetuneState.model_search_source == "hf",
+                            "rgba(255,157,0,0.15)",
+                            "transparent",
+                        ),
                         border_top_right_radius="0",
                         border_bottom_right_radius="0",
                     ),
@@ -344,12 +347,15 @@ def _unified_card() -> rx.Component:
                             height="20px",
                         ),
                         on_click=FinetuneState.set_model_search_source("github"),
-                        variant=rx.cond(
-                            FinetuneState.model_search_source == "github", "soft", "ghost"
-                        ),
+                        variant="ghost",
                         color_scheme="gray",
                         size="2",
                         padding_x="18px",
+                        background=rx.cond(
+                            FinetuneState.model_search_source == "github",
+                            "rgba(150,150,150,0.15)",
+                            "transparent",
+                        ),
                         border_top_left_radius="0",
                         border_bottom_left_radius="0",
                     ),

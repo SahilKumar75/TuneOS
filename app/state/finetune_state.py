@@ -241,6 +241,7 @@ class FinetuneState(rx.State):
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
     intent_description: str = ""  # project description
+    training_goal_help_error: bool = False
     intent_request_volume: str = ""  # expected request volume
     intent_accuracy_req: str = ""  # accuracy requirements
 
@@ -1202,6 +1203,49 @@ class FinetuneState(rx.State):
     @rx.event
     def set_intent_description(self, v: str):
         self.intent_description = v
+
+    @rx.event
+    def ask_training_goal_help(self):
+        """Validate project fields, then inject a context-rich prompt into the chat panel."""
+        from app.state.app_state import AppState
+
+        has_any = bool(
+            self.intent_project_name.strip()
+            or self.intent_description.strip()
+            or self.intent_use_for
+            or self.intent_domain
+            or self.intent_task_type
+        )
+        if not has_any:
+            self.training_goal_help_error = True
+            return
+
+        self.training_goal_help_error = False
+
+        parts = []
+        if self.selected_model_id:
+            parts.append(f"Model: {self.selected_model_id}")
+        if self.intent_project_name.strip():
+            parts.append(f"Project: {self.intent_project_name.strip()}")
+        if self.intent_description.strip():
+            parts.append(f"Description: {self.intent_description.strip()}")
+        if self.intent_use_for:
+            parts.append(f"Use case: {self.intent_use_for}")
+        if self.intent_domain:
+            parts.append(f"Domain: {self.intent_domain}")
+        if self.intent_task_type:
+            parts.append(f"Task type: {self.intent_task_type}")
+
+        context = "\n".join(parts)
+        prompt = (
+            f"{context}\n\n"
+            "Based only on the above, tell me which single training goal — "
+            "Supervised Fine-Tuning (SFT), Preference Alignment (DPO), or Knowledge Distillation — "
+            "is best for my project, and explain why in 2–3 sentences. "
+            "Do not explain all three. Just give me the winner and the reason."
+        )
+        yield AppState.set_chat_input(prompt)
+        yield AppState.send_chat_message
 
     @rx.event
     def set_intent_request_volume(self, v: str):

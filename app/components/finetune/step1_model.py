@@ -42,32 +42,18 @@ def _selected_model_panel() -> rx.Component:
     return rx.cond(
         FinetuneState.selected_model_id != "",
         rx.vstack(
-            rx.hstack(
-                rx.text(
-                    "Current model",
-                    font_size="0.72rem",
-                    font_weight="700",
-                    color=c("text_muted"),
-                    text_transform="uppercase",
-                    letter_spacing="0.06em",
-                ),
-                rx.spacer(),
-                rx.cond(
-                    FinetuneState.model_source == "hub",
-                    rx.hstack(
-                        rx.image(src=_HF_LOGO, width="13px", height="13px"),
-                        rx.text("Hugging Face", font_size="0.7rem", color="#FF9D00", font_weight="600"),
-                        spacing="1",
-                        align="center",
-                    ),
-                    rx.fragment(),
-                ),
-                width="100%",
-                align="center",
+            # Label (no source badge — kept minimal)
+            rx.text(
+                "Current model",
+                font_size="0.72rem",
+                font_weight="700",
+                color=c("text_muted"),
+                text_transform="uppercase",
+                letter_spacing="0.06em",
             ),
             rx.box(
                 rx.vstack(
-                    # ── Header: avatar + model id + org + spinner ──────────
+                    # ── Header: avatar + model name + org + spinner ────────
                     rx.hstack(
                         rx.cond(
                             FinetuneState.selected_model_org_avatar != "",
@@ -111,115 +97,63 @@ def _selected_model_panel() -> rx.Component:
                         align="center",
                         width="100%",
                     ),
-                    # ── Params + pipeline ─────────────────────────────────
+                    # ── Params / pipeline / arch LEFT  ·  downloads / likes RIGHT ──
                     rx.cond(
                         ~FinetuneState.is_fetching_model_info,
                         rx.hstack(
-                            rx.cond(
-                                FinetuneState.model_params != "",
-                                rx.badge(
-                                    FinetuneState.model_params,
-                                    color_scheme="indigo",
-                                    size="2",
-                                    variant="solid",
+                            # left badges
+                            rx.hstack(
+                                rx.cond(
+                                    FinetuneState.model_params != "",
+                                    rx.badge(
+                                        FinetuneState.model_params,
+                                        color_scheme="indigo",
+                                        size="2",
+                                        variant="solid",
+                                    ),
+                                    rx.fragment(),
                                 ),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_pipeline != "",
-                                rx.badge(FinetuneState.model_pipeline, color_scheme="blue", size="1"),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_architecture != "",
-                                rx.badge(
-                                    FinetuneState.model_architecture,
-                                    color_scheme="gray",
-                                    size="1",
-                                    variant="outline",
+                                rx.cond(
+                                    FinetuneState.model_pipeline != "",
+                                    rx.badge(
+                                        FinetuneState.model_pipeline,
+                                        color_scheme="blue",
+                                        size="1",
+                                    ),
+                                    rx.fragment(),
                                 ),
-                                rx.fragment(),
+                                rx.cond(
+                                    FinetuneState.model_architecture != "",
+                                    rx.badge(
+                                        FinetuneState.model_architecture,
+                                        color_scheme="gray",
+                                        size="1",
+                                        variant="outline",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                spacing="2",
+                                align="center",
+                                wrap="wrap",
                             ),
-                            spacing="2",
-                            wrap="wrap",
+                            rx.spacer(),
+                            # right stats
+                            rx.hstack(
+                                rx.cond(
+                                    FinetuneState.model_downloads != "",
+                                    _stat_item("download", FinetuneState.model_downloads),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_likes != "",
+                                    _stat_item("heart", FinetuneState.model_likes, "#E53E3E"),
+                                    rx.fragment(),
+                                ),
+                                spacing="3",
+                                align="center",
+                            ),
+                            width="100%",
                             align="center",
-                        ),
-                        rx.fragment(),
-                    ),
-                    # ── Stats row: downloads · likes · context window ───────
-                    rx.cond(
-                        ~FinetuneState.is_fetching_model_info,
-                        rx.hstack(
-                            rx.cond(
-                                FinetuneState.model_downloads != "",
-                                _stat_item("download", FinetuneState.model_downloads),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_likes != "",
-                                _stat_item("heart", FinetuneState.model_likes, "#E53E3E"),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_context_window != "",
-                                _stat_item("layers", FinetuneState.model_context_window),
-                                rx.fragment(),
-                            ),
-                            spacing="3",
-                            wrap="wrap",
-                            align="center",
-                        ),
-                        rx.fragment(),
-                    ),
-                    # ── Meta row: library · formats · license ──────────────
-                    rx.cond(
-                        ~FinetuneState.is_fetching_model_info,
-                        rx.hstack(
-                            rx.cond(
-                                FinetuneState.model_library != "",
-                                rx.badge(
-                                    FinetuneState.model_library,
-                                    color_scheme="purple",
-                                    size="1",
-                                    variant="soft",
-                                ),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_formats != "",
-                                rx.badge(
-                                    FinetuneState.model_formats,
-                                    color_scheme="green",
-                                    size="1",
-                                    variant="soft",
-                                ),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                FinetuneState.model_license != "",
-                                rx.text(
-                                    FinetuneState.model_license,
-                                    font_size="0.72rem",
-                                    color=c("text_muted"),
-                                ),
-                                rx.fragment(),
-                            ),
-                            spacing="2",
-                            wrap="wrap",
-                            align="center",
-                        ),
-                        rx.fragment(),
-                    ),
-                    # ── Capability tags ───────────────────────────────────
-                    rx.cond(
-                        FinetuneState.model_hf_tags.length() > 0,
-                        rx.hstack(
-                            rx.foreach(
-                                FinetuneState.model_hf_tags,
-                                lambda tag: rx.badge(tag, color_scheme="gray", size="1", variant="soft"),
-                            ),
-                            wrap="wrap",
-                            spacing="1",
                         ),
                         rx.fragment(),
                     ),
@@ -231,6 +165,57 @@ def _selected_model_panel() -> rx.Component:
                             font_size="0.8rem",
                             color=c("text_secondary"),
                             line_height="1.65",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # ── Footer: divider + all tags in one row ──────────────
+                    rx.cond(
+                        ~FinetuneState.is_fetching_model_info,
+                        rx.vstack(
+                            rx.divider(),
+                            rx.hstack(
+                                rx.cond(
+                                    FinetuneState.model_library != "",
+                                    rx.badge(
+                                        FinetuneState.model_library,
+                                        color_scheme="purple",
+                                        size="1",
+                                        variant="soft",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_formats != "",
+                                    rx.badge(
+                                        FinetuneState.model_formats,
+                                        color_scheme="green",
+                                        size="1",
+                                        variant="soft",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.foreach(
+                                    FinetuneState.model_hf_tags,
+                                    lambda tag: rx.badge(
+                                        tag, color_scheme="gray", size="1", variant="soft"
+                                    ),
+                                ),
+                                rx.cond(
+                                    FinetuneState.model_license != "",
+                                    rx.text(
+                                        FinetuneState.model_license,
+                                        font_size="0.72rem",
+                                        color=c("text_muted"),
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                spacing="2",
+                                wrap="wrap",
+                                align="center",
+                                width="100%",
+                            ),
+                            spacing="2",
+                            width="100%",
                         ),
                         rx.fragment(),
                     ),

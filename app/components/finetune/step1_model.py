@@ -323,14 +323,14 @@ def _unified_card() -> rx.Component:
                 # Source segmented picker (icon-only)
                 rx.hstack(
                     rx.button(
-                        rx.image(src=_HF_ICON, width="22px", height="22px"),
+                        rx.image(src=_HF_ICON, width="20px", height="20px"),
                         on_click=FinetuneState.set_model_search_source("hf"),
                         variant=rx.cond(
                             FinetuneState.model_search_source == "hf", "soft", "ghost"
                         ),
                         color_scheme="orange",
-                        size="3",
-                        padding="10px 14px",
+                        size="2",
+                        padding_x="18px",
                         border_top_right_radius="0",
                         border_bottom_right_radius="0",
                     ),
@@ -340,16 +340,16 @@ def _unified_card() -> rx.Component:
                                 light=_GH_ICON_LIGHT_MODE,
                                 dark=_GH_ICON_DARK_MODE,
                             ),
-                            width="22px",
-                            height="22px",
+                            width="20px",
+                            height="20px",
                         ),
                         on_click=FinetuneState.set_model_search_source("github"),
                         variant=rx.cond(
                             FinetuneState.model_search_source == "github", "soft", "ghost"
                         ),
                         color_scheme="gray",
-                        size="3",
-                        padding="10px 14px",
+                        size="2",
+                        padding_x="18px",
                         border_top_left_radius="0",
                         border_bottom_left_radius="0",
                     ),
@@ -369,7 +369,7 @@ def _unified_card() -> rx.Component:
                     value=FinetuneState.model_search_query,
                     on_change=FinetuneState.set_model_search_query,
                     flex="1",
-                    max_width="480px",
+                    size="2",
                 ),
                 # Local import toggle
                 rx.button(
@@ -382,6 +382,7 @@ def _unified_card() -> rx.Component:
                     variant="soft",
                     color_scheme="gray",
                     size="2",
+                    padding_x="14px",
                     title="Import local model file",
                 ),
                 spacing="2",

@@ -1450,22 +1450,6 @@ intent_answers: {self.intent_answers}
                         "Mixed / varies",
                     ],
                 ),
-                IntentQuestion(
-                    heading="What tone and style should the model use?",
-                    options=[
-                        "Formal and precise",
-                        "Friendly and conversational",
-                        "Concise and direct",
-                    ],
-                ),
-                IntentQuestion(
-                    heading="How will you measure success?",
-                    options=[
-                        "Accuracy / factual correctness",
-                        "User satisfaction / engagement",
-                        "Task completion / automation rate",
-                    ],
-                ),
             ]
             self.intent_answers = [""] * len(self.intent_questions)
             self.intent_custom_answers = [""] * len(self.intent_questions)
@@ -1474,19 +1458,34 @@ intent_answers: {self.intent_answers}
             yield
             return
 
-        # Build context from Phase A
-        context = f"""Generate 5 personalized questions for a fine-tuning project with these details:
-- Project Name: {self.intent_project_name or "Not specified"}
-- Description: {self.intent_description or "General purpose"}
-- Use Case: {self.intent_use_for or "Not specified"}
-- Domain: {self.intent_domain or "General"}
-- Task Type: {self.intent_task_type or "Text"}
-- Expected Volume: {self.intent_request_volume or "Not specified"}
-- Accuracy Requirements: {self.intent_accuracy_req or "Standard"}
+        # Build context from Step 1 + Phase A
+        technique_label = {
+            "qlora": "QLoRA (4-bit, memory-efficient)",
+            "lora": "LoRA (float16, faster convergence)",
+            "dpo": "DPO (preference alignment)",
+            "full": "Full fine-tune (all weights)",
+        }.get(self.selected_technique, self.selected_technique)
+        training_mode_label = {
+            "sft": "Supervised Fine-Tuning (SFT)",
+            "dpo": "Preference Alignment (DPO)",
+            "kd": "Knowledge Distillation",
+        }.get(self.training_mode, self.training_mode)
 
-Generate 5 highly relevant questions that will help refine this fine-tuning project. Each question should have 3-4 specific answer options.
+        context = f"""You are helping a user configure a fine-tuning job. Generate exactly 3 highly relevant, specific questions to understand their use case better. Make questions and options concrete and tailored to their exact context.
 
-Return ONLY valid JSON in this exact format, no other text:
+User's full configuration so far:
+- Base model: {self.selected_model_name or self.selected_model_id or "Not specified"}
+- Training paradigm: {training_mode_label or "Not specified"}
+- Fine-tuning technique: {technique_label or "Not specified"}
+- Project name: {self.intent_project_name or "Not specified"}
+- Project description: {self.intent_description or "Not specified"}
+- Use case: {self.intent_use_for or "Not specified"}
+- Domain: {self.intent_domain or "Not specified"}
+- Task type: {self.intent_task_type or "Not specified"}
+
+Generate exactly 3 questions that dig deeper — focus on output quality expectations, training data they have, and deployment constraints. Each question must have exactly 3 specific options reflecting real choices for this model/domain.
+
+Return ONLY valid JSON, no other text:
 {{
   "questions": [
     {{
@@ -1510,12 +1509,12 @@ Return ONLY valid JSON in this exact format, no other text:
                         "messages": [
                             {
                                 "role": "system",
-                                "content": "You are a helpful AI that generates JSON only. Never include explanations, just pure JSON.",
+                                "content": "You are an expert ML assistant. Output exactly 3 questions as JSON only. No explanations, no markdown, just pure JSON.",
                             },
                             {"role": "user", "content": context},
                         ],
-                        "max_tokens": 1500,
-                        "temperature": 0.7,
+                        "max_tokens": 800,
+                        "temperature": 0.5,
                     },
                 )
 
@@ -1534,7 +1533,7 @@ Return ONLY valid JSON in this exact format, no other text:
                                 heading=q.get("heading", ""),
                                 options=q.get("options", []),
                             )
-                            for q in parsed.get("questions", [])[:5]
+                            for q in parsed.get("questions", [])[:3]
                         ]
 
                         # Initialize answer arrays

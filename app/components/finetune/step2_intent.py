@@ -1,9 +1,10 @@
-"""Fine-tune wizard — Step 2: Structured intent questionnaire (3-phase) with iOS-style design."""
+"""Fine-tune wizard — Step 2: Intent questionnaire — cascading AI-generated questions."""
 
 from __future__ import annotations
 
 import reflex as rx
 
+from app.components.brand.loader import metaball_loader
 from app.components.finetune.shared import _card, _section_heading
 from app.state.finetune_state import FinetuneState
 from app.styles import c
@@ -238,312 +239,347 @@ def _phase_a() -> rx.Component:
 
 # ── Phase B helpers ───────────────────────────────────────────────────────────
 
-
-def _question_option_btn(q_idx: int, option_text: str) -> rx.Component:
-    """iOS-style option button with smooth animations."""
-    is_selected = FinetuneState.intent_answers[q_idx] == option_text
-    return rx.button(
-        rx.hstack(
-            rx.icon(
-                "check-circle",
-                size=18,
-                color=rx.cond(is_selected, "white", "transparent"),
-            ),
-            rx.text(option_text, flex="1"),
-            spacing="3",
-            align="center",
-            width="100%",
-        ),
-        on_click=FinetuneState.set_intent_answer(q_idx, option_text),
-        variant="surface",
-        color_scheme=rx.cond(is_selected, "blue", "gray"),
-        size="3",
-        width="100%",
-        text_align="left",
-        justify_content="flex-start",
-        style={
-            "background": rx.cond(
-                is_selected,
-                "var(--blue-9)",
-                "var(--gray-2)",
-            ),
-            "color": rx.cond(is_selected, "white", "var(--gray-12)"),
-            "border": rx.cond(
-                is_selected,
-                "2px solid var(--blue-9)",
-                "2px solid var(--gray-5)",
-            ),
-            "border-radius": "12px",
-            "padding": "16px",
-            "transition": "all 0.2s ease",
-            "cursor": "pointer",
-            ":hover": {
-                "transform": "translateY(-2px)",
-                "box-shadow": "0 4px 12px rgba(0,0,0,0.1)",
-                "border-color": rx.cond(is_selected, "var(--blue-9)", "var(--blue-7)"),
-            },
-            ":active": {
-                "transform": "translateY(0)",
-            },
-        },
-    )
+_LOADING_MESSAGES = [
+    "Analysing your model choice…",
+    "Reading your project context…",
+    "Crafting targeted questions…",
+]
 
 
-def _question_other_input(q_idx: int) -> rx.Component:
-    """iOS-style custom input with smooth expansion."""
-    is_open = FinetuneState.intent_is_custom[q_idx]
-    return rx.vstack(
-        rx.button(
-            rx.hstack(
-                rx.icon(
-                    rx.cond(is_open, "chevron-down", "chevron-right"),
-                    size=16,
-                ),
-                rx.text("Other...", font_weight="500"),
-                spacing="2",
-                align="center",
-            ),
-            on_click=FinetuneState.toggle_intent_custom(q_idx),
-            variant="ghost",
-            color_scheme="blue",
-            size="3",
-            style={
-                "border-radius": "10px",
-                "transition": "all 0.2s ease",
-            },
-        ),
-        rx.cond(
-            is_open,
-            rx.box(
-                rx.input(
-                    placeholder="Describe in your own words...",
-                    value=FinetuneState.intent_custom_answers[q_idx],
-                    on_change=lambda v: FinetuneState.set_intent_custom_answer(q_idx, v),
-                    width="100%",
-                    auto_focus=True,
-                    size="3",
-                    style={
-                        "border-radius": "12px",
-                        "border": "2px solid var(--blue-7)",
-                        "padding": "12px 16px",
-                        "transition": "all 0.2s ease",
-                        ":focus": {
-                            "outline": "none",
-                            "border-color": "var(--blue-9)",
-                            "box-shadow": "0 0 0 3px var(--blue-a4)",
-                        },
-                    },
-                ),
-                style={
-                    "animation": "slideDown 0.2s ease",
-                    "@keyframes slideDown": {
-                        "from": {
-                            "opacity": "0",
-                            "transform": "translateY(-10px)",
-                        },
-                        "to": {
-                            "opacity": "1",
-                            "transform": "translateY(0)",
-                        },
-                    },
-                },
-            ),
-            rx.fragment(),
-        ),
-        spacing="3",
-        width="100%",
-    )
-
-
-def _progress_dots() -> rx.Component:
-    """iOS-style progress indicator with smooth animations."""
-    total_questions = rx.cond(
-        FinetuneState.intent_questions.length() > 0,
-        FinetuneState.intent_questions.length(),
-        5,
-    )
-    return rx.hstack(
-        rx.foreach(
-            rx.Var.range(total_questions),
-            lambda i: rx.box(
-                width="32px",
-                height="5px",
-                border_radius="3px",
-                background=rx.cond(
-                    FinetuneState.intent_question_idx >= i,
-                    "var(--blue-9)",
-                    "var(--gray-5)",
-                ),
-                style={
-                    "transition": "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                },
-            ),
-        ),
-        spacing="2",
-    )
-
-
-def _phase_b_question(q_idx: int) -> rx.Component:
-    """Render a single question card with iOS-style design and dynamic content."""
-    # Use dynamic questions from state
-    q = FinetuneState.intent_questions[q_idx]
-    is_answered = (FinetuneState.intent_answers[q_idx] != "") | FinetuneState.intent_is_custom[
-        q_idx
-    ]
-    total_q = FinetuneState.intent_questions.length()
-    is_last = q_idx >= (total_q - 1)
-
+def _loading_state() -> rx.Component:
+    """TuneOS brand loader shown while AI generates questions."""
     return _card(
         rx.vstack(
-            # Header with progress
-            rx.hstack(
-                rx.text(
-                    f"Question {q_idx + 1} of {total_q.to(str)}",
-                    font_size="0.8rem",
-                    color="var(--gray-10)",
-                    font_weight="500",
-                ),
-                rx.spacer(),
-                _progress_dots(),
-                width="100%",
-                align="center",
-            ),
-            rx.box(height="8px"),
-            # Question heading
+            metaball_loader(80, color=True),
             rx.text(
-                q.heading,
-                font_size="1.1rem",
+                "Generating personalised questions",
+                font_size="1rem",
                 font_weight="600",
                 color="var(--gray-12)",
-                line_height="1.4",
             ),
-            rx.box(height="12px"),
-            # Options with dynamic rendering
-            rx.foreach(
-                q.options,
-                lambda opt: _question_option_btn(q_idx, opt),
+            rx.text(
+                "Based on your model, technique and project context",
+                font_size="0.82rem",
+                color="var(--gray-10)",
+                text_align="center",
             ),
-            _question_other_input(q_idx),
-            rx.box(height="12px"),
-            # Navigation buttons
-            rx.hstack(
-                rx.button(
-                    rx.hstack(
-                        rx.icon("arrow-left", size=16),
-                        rx.text("Back"),
-                        spacing="2",
-                    ),
-                    on_click=FinetuneState.intent_prev_question,
-                    variant="soft",
-                    color_scheme="gray",
-                    size="3",
-                    style={
-                        "border-radius": "10px",
-                        "padding": "12px 20px",
-                    },
-                ),
-                rx.spacer(),
-                rx.button(
-                    rx.hstack(
-                        rx.text(rx.cond(is_last, "Preview", "Continue")),
-                        rx.icon("arrow-right", size=16),
-                        spacing="2",
-                    ),
-                    on_click=FinetuneState.intent_next_question,
-                    disabled=~is_answered,
-                    color_scheme="blue",
-                    size="3",
-                    style={
-                        "border-radius": "10px",
-                        "padding": "12px 24px",
-                        "background": rx.cond(is_answered, "var(--blue-9)", "var(--gray-5)"),
-                    },
-                ),
-                width="100%",
-                align="center",
-            ),
-            spacing="0",
+            spacing="3",
+            align="center",
+            padding="40px 24px",
             width="100%",
         ),
         style={
             "border-radius": "16px",
-            "box-shadow": "0 2px 8px rgba(0,0,0,0.05)",
+            "border": "1px solid var(--gray-4)",
+            "box-shadow": "0 2px 12px rgba(0,0,0,0.06)",
+        },
+    )
+
+
+def _answered_question_card(q_idx: int) -> rx.Component:
+    """Compact summary row for an already-answered question."""
+    q = FinetuneState.intent_questions[q_idx]
+    answer = FinetuneState.intent_answers[q_idx]
+    return rx.box(
+        rx.hstack(
+            rx.box(
+                rx.icon("check", size=14, color="white"),
+                width="22px",
+                height="22px",
+                border_radius="50%",
+                background="var(--green-9)",
+                display="flex",
+                align_items="center",
+                justify_content="center",
+                flex_shrink="0",
+            ),
+            rx.vstack(
+                rx.text(
+                    q.heading,
+                    font_size="0.82rem",
+                    color="var(--gray-10)",
+                    font_weight="500",
+                    line_height="1.3",
+                ),
+                rx.text(
+                    answer,
+                    font_size="0.9rem",
+                    color="var(--gray-12)",
+                    font_weight="600",
+                ),
+                spacing="0",
+                align_items="flex-start",
+            ),
+            rx.spacer(),
+            rx.button(
+                "Edit",
+                on_click=FinetuneState.intent_edit_question(q_idx),
+                variant="ghost",
+                color_scheme="blue",
+                size="1",
+                style={"font-size": "0.78rem", "padding": "4px 10px"},
+            ),
+            spacing="3",
+            align="center",
+            width="100%",
+        ),
+        padding="14px 16px",
+        border_radius="12px",
+        background="var(--gray-2)",
+        border="1px solid var(--gray-4)",
+        width="100%",
+        style={"transition": "background 0.15s ease"},
+    )
+
+
+def _active_question_card(q_idx: int) -> rx.Component:
+    """Full expanded card for the currently active question."""
+    q = FinetuneState.intent_questions[q_idx]
+    total_q = FinetuneState.intent_questions.length()
+    is_answered = (FinetuneState.intent_answers[q_idx] != "") | FinetuneState.intent_is_custom[
+        q_idx
+    ]
+    is_last = q_idx >= (total_q - 1)
+    is_open = FinetuneState.intent_is_custom[q_idx]
+
+    return rx.box(
+        rx.vstack(
+            # Question number badge + heading
+            rx.hstack(
+                rx.box(
+                    rx.text(
+                        f"{q_idx + 1}",
+                        font_size="0.72rem",
+                        font_weight="700",
+                        color="white",
+                    ),
+                    width="22px",
+                    height="22px",
+                    border_radius="50%",
+                    background="var(--blue-9)",
+                    display="flex",
+                    align_items="center",
+                    justify_content="center",
+                    flex_shrink="0",
+                ),
+                rx.text(
+                    q.heading,
+                    font_size="1.05rem",
+                    font_weight="700",
+                    color="var(--gray-12)",
+                    line_height="1.35",
+                ),
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            rx.box(height="4px"),
+            # Options
+            rx.vstack(
+                rx.foreach(
+                    q.options,
+                    lambda opt: rx.box(
+                        rx.hstack(
+                            rx.box(
+                                rx.cond(
+                                    FinetuneState.intent_answers[q_idx] == opt,
+                                    rx.icon("check", size=13, color="white"),
+                                    rx.box(
+                                        width="13px",
+                                        height="13px",
+                                        border_radius="50%",
+                                        border="2px solid var(--gray-7)",
+                                    ),
+                                ),
+                                width="20px",
+                                height="20px",
+                                border_radius="50%",
+                                background=rx.cond(
+                                    FinetuneState.intent_answers[q_idx] == opt,
+                                    "var(--blue-9)",
+                                    "transparent",
+                                ),
+                                display="flex",
+                                align_items="center",
+                                justify_content="center",
+                                flex_shrink="0",
+                                style={"transition": "all 0.15s ease"},
+                            ),
+                            rx.text(
+                                opt,
+                                font_size="0.9rem",
+                                color=rx.cond(
+                                    FinetuneState.intent_answers[q_idx] == opt,
+                                    "var(--gray-12)",
+                                    "var(--gray-11)",
+                                ),
+                                font_weight=rx.cond(
+                                    FinetuneState.intent_answers[q_idx] == opt,
+                                    "600",
+                                    "400",
+                                ),
+                            ),
+                            spacing="3",
+                            align="center",
+                        ),
+                        on_click=FinetuneState.set_intent_answer(q_idx, opt),
+                        padding="12px 14px",
+                        border_radius="10px",
+                        border=rx.cond(
+                            FinetuneState.intent_answers[q_idx] == opt,
+                            "1.5px solid var(--blue-7)",
+                            "1.5px solid var(--gray-4)",
+                        ),
+                        background=rx.cond(
+                            FinetuneState.intent_answers[q_idx] == opt,
+                            "var(--blue-2)",
+                            "var(--gray-1)",
+                        ),
+                        cursor="pointer",
+                        width="100%",
+                        style={
+                            "transition": "all 0.15s ease",
+                            ":hover": {
+                                "border-color": "var(--blue-6)",
+                                "background": "var(--blue-1)",
+                            },
+                        },
+                    ),
+                ),
+                # Other... toggle
+                rx.vstack(
+                    rx.button(
+                        rx.hstack(
+                            rx.icon(
+                                rx.cond(is_open, "chevron-down", "chevron-right"),
+                                size=14,
+                            ),
+                            rx.text("Other…", font_size="0.85rem"),
+                            spacing="1",
+                            align="center",
+                        ),
+                        on_click=FinetuneState.toggle_intent_custom(q_idx),
+                        variant="ghost",
+                        color_scheme="gray",
+                        size="2",
+                        padding="6px 10px",
+                    ),
+                    rx.cond(
+                        is_open,
+                        rx.input(
+                            placeholder="Describe in your own words…",
+                            value=FinetuneState.intent_custom_answers[q_idx],
+                            on_change=lambda v: FinetuneState.set_intent_custom_answer(q_idx, v),
+                            width="100%",
+                            size="2",
+                            auto_focus=True,
+                            style={
+                                "border-radius": "8px",
+                                "border": "1.5px solid var(--blue-6)",
+                            },
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="2",
+                    width="100%",
+                    align_items="flex-start",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            # Continue / Preview button (only shown when answered)
+            rx.cond(
+                is_answered,
+                rx.box(
+                    rx.button(
+                        rx.hstack(
+                            rx.text(rx.cond(is_last, "Preview intent →", "Next question →")),
+                            spacing="2",
+                            align="center",
+                        ),
+                        on_click=FinetuneState.intent_next_question,
+                        color_scheme="blue",
+                        size="3",
+                        width="100%",
+                        style={
+                            "border-radius": "10px",
+                            "font-weight": "600",
+                            "background": "var(--blue-9)",
+                            "margin-top": "8px",
+                            ":hover": {"background": "var(--blue-10)"},
+                        },
+                    ),
+                    width="100%",
+                    style={
+                        "animation": "fadeSlideUp 0.2s ease",
+                        "@keyframes fadeSlideUp": {
+                            "from": {"opacity": "0", "transform": "translateY(6px)"},
+                            "to": {"opacity": "1", "transform": "translateY(0)"},
+                        },
+                    },
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        id=f"intent-q-{q_idx}",
+        padding="20px",
+        border_radius="14px",
+        background="var(--gray-1)",
+        border="1.5px solid var(--blue-6)",
+        box_shadow="0 4px 16px rgba(0,0,0,0.08)",
+        width="100%",
+        style={
+            "animation": "cascadeIn 0.25s cubic-bezier(0.4,0,0.2,1)",
+            "@keyframes cascadeIn": {
+                "from": {"opacity": "0", "transform": "translateY(12px)"},
+                "to": {"opacity": "1", "transform": "translateY(0)"},
+            },
         },
     )
 
 
 def _phase_b() -> rx.Component:
-    """Phase B: Dynamic questionnaire with live plan preview."""
+    """Phase B: cascading question reveal — answered questions collapse above, active expands below."""
     return rx.cond(
         FinetuneState.intent_is_generating_questions,
-        # Loading state while generating questions
-        _card(
-            rx.vstack(
-                rx.spinner(size="3", color="blue"),
-                rx.text(
-                    "Generating personalized questions...",
-                    font_size="0.95rem",
-                    font_weight="500",
-                    color="var(--gray-11)",
-                ),
-                rx.text(
-                    "Based on your project details",
-                    font_size="0.82rem",
-                    color="var(--gray-9)",
-                ),
-                spacing="4",
-                align="center",
-                padding="48px 24px",
-            ),
-            style={"border-radius": "16px"},
-        ),
-        # Show dynamic questions when loaded
+        _loading_state(),
         rx.vstack(
-            # Live plan preview (if available)
-            rx.cond(
-                FinetuneState.intent_live_plan != "",
-                _card(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.icon("lightbulb", size=18, color="var(--amber-9)"),
-                            rx.text(
-                                "Your Plan",
-                                font_size="0.85rem",
-                                font_weight="600",
-                                color="var(--gray-12)",
-                            ),
-                            spacing="2",
-                            align="center",
-                        ),
-                        rx.text(
-                            FinetuneState.intent_live_plan,
-                            font_size="0.88rem",
-                            color="var(--gray-11)",
-                            line_height="1.5",
-                        ),
-                        spacing="3",
-                        width="100%",
-                    ),
-                    style={
-                        "background": "var(--amber-2)",
-                        "border": "1px solid var(--amber-6)",
-                        "border-radius": "12px",
-                        "margin-bottom": "16px",
-                    },
+            # Answered questions (compact, stacked above)
+            rx.foreach(
+                FinetuneState.intent_questions,
+                lambda q, idx: rx.cond(
+                    FinetuneState.intent_question_idx > idx,
+                    _answered_question_card(idx),
+                    rx.fragment(),
                 ),
-                rx.fragment(),
             ),
-            # Current question
+            # Active (current) question — full expanded
             rx.foreach(
                 FinetuneState.intent_questions,
                 lambda q, idx: rx.cond(
                     FinetuneState.intent_question_idx == idx,
-                    _phase_b_question(idx),
+                    _active_question_card(idx),
                     rx.fragment(),
                 ),
             ),
+            # Back link
+            rx.button(
+                rx.hstack(
+                    rx.icon("arrow-left", size=14),
+                    rx.text("Back to project details"),
+                    spacing="2",
+                    align="center",
+                ),
+                on_click=FinetuneState.intent_prev_phase,
+                variant="ghost",
+                color_scheme="gray",
+                size="2",
+                margin_top="4px",
+            ),
+            spacing="3",
             width="100%",
-            spacing="0",
         ),
     )
 

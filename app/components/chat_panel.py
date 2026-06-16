@@ -382,20 +382,70 @@ def _input_area() -> rx.Component:
     )
 
 
+def _resize_script() -> rx.Component:
+    """Global script — injected once at page level so it survives React re-renders."""
+    return rx.script(
+        """
+window.__chatResize = window.__chatResize || (function() {
+    var KEY = 'tuneos_chat_width', MIN = 300, MAX = 720;
+    function panel() { return document.getElementById('chat-panel'); }
+    function apply(w) {
+        var p = panel();
+        if (p) { p.style.width = w + 'px'; p.style.minWidth = w + 'px'; }
+    }
+    // restore saved width (retry until element exists)
+    function restore() {
+        var saved = localStorage.getItem(KEY);
+        if (!saved) return;
+        var p = panel();
+        if (p) { apply(parseInt(saved)); }
+        else { setTimeout(restore, 80); }
+    }
+    restore();
+    return {
+        start: function(e) {
+            e.preventDefault();
+            var p = panel();
+            var startX = e.clientX;
+            var startW = p ? p.offsetWidth : 380;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            function move(e) {
+                apply(Math.max(MIN, Math.min(MAX, startW + (startX - e.clientX))));
+            }
+            function up() {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', up);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                var p2 = panel();
+                if (p2) localStorage.setItem(KEY, p2.offsetWidth);
+            }
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+        }
+    };
+})();
+""",
+        strategy="afterInteractive",
+    )
+
+
 def _open_panel() -> rx.Component:
     return rx.box(
-        # Drag-to-resize handle — left edge
+        # Drag-to-resize handle — left edge, wired via React synthetic event
         rx.box(
             id="chat-resize-handle",
+            on_mouse_down=rx.call_script("window.__chatResize.start(event)"),
             position="absolute",
             left="0",
             top="0",
-            width="4px",
+            width="5px",
             height="100%",
             cursor="col-resize",
             z_index="10",
             background="transparent",
-            _hover={"background": c("accent")},
+            _hover={"background": c("accent"), "opacity": "0.6"},
             style={"transition": "background 0.15s ease"},
         ),
         rx.vstack(
@@ -410,51 +460,6 @@ def _open_panel() -> rx.Component:
             height="100%",
             width="100%",
         ),
-        # Resize + localStorage persistence script
-        rx.script("""
-(function() {
-    var STORAGE_KEY = 'tuneos_chat_width';
-    var MIN_W = 300, MAX_W = 720;
-
-    function getPanel() { return document.getElementById('chat-panel'); }
-
-    function applyWidth(w) {
-        var p = getPanel();
-        if (p) { p.style.width = w + 'px'; p.style.minWidth = w + 'px'; }
-    }
-
-    // Restore saved width on mount
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) { setTimeout(function() { applyWidth(parseInt(saved)); }, 60); }
-
-    // Drag logic
-    document.addEventListener('mousedown', function(e) {
-        var handle = document.getElementById('chat-resize-handle');
-        if (!handle || !e.composedPath().includes(handle)) return;
-        e.preventDefault();
-        var panel = getPanel();
-        var startX = e.clientX;
-        var startW = panel ? panel.offsetWidth : 380;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-
-        function onMove(e) {
-            var newW = Math.max(MIN_W, Math.min(MAX_W, startW + (startX - e.clientX)));
-            applyWidth(newW);
-        }
-        function onUp() {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            var p = getPanel();
-            if (p) { localStorage.setItem(STORAGE_KEY, p.offsetWidth); }
-        }
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-    });
-})();
-"""),
         id="chat-panel",
         position="relative",
         width="380px",
@@ -507,6 +512,10 @@ def chat_panel() -> rx.Component:
     """Single collapsible, context-aware assistant — mounted once in the shell."""
     return rx.cond(
         _has_started(),
-        rx.cond(AppState.chat_open, _open_panel(), _collapsed()),
+        rx.fragment(
+            # Script mounted once; survives open/collapsed toggling
+            _resize_script(),
+            rx.cond(AppState.chat_open, _open_panel(), _collapsed()),
+        ),
         rx.fragment(),
     )

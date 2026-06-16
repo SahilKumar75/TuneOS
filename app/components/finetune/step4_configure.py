@@ -6,6 +6,7 @@ import reflex as rx
 
 from app.components.finetune.shared import _card, _label, _nav_buttons, _section_heading
 from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 _LR_PRESETS = [
@@ -452,14 +453,10 @@ def _step4() -> rx.Component:
                             font_weight="500",
                             color=c("accent"),
                         ),
-                        rx.button(
-                            "← Edit in Step 1",
-                            on_click=FinetuneState.go_to_step(1),
-                            variant="ghost",
-                            size="1",
-                            color_scheme="blue",
-                            padding="0",
-                            height="auto",
+                        rx.text(
+                            "Change below ↓",
+                            font_size="0.72rem",
+                            color=c("text_muted"),
                         ),
                         spacing="1",
                     ),
@@ -752,51 +749,7 @@ def _step4() -> rx.Component:
                             spacing="4",
                             width="100%",
                         ),
-                        rx.vstack(
-                            _label("Experiment name"),
-                            rx.input(
-                                placeholder="my-run-1",
-                                value=FinetuneState.experiment_name,
-                                on_change=FinetuneState.set_experiment_name,
-                                width="100%",
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Eval split ratio"),
-                            rx.slider(
-                                min=0.0,
-                                max=0.3,
-                                step=0.05,
-                                default_value=[FinetuneState.eval_split_ratio],
-                                on_value_commit=FinetuneState.set_eval_split_ratio,
-                            ),
-                            rx.text(
-                                FinetuneState.eval_split_ratio.to_string(),
-                                font_size="0.82rem",
-                                color=c("text_secondary"),
-                            ),
-                            rx.text(
-                                "Fraction held out for validation",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Early stopping patience"),
-                            rx.input(
-                                value=FinetuneState.early_stopping_patience.to_string(),
-                                on_change=FinetuneState.set_early_stopping_patience,
-                                type="number",
-                                width="100%",
-                            ),
-                            rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
+                        spacing="0",
                     ),
                     # Section 4 — Adapter Composition (researcher feature)
                     rx.text(
@@ -944,6 +897,7 @@ def _step4() -> rx.Component:
         _nav_buttons(
             next_label="Start Training →",
             next_disabled=~FinetuneState.can_start_training,
+            next_event=TrainingPollerState.start_training,
         ),
         spacing="4",
         width="100%",

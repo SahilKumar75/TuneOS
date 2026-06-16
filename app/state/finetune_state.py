@@ -159,6 +159,8 @@ class HubSearchResult(BaseModel):
     downloads: int = 0
     likes: int = 0
     description: str = ""
+    tags: list[str] = []
+    size_category: str = ""
 
 
 class ChatMessage(BaseModel):
@@ -306,6 +308,9 @@ class FinetuneState(rx.State):
     hub_search_query: str = ""
     hub_search_results: list[HubSearchResult] = []
     hub_is_searching: bool = False
+    # Hub recommendations (intent-aware, fetched from HF API)
+    hub_recommended: list[HubSearchResult] = []
+    hub_is_loading_recs: bool = False
 
     # DPO column mapping (used when training_mode == "dpo")
     dpo_prompt_col: str = "prompt"
@@ -1720,6 +1725,115 @@ Write ONLY the summary, no other text."""
         except Exception:
             self.hub_search_results = []
         self.hub_is_searching = False
+        yield
+
+    @rx.event
+    async def load_hub_recommendations(self):
+        """Fetch intent-aware dataset recommendations from HF API."""
+        _DOMAIN_POOL: dict[str, list[str]] = {
+            "finance": [
+                "gbharti/finance-alpaca",
+                "nickmuchi/financial-classification",
+                "FinGPT/fingpt-sentiment-train",
+            ],
+            "healthcare": [
+                "medalpaca/medical_meadow_medical_flashcards",
+                "medalpaca/medical_meadow_wikidoc",
+                "lavita/medical-qa-datasets",
+            ],
+            "legal": ["pile-of-law/pile-of-law", "joelniklaus/legal_case_document_summarization"],
+            "education": ["HuggingFaceH4/ultrachat_200k", "camel-ai/math"],
+            "creative": ["teknium/OpenHermes-2.5", "jondurbin/airoboros-gpt4-1.4.1"],
+            "technology": [
+                "sahil2801/CodeAlpaca-20k",
+                "iamtarun/python_code_instructions_18k_alpaca",
+            ],
+            "ecommerce": ["tatsu-lab/alpaca", "databricks/databricks-dolly-15k"],
+            "customer_service": [
+                "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+                "HuggingFaceH4/ultrachat_200k",
+            ],
+        }
+        _MODE_POOL: dict[str, list[str]] = {
+            "dpo": [
+                "Anthropic/hh-rlhf",
+                "HuggingFaceH4/ultrafeedback_binarized",
+                "Intel/orca_dpo_pairs",
+            ],
+            "kd": ["microsoft/orca-math-word-problems-200k", "HuggingFaceH4/ultrachat_200k"],
+        }
+        _TASK_POOL: dict[str, list[str]] = {
+            "code": ["sahil2801/CodeAlpaca-20k", "nampdn-ai/tiny-codes"],
+            "text": ["tatsu-lab/alpaca", "teknium/OpenHermes-2.5"],
+        }
+        _FALLBACK = [
+            "tatsu-lab/alpaca",
+            "databricks/databricks-dolly-15k",
+            "teknium/OpenHermes-2.5",
+            "HuggingFaceH4/ultrachat_200k",
+            "Open-Orca/OpenOrca",
+            "sahil2801/CodeAlpaca-20k",
+        ]
+
+        self.hub_is_loading_recs = True
+        yield
+
+        # Build ordered candidate list: mode → domain → task → fallback
+        candidates: list[str] = []
+        candidates += _MODE_POOL.get(self.training_mode, [])
+        candidates += _DOMAIN_POOL.get(self.intent_domain, [])
+        task_key = "code" if "code" in (self.intent_task_type or "").lower() else "text"
+        candidates += _TASK_POOL.get(task_key, [])
+        seen: set[str] = set(candidates)
+        ordered = list(dict.fromkeys(candidates))  # deduplicate preserving order
+        for f in _FALLBACK:
+            if f not in seen and len(ordered) < 6:
+                ordered.append(f)
+                seen.add(f)
+
+        results: list[HubSearchResult] = []
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            for ds_id in ordered[:6]:
+                try:
+                    resp = await client.get(f"https://huggingface.co/api/datasets/{ds_id}")
+                    if resp.status_code == 200:
+                        d = resp.json()
+                        raw_tags: list[str] = d.get("tags") or []
+                        size_cat = next(
+                            (
+                                t.split(":")[-1]
+                                for t in raw_tags
+                                if t.startswith("size_categories:")
+                            ),
+                            "",
+                        )
+                        task_tags = [
+                            t.split(":")[-1].replace("-", " ")
+                            for t in raw_tags
+                            if t.startswith("task_categories:") or t.startswith("task_ids:")
+                        ][:3]
+                        desc = (d.get("description") or "").strip()
+                        # Trim to first sentence or 180 chars
+                        if desc:
+                            first = desc.split(". ")[0]
+                            desc = first if len(first) < 180 else desc[:180].rstrip() + "…"
+                        results.append(
+                            HubSearchResult(
+                                id=ds_id,
+                                downloads=d.get("downloads", 0),
+                                likes=d.get("likes", 0),
+                                description=desc,
+                                tags=task_tags,
+                                size_category=size_cat,
+                            )
+                        )
+                    else:
+                        results.append(HubSearchResult(id=ds_id))
+                except Exception:
+                    results.append(HubSearchResult(id=ds_id))
+
+        self.hub_recommended = results
+        self.hub_is_loading_recs = False
         yield
 
     @rx.event

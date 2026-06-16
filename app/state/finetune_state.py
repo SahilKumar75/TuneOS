@@ -1320,7 +1320,8 @@ class FinetuneState(rx.State):
         self.intent_is_custom = is_custom
 
         # Update live plan immediately
-        await self._update_live_plan()
+        async for _ in self._update_live_plan():
+            yield
 
         # Auto-advance focus and scroll to next question
         if self.intent_question_idx == idx and idx < len(self.intent_answers) - 1:
@@ -1502,10 +1503,11 @@ Return ONLY valid JSON, no other text:
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        "HTTP-Referer": "https://tuneos.app",
                         "X-Title": "TuneOS Intent Questions",
                     },
                     json={
-                        "model": "deepseek/deepseek-v4-flash:free",
+                        "model": "deepseek/deepseek-chat:free",
                         "messages": [
                             {
                                 "role": "system",
@@ -1620,10 +1622,11 @@ Write ONLY the summary, no other text."""
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        "HTTP-Referer": "https://tuneos.app",
                         "X-Title": "TuneOS Plan Update",
                     },
                     json={
-                        "model": "deepseek/deepseek-v4-flash:free",
+                        "model": "deepseek/deepseek-chat:free",
                         "messages": [
                             {
                                 "role": "system",

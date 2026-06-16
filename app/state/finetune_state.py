@@ -1721,7 +1721,7 @@ Write ONLY the summary, no other text."""
                             downloads=d.get("downloads", 0),
                             likes=d.get("likes", 0),
                             description=(d.get("description") or "")[:120],
-                            org_logo=f"https://github.com/{d.get('id','').split('/')[0]}.png?size=64"
+                            org_logo=f"https://github.com/{d.get('id', '').split('/')[0]}.png?size=64"
                             if "/" in (d.get("id") or "")
                             else "",
                         )

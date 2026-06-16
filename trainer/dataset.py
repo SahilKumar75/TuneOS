@@ -18,17 +18,6 @@ def _format_prompt_prefix(row: dict, template: str = "alpaca") -> str:
     return prefix_tmpl.format(instruction=row.get("instruction", ""))
 
 
-def _format_prompt_prefix(row: dict, template: str = "alpaca") -> str:
-    """Return just the instruction part of the formatted text (no output).
-
-    Used to compute prompt token length for label masking — the model should
-    only compute loss on the response, not on the repeated instruction.
-    """
-    tmpl = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"])
-    prefix_tmpl = tmpl.split("{output}")[0]
-    return prefix_tmpl.format(instruction=row.get("instruction", ""))
-
-
 def format_prompt(
     row: dict,
     instruction_col: str = "instruction",

@@ -255,10 +255,15 @@ def _header() -> rx.Component:
         ),
         align="center",
         width="100%",
-        padding_bottom="10px",
+        # Match workspace tab bar: 36px tall + 1px border = same baseline
+        height="36px",
+        min_height="36px",
+        max_height="36px",
+        padding_x="4px",
         border_bottom="1px solid",
         border_color=c("border"),
         spacing="2",
+        flex_shrink="0",
     )
 
 
@@ -377,8 +382,72 @@ def _input_area() -> rx.Component:
     )
 
 
+def _resize_script() -> rx.Component:
+    """Global script — injected once at page level so it survives React re-renders."""
+    return rx.script(
+        """
+window.__chatResize = window.__chatResize || (function() {
+    var KEY = 'tuneos_chat_width', MIN = 300, MAX = 720;
+    function panel() { return document.getElementById('chat-panel'); }
+    function apply(w) {
+        var p = panel();
+        if (p) { p.style.width = w + 'px'; p.style.minWidth = w + 'px'; }
+    }
+    // restore saved width (retry until element exists)
+    function restore() {
+        var saved = localStorage.getItem(KEY);
+        if (!saved) return;
+        var p = panel();
+        if (p) { apply(parseInt(saved)); }
+        else { setTimeout(restore, 80); }
+    }
+    restore();
+    return {
+        start: function(e) {
+            e.preventDefault();
+            var p = panel();
+            var startX = e.clientX;
+            var startW = p ? p.offsetWidth : 380;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            function move(e) {
+                apply(Math.max(MIN, Math.min(MAX, startW + (startX - e.clientX))));
+            }
+            function up() {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', up);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                var p2 = panel();
+                if (p2) localStorage.setItem(KEY, p2.offsetWidth);
+            }
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+        }
+    };
+})();
+""",
+        strategy="afterInteractive",
+    )
+
+
 def _open_panel() -> rx.Component:
     return rx.box(
+        # Drag-to-resize handle — left edge, wired via React synthetic event
+        rx.box(
+            id="chat-resize-handle",
+            on_mouse_down=rx.call_script("window.__chatResize.start(event)"),
+            position="absolute",
+            left="0",
+            top="0",
+            width="5px",
+            height="100%",
+            cursor="col-resize",
+            z_index="10",
+            background="transparent",
+            _hover={"background": c("accent"), "opacity": "0.6"},
+            style={"transition": "background 0.15s ease"},
+        ),
         rx.vstack(
             _header(),
             rx.cond(
@@ -391,16 +460,20 @@ def _open_panel() -> rx.Component:
             height="100%",
             width="100%",
         ),
+        id="chat-panel",
+        position="relative",
         width="380px",
-        min_width="360px",
+        min_width="300px",
+        max_width="720px",
         height="100vh",
-        padding_top="10px",
+        padding_top="0",
         padding_x="16px",
         padding_bottom="16px",
         background=c("bg_sidebar"),
         border_left="1px solid",
         border_color=c("border"),
         flex_shrink="0",
+        overflow="hidden",
     )
 
 
@@ -439,6 +512,10 @@ def chat_panel() -> rx.Component:
     """Single collapsible, context-aware assistant — mounted once in the shell."""
     return rx.cond(
         _has_started(),
-        rx.cond(AppState.chat_open, _open_panel(), _collapsed()),
+        rx.fragment(
+            # Script mounted once; survives open/collapsed toggling
+            _resize_script(),
+            rx.cond(AppState.chat_open, _open_panel(), _collapsed()),
+        ),
         rx.fragment(),
     )

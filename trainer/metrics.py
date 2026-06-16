@@ -111,7 +111,7 @@ def compute_rouge1(predictions: list[str], references: list[str]) -> float | Non
 
 @register("bleu", greater_is_better=True, kind="reference")
 def compute_bleu(predictions: list[str], references: list[str]) -> float | None:
-    """Corpus-level BLEU via the HuggingFace evaluate library (sacrebleu)."""
+    """Corpus-level BLEU via the HuggingFace evaluate library (sacrebleu), with pure-Python fallback."""
     if not predictions or len(predictions) != len(references):
         return None
     try:
@@ -121,7 +121,33 @@ def compute_bleu(predictions: list[str], references: list[str]) -> float | None:
         result = metric.compute(predictions=predictions, references=[[r] for r in references])
         return round(float(result["bleu"]), 4) if result else None
     except Exception:
-        return None
+        pass
+    # Pure-Python corpus BLEU fallback (4-gram with brevity penalty).
+    from collections import Counter
+
+    def _ngrams(tokens: list[str], n: int) -> list[tuple]:
+        return [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+
+    clipped: list[Counter] = [Counter() for _ in range(4)]
+    total_pred_len = 0
+    total_ref_len = 0
+    for pred, ref in zip(predictions, references, strict=False):
+        pt, rt = pred.lower().split(), ref.lower().split()
+        total_pred_len += len(pt)
+        total_ref_len += len(rt)
+        for n in range(1, 5):
+            ref_ng = Counter(_ngrams(rt, n))
+            for gram, cnt in Counter(_ngrams(pt, n)).items():
+                clipped[n - 1][gram] += min(cnt, ref_ng.get(gram, 0))
+    precisions = []
+    for n in range(1, 5):
+        denom = sum(max(0, len(p.lower().split()) - n + 1) for p in predictions)
+        num = sum(clipped[n - 1].values())
+        precisions.append(num / denom if denom else 0.0)
+    if any(p == 0 for p in precisions):
+        return 0.0
+    bp = 1.0 if total_pred_len >= total_ref_len else math.exp(1 - total_ref_len / total_pred_len)
+    return round(bp * math.exp(sum(math.log(p) for p in precisions) / 4), 4)
 
 
 def _f1(overlap: int, n_pred: int, n_ref: int) -> float:
@@ -189,7 +215,7 @@ def compute_rougeL(predictions: list[str], references: list[str]) -> float | Non
 
 @register("meteor", greater_is_better=True, kind="reference")
 def compute_meteor(predictions: list[str], references: list[str]) -> float | None:
-    """Corpus-level METEOR via the HuggingFace evaluate library."""
+    """Corpus-level METEOR via the HuggingFace evaluate library, with pure-Python fallback."""
     if not predictions or len(predictions) != len(references):
         return None
     try:
@@ -199,7 +225,30 @@ def compute_meteor(predictions: list[str], references: list[str]) -> float | Non
         result = metric.compute(predictions=predictions, references=references)
         return round(float(result["meteor"]), 4) if result else None
     except Exception:
-        return None
+        pass
+    # Pure-Python fallback: unigram F-mean with METEOR alpha=0.9.
+    scores = []
+    for pred, ref in zip(predictions, references, strict=False):
+        pt, rt = pred.lower().split(), ref.lower().split()
+        if not pt or not rt:
+            scores.append(0.0)
+            continue
+        ref_counts: dict[str, int] = {}
+        for t in rt:
+            ref_counts[t] = ref_counts.get(t, 0) + 1
+        matches: int = 0
+        seen: dict[str, int] = {}
+        for t in pt:
+            seen[t] = seen.get(t, 0) + 1
+            if seen[t] <= ref_counts.get(t, 0):
+                matches += 1
+        if matches == 0:
+            scores.append(0.0)
+            continue
+        precision = matches / len(pt)
+        recall = matches / len(rt)
+        scores.append(precision * recall / (0.9 * precision + 0.1 * recall))
+    return round(sum(scores) / len(scores), 4)
 
 
 def available_metrics() -> list[str]:

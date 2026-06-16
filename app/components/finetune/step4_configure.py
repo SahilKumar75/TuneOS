@@ -6,6 +6,7 @@ import reflex as rx
 
 from app.components.finetune.shared import _card, _label, _nav_buttons, _section_heading
 from app.state.finetune_state import FinetuneState
+from app.state.training_poller_state import TrainingPollerState
 from app.styles import c
 
 _LR_PRESETS = [
@@ -216,8 +217,156 @@ def _kd_params_card() -> rx.Component:
     )
 
 
+_TECHNIQUE_META = {
+    "qlora": (
+        "QLoRA",
+        "4-bit compressed adapters. Fits in 12 GB+ GPU. Best for most cases.",
+        "violet",
+    ),
+    "lora": (
+        "LoRA",
+        "Float16 adapters. Needs ~16 GB GPU for 7B models. Faster convergence.",
+        "blue",
+    ),
+    "dpo": (
+        "DPO",
+        "Preference tuning on chosen/rejected pairs. Best for alignment tasks.",
+        "orange",
+    ),
+    "full": ("Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", "gray"),
+}
+
+
+def _technique_section() -> rx.Component:
+    """Technique picker with AI recommendation based on model + intent."""
+    return rx.vstack(
+        _section_heading("Training technique"),
+        # Recommendation callout
+        rx.cond(
+            FinetuneState.suggested_technique != "",
+            rx.callout(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("sparkles", size=14),
+                        rx.text(
+                            "Recommended for your setup",
+                            font_size="0.78rem",
+                            font_weight="700",
+                            color=c("text_primary"),
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.text(
+                        rx.cond(
+                            FinetuneState.suggested_technique == "qlora",
+                            "Based on your model size and intent, QLoRA gives the best memory/quality trade-off — runs on a single 12 GB GPU.",
+                            rx.cond(
+                                FinetuneState.suggested_technique == "lora",
+                                "Your model is small enough for standard LoRA — float16 adapters with faster convergence.",
+                                rx.cond(
+                                    FinetuneState.suggested_technique == "dpo",
+                                    "Your intent signals preference alignment — DPO trains on chosen/rejected pairs to align model behaviour.",
+                                    "Full fine-tuning updates all weights. Make sure you have 80 GB+ GPU available.",
+                                ),
+                            ),
+                        ),
+                        font_size="0.78rem",
+                        color=c("text_secondary"),
+                    ),
+                    spacing="1",
+                    align_items="flex-start",
+                ),
+                color_scheme="blue",
+                size="1",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        rx.box(height="10px"),
+        # Technique cards
+        rx.flex(
+            *[
+                rx.box(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text(
+                                label,
+                                font_size="0.88rem",
+                                font_weight="500",
+                                color=rx.cond(
+                                    FinetuneState.selected_technique == tech,
+                                    c("accent"),
+                                    c("text_primary"),
+                                ),
+                            ),
+                            rx.cond(
+                                FinetuneState.selected_technique == tech,
+                                rx.icon("circle-check", size=14, color=c("accent")),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                FinetuneState.suggested_technique == tech,
+                                rx.badge("Recommended", color_scheme="blue", size="1"),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                coming_soon,
+                                rx.badge("Soon", color_scheme="gray", size="1"),
+                                rx.fragment(),
+                            ),
+                            spacing="2",
+                            align="center",
+                            wrap="wrap",
+                        ),
+                        rx.text(desc, font_size="0.76rem", color=c("text_muted")),
+                        spacing="1",
+                        align_items="flex-start",
+                    ),
+                    background=rx.cond(
+                        FinetuneState.selected_technique == tech,
+                        c("accent_soft"),
+                        c("bg_input"),
+                    ),
+                    border="1px solid",
+                    border_color=rx.cond(
+                        FinetuneState.selected_technique == tech,
+                        c("accent"),
+                        c("border"),
+                    ),
+                    border_radius="8px",
+                    padding="12px 14px",
+                    cursor=rx.cond(coming_soon, "not-allowed", "pointer"),
+                    opacity=rx.cond(coming_soon, "0.5", "1"),
+                    on_click=rx.cond(
+                        coming_soon,
+                        rx.prevent_default,
+                        FinetuneState.select_technique(tech),
+                    ),
+                    flex="1",
+                    min_width="140px",
+                )
+                for tech, label, desc, coming_soon in [
+                    ("qlora", "QLoRA", "4-bit compressed. Runs on 12 GB+ GPU. Recommended.", False),
+                    ("lora", "LoRA", "Float16. Needs ~16 GB GPU for 7B models.", False),
+                    ("full", "Full Fine-tune", "All weights updated. Needs 80 GB+ GPU.", True),
+                    ("dpo", "DPO", "Preference tuning on chosen/rejected pairs.", False),
+                ]
+            ],
+            wrap="wrap",
+            gap="10px",
+            width="100%",
+        ),
+        rx.box(height="24px"),
+        spacing="0",
+        width="100%",
+        align_items="flex-start",
+    )
+
+
 def _step4() -> rx.Component:
     return rx.vstack(
+        _technique_section(),
         rx.hstack(
             _section_heading("Training configuration"),
             rx.spacer(),
@@ -304,14 +453,10 @@ def _step4() -> rx.Component:
                             font_weight="500",
                             color=c("accent"),
                         ),
-                        rx.button(
-                            "← Edit in Step 1",
-                            on_click=FinetuneState.go_to_step(1),
-                            variant="ghost",
-                            size="1",
-                            color_scheme="blue",
-                            padding="0",
-                            height="auto",
+                        rx.text(
+                            "Change below ↓",
+                            font_size="0.72rem",
+                            color=c("text_muted"),
                         ),
                         spacing="1",
                     ),
@@ -604,51 +749,7 @@ def _step4() -> rx.Component:
                             spacing="4",
                             width="100%",
                         ),
-                        rx.vstack(
-                            _label("Experiment name"),
-                            rx.input(
-                                placeholder="my-run-1",
-                                value=FinetuneState.experiment_name,
-                                on_change=FinetuneState.set_experiment_name,
-                                width="100%",
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Eval split ratio"),
-                            rx.slider(
-                                min=0.0,
-                                max=0.3,
-                                step=0.05,
-                                default_value=[FinetuneState.eval_split_ratio],
-                                on_value_commit=FinetuneState.set_eval_split_ratio,
-                            ),
-                            rx.text(
-                                FinetuneState.eval_split_ratio.to_string(),
-                                font_size="0.82rem",
-                                color=c("text_secondary"),
-                            ),
-                            rx.text(
-                                "Fraction held out for validation",
-                                font_size="0.72rem",
-                                color=c("text_muted"),
-                            ),
-                            spacing="1",
-                        ),
-                        rx.vstack(
-                            _label("Early stopping patience"),
-                            rx.input(
-                                value=FinetuneState.early_stopping_patience.to_string(),
-                                on_change=FinetuneState.set_early_stopping_patience,
-                                type="number",
-                                width="100%",
-                            ),
-                            rx.text("0 = disabled", font_size="0.72rem", color=c("text_muted")),
-                            spacing="1",
-                        ),
-                        columns="3",
-                        spacing="4",
-                        width="100%",
+                        spacing="0",
                     ),
                     # Section 4 — Adapter Composition (researcher feature)
                     rx.text(
@@ -792,12 +893,11 @@ def _step4() -> rx.Component:
                 ),
                 spacing="0",
             ),
-            background=c("bg_input"),
         ),
         _nav_buttons(
             next_label="Start Training →",
             next_disabled=~FinetuneState.can_start_training,
-            next_event=FinetuneState.start_training,
+            next_event=TrainingPollerState.start_training,
         ),
         spacing="4",
         width="100%",

@@ -161,6 +161,7 @@ class HubSearchResult(BaseModel):
     description: str = ""
     tags: list[str] = []
     size_category: str = ""
+    org_logo: str = ""  # GitHub avatar URL for the org
 
 
 class ChatMessage(BaseModel):
@@ -311,6 +312,8 @@ class FinetuneState(rx.State):
     # Hub recommendations (intent-aware, fetched from HF API)
     hub_recommended: list[HubSearchResult] = []
     hub_is_loading_recs: bool = False
+    # Multi-select
+    hub_selected_ids: list[str] = []
 
     # DPO column mapping (used when training_mode == "dpo")
     dpo_prompt_col: str = "prompt"
@@ -1718,6 +1721,9 @@ Write ONLY the summary, no other text."""
                             downloads=d.get("downloads", 0),
                             likes=d.get("likes", 0),
                             description=(d.get("description") or "")[:120],
+                            org_logo=f"https://github.com/{d.get('id','').split('/')[0]}.png?size=64"
+                            if "/" in (d.get("id") or "")
+                            else "",
                         )
                         for d in data
                         if d.get("id")
@@ -1817,6 +1823,7 @@ Write ONLY the summary, no other text."""
                         if desc:
                             first = desc.split(". ")[0]
                             desc = first if len(first) < 180 else desc[:180].rstrip() + "…"
+                        org = ds_id.split("/")[0] if "/" in ds_id else ""
                         results.append(
                             HubSearchResult(
                                 id=ds_id,
@@ -1825,16 +1832,46 @@ Write ONLY the summary, no other text."""
                                 description=desc,
                                 tags=task_tags,
                                 size_category=size_cat,
+                                org_logo=f"https://github.com/{org}.png?size=64" if org else "",
                             )
                         )
                     else:
-                        results.append(HubSearchResult(id=ds_id))
+                        org = ds_id.split("/")[0] if "/" in ds_id else ""
+                        results.append(
+                            HubSearchResult(
+                                id=ds_id,
+                                org_logo=f"https://github.com/{org}.png?size=64" if org else "",
+                            )
+                        )
                 except Exception:
-                    results.append(HubSearchResult(id=ds_id))
+                    org = ds_id.split("/")[0] if "/" in ds_id else ""
+                    results.append(
+                        HubSearchResult(
+                            id=ds_id,
+                            org_logo=f"https://github.com/{org}.png?size=64" if org else "",
+                        )
+                    )
 
         self.hub_recommended = results
         self.hub_is_loading_recs = False
         yield
+
+    @rx.event
+    def toggle_hub_selection(self, ds_id: str):
+        selected = list(self.hub_selected_ids)
+        if ds_id in selected:
+            selected.remove(ds_id)
+        else:
+            selected.append(ds_id)
+        self.hub_selected_ids = selected
+
+    @rx.event
+    def confirm_hub_selection(self):
+        if self.hub_selected_ids:
+            self.hub_dataset_id = self.hub_selected_ids[0]
+            self.hub_selected_ids = []
+            self.hub_search_query = ""
+            self.hub_search_results = []
 
     @rx.event
     def set_hub_instruction_col(self, value: str):

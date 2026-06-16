@@ -16,22 +16,30 @@ from app.styles import c
 
 
 def _hf_icon(size: int = 20) -> rx.Component:
-    """HuggingFace logo as inline SVG in brand orange."""
-    s = str(size)
-    svg = (
-        f'<svg width="{s}" height="{s}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
-        '<ellipse cx="12" cy="12.5" rx="10.5" ry="10.5" fill="#FF9D00"/>'
-        '<circle cx="8.8" cy="10.5" r="1.4" fill="#1a1a1a"/>'
-        '<circle cx="15.2" cy="10.5" r="1.4" fill="#1a1a1a"/>'
-        '<path d="M8.5 15.5 Q12 18.5 15.5 15.5" stroke="#1a1a1a" stroke-width="1.4"'
-        ' fill="none" stroke-linecap="round"/>'
-        '<line x1="8.8" y1="7" x2="8.8" y2="9" stroke="#1a1a1a" stroke-width="1.2"'
-        ' stroke-linecap="round"/>'
-        '<line x1="15.2" y1="7" x2="15.2" y2="9" stroke="#1a1a1a" stroke-width="1.2"'
-        ' stroke-linecap="round"/>'
-        "</svg>"
+    """Official HuggingFace logo from their CDN."""
+    return rx.image(
+        src="https://huggingface.co/front/assets/huggingface_logo-nobg.svg",
+        width=f"{size}px",
+        height=f"{size}px",
+        alt="HF",
+        style={"display": "inline-block", "flex-shrink": "0"},
     )
-    return rx.html(svg)
+
+
+def _dataset_avatar(org_logo: rx.Var, size: int = 28) -> rx.Component:
+    """Show org GitHub avatar if available, else HF logo."""
+    return rx.cond(
+        org_logo != "",
+        rx.image(
+            src=org_logo,
+            width=f"{size}px",
+            height=f"{size}px",
+            border_radius="6px",
+            alt="org",
+            style={"flex-shrink": "0", "object-fit": "cover"},
+        ),
+        _hf_icon(size),
+    )
 
 
 def _seg_btn(mode: str, *children, extra_event=None) -> rx.Component:
@@ -263,6 +271,7 @@ def _hub_dataset_panel() -> rx.Component:
                                     FinetuneState.hub_search_results,
                                     lambda r: rx.box(
                                         rx.hstack(
+                                            _dataset_avatar(r.org_logo, 28),
                                             rx.vstack(
                                                 rx.text(
                                                     r.id,
@@ -298,26 +307,78 @@ def _hub_dataset_panel() -> rx.Component:
                                                 ),
                                                 spacing="1",
                                                 align_items="start",
+                                                flex="1",
                                             ),
-                                            rx.button(
-                                                "Use",
-                                                size="1",
-                                                variant="soft",
-                                                color_scheme="blue",
-                                                on_click=FinetuneState.set_hub_dataset_id(r.id),
+                                            rx.cond(
+                                                FinetuneState.hub_selected_ids.contains(r.id),
+                                                rx.box(
+                                                    rx.icon("check", size=11, color="white"),
+                                                    width="20px",
+                                                    height="20px",
+                                                    border_radius="50%",
+                                                    background="var(--blue-9)",
+                                                    display="flex",
+                                                    align_items="center",
+                                                    justify_content="center",
+                                                    flex_shrink="0",
+                                                ),
+                                                rx.box(
+                                                    width="20px",
+                                                    height="20px",
+                                                    border_radius="50%",
+                                                    border="1.5px solid var(--gray-5)",
+                                                    flex_shrink="0",
+                                                ),
                                             ),
-                                            justify="between",
+                                            spacing="2",
                                             align="center",
                                             width="100%",
                                         ),
+                                        on_click=FinetuneState.toggle_hub_selection(r.id),
                                         padding="10px 12px",
-                                        border="1px solid var(--gray-4)",
+                                        border=rx.cond(
+                                            FinetuneState.hub_selected_ids.contains(r.id),
+                                            "2px solid var(--blue-8)",
+                                            "1.5px solid var(--gray-4)",
+                                        ),
                                         border_radius="8px",
-                                        background="var(--gray-1)",
+                                        background=rx.cond(
+                                            FinetuneState.hub_selected_ids.contains(r.id),
+                                            "var(--blue-2)",
+                                            "var(--gray-1)",
+                                        ),
                                         width="100%",
                                         cursor="pointer",
-                                        _hover={"background": "var(--gray-2)"},
+                                        _hover={"border-color": "var(--blue-6)"},
+                                        style={"transition": "all 0.12s ease"},
                                     ),
+                                ),
+                                # Confirm bar for search results
+                                rx.cond(
+                                    FinetuneState.hub_selected_ids.length() > 0,
+                                    rx.hstack(
+                                        rx.text(
+                                            FinetuneState.hub_selected_ids.length().to_string()
+                                            + " dataset(s) selected",
+                                            font_size="0.84rem",
+                                            font_weight="500",
+                                            color="var(--blue-11)",
+                                        ),
+                                        rx.button(
+                                            "Use selected →",
+                                            size="2",
+                                            color_scheme="blue",
+                                            on_click=FinetuneState.confirm_hub_selection,
+                                        ),
+                                        justify="between",
+                                        align="center",
+                                        width="100%",
+                                        padding="10px 14px",
+                                        border_radius="8px",
+                                        background="var(--blue-3)",
+                                        border="1px solid var(--blue-6)",
+                                    ),
+                                    rx.fragment(),
                                 ),
                                 spacing="2",
                                 width="100%",
@@ -349,71 +410,99 @@ def _hub_dataset_panel() -> rx.Component:
                             ),
                             rx.cond(
                                 FinetuneState.hub_recommended.length() > 0,
-                                rx.grid(
-                                    rx.foreach(
-                                        FinetuneState.hub_recommended,
-                                        lambda r: rx.box(
-                                            rx.vstack(
-                                                # Header: big HF icon + full dataset id
-                                                rx.hstack(
-                                                    _hf_icon(18),
-                                                    rx.vstack(
-                                                        rx.text(
-                                                            r.id,
-                                                            font_size="0.8rem",
-                                                            font_weight="700",
-                                                            color="var(--gray-12)",
-                                                            no_of_lines=1,
+                                rx.vstack(
+                                    rx.grid(
+                                        rx.foreach(
+                                            FinetuneState.hub_recommended,
+                                            lambda r: rx.box(
+                                                rx.vstack(
+                                                    # Header: org avatar + dataset id + check
+                                                    rx.hstack(
+                                                        _dataset_avatar(r.org_logo, 28),
+                                                        rx.vstack(
+                                                            rx.text(
+                                                                r.id,
+                                                                font_size="0.8rem",
+                                                                font_weight="700",
+                                                                color="var(--gray-12)",
+                                                                no_of_lines=1,
+                                                            ),
+                                                            rx.cond(
+                                                                r.size_category != "",
+                                                                rx.badge(
+                                                                    r.size_category,
+                                                                    size="1",
+                                                                    variant="soft",
+                                                                    color_scheme="gray",
+                                                                ),
+                                                                rx.fragment(),
+                                                            ),
+                                                            spacing="1",
+                                                            align_items="start",
+                                                            flex="1",
                                                         ),
                                                         rx.cond(
-                                                            r.size_category != "",
-                                                            rx.badge(
-                                                                r.size_category,
-                                                                size="1",
-                                                                variant="soft",
-                                                                color_scheme="gray",
+                                                            FinetuneState.hub_selected_ids.contains(
+                                                                r.id
                                                             ),
-                                                            rx.fragment(),
-                                                        ),
-                                                        spacing="1",
-                                                        align_items="start",
-                                                    ),
-                                                    spacing="2",
-                                                    align="start",
-                                                    width="100%",
-                                                ),
-                                                # Description
-                                                rx.cond(
-                                                    r.description != "",
-                                                    rx.text(
-                                                        r.description,
-                                                        font_size="0.74rem",
-                                                        color="var(--gray-10)",
-                                                        no_of_lines=3,
-                                                        line_height="1.45",
-                                                    ),
-                                                    rx.fragment(),
-                                                ),
-                                                # Task tags
-                                                rx.cond(
-                                                    r.tags.length() > 0,
-                                                    rx.hstack(
-                                                        rx.foreach(
-                                                            r.tags,
-                                                            lambda t: rx.badge(
-                                                                t,
-                                                                size="1",
-                                                                variant="soft",
-                                                                color_scheme="blue",
+                                                            rx.box(
+                                                                rx.icon(
+                                                                    "check",
+                                                                    size=11,
+                                                                    color="white",
+                                                                ),
+                                                                width="20px",
+                                                                height="20px",
+                                                                border_radius="50%",
+                                                                background="var(--blue-9)",
+                                                                display="flex",
+                                                                align_items="center",
+                                                                justify_content="center",
+                                                                flex_shrink="0",
+                                                            ),
+                                                            rx.box(
+                                                                width="20px",
+                                                                height="20px",
+                                                                border_radius="50%",
+                                                                border="1.5px solid var(--gray-5)",
+                                                                flex_shrink="0",
                                                             ),
                                                         ),
-                                                        spacing="1",
-                                                        wrap="wrap",
+                                                        spacing="2",
+                                                        align="center",
+                                                        width="100%",
                                                     ),
-                                                    rx.fragment(),
-                                                ),
-                                                # Footer: stats + Use button
-                                                rx.hstack(
+                                                    # Description
+                                                    rx.cond(
+                                                        r.description != "",
+                                                        rx.text(
+                                                            r.description,
+                                                            font_size="0.74rem",
+                                                            color="var(--gray-10)",
+                                                            no_of_lines=3,
+                                                            line_height="1.45",
+                                                        ),
+                                                        rx.fragment(),
+                                                    ),
+                                                    # Task tags
+                                                    rx.cond(
+                                                        r.tags.length() > 0,
+                                                        rx.hstack(
+                                                            rx.foreach(
+                                                                r.tags,
+                                                                lambda t: rx.badge(
+                                                                    t,
+                                                                    size="1",
+                                                                    variant="soft",
+                                                                    color_scheme="blue",
+                                                                ),
+                                                            ),
+                                                            spacing="1",
+                                                            wrap="wrap",
+                                                        ),
+                                                        rx.fragment(),
+                                                    ),
+                                                    # Footer: download + likes stats
                                                     rx.hstack(
                                                         rx.icon(
                                                             "download",
@@ -438,33 +527,58 @@ def _hub_dataset_panel() -> rx.Component:
                                                         spacing="1",
                                                         align="center",
                                                     ),
-                                                    rx.button(
-                                                        "Use",
-                                                        size="1",
-                                                        variant="soft",
-                                                        color_scheme="blue",
-                                                        on_click=FinetuneState.set_hub_dataset_id(
-                                                            r.id
-                                                        ),
-                                                    ),
-                                                    justify="between",
-                                                    width="100%",
+                                                    spacing="2",
+                                                    align_items="start",
                                                 ),
-                                                spacing="2",
-                                                align_items="start",
+                                                on_click=FinetuneState.toggle_hub_selection(r.id),
+                                                padding="14px",
+                                                border=rx.cond(
+                                                    FinetuneState.hub_selected_ids.contains(r.id),
+                                                    "2px solid var(--blue-8)",
+                                                    "1.5px solid var(--gray-4)",
+                                                ),
+                                                border_radius="10px",
+                                                background=rx.cond(
+                                                    FinetuneState.hub_selected_ids.contains(r.id),
+                                                    "var(--blue-2)",
+                                                    "var(--gray-1)",
+                                                ),
+                                                cursor="pointer",
+                                                _hover={"border-color": "var(--blue-6)"},
+                                                style={"transition": "all 0.12s ease"},
                                             ),
-                                            padding="14px",
-                                            border="1px solid var(--gray-4)",
-                                            border_radius="10px",
-                                            background="var(--gray-1)",
-                                            _hover={
-                                                "background": "var(--gray-2)",
-                                                "border-color": "var(--gray-5)",
-                                            },
-                                            style={"transition": "all 0.12s ease"},
                                         ),
+                                        columns="2",
+                                        spacing="3",
+                                        width="100%",
                                     ),
-                                    columns="2",
+                                    # Floating confirm bar
+                                    rx.cond(
+                                        FinetuneState.hub_selected_ids.length() > 0,
+                                        rx.hstack(
+                                            rx.text(
+                                                FinetuneState.hub_selected_ids.length().to_string()
+                                                + " dataset(s) selected",
+                                                font_size="0.84rem",
+                                                font_weight="500",
+                                                color="var(--blue-11)",
+                                            ),
+                                            rx.button(
+                                                "Use selected →",
+                                                size="2",
+                                                color_scheme="blue",
+                                                on_click=FinetuneState.confirm_hub_selection,
+                                            ),
+                                            justify="between",
+                                            align="center",
+                                            width="100%",
+                                            padding="10px 14px",
+                                            border_radius="8px",
+                                            background="var(--blue-3)",
+                                            border="1px solid var(--blue-6)",
+                                        ),
+                                        rx.fragment(),
+                                    ),
                                     spacing="3",
                                     width="100%",
                                 ),

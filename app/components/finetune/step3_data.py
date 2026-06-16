@@ -15,14 +15,69 @@ from app.state.finetune_state import FinetuneState
 from app.styles import c
 
 
-def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
+def _hf_icon(size: int = 20) -> rx.Component:
+    """Official HuggingFace logo from their CDN."""
+    return rx.image(
+        src="https://huggingface.co/front/assets/huggingface_logo-nobg.svg",
+        width=f"{size}px",
+        height=f"{size}px",
+        alt="HF",
+        style={"display": "inline-block", "flex-shrink": "0"},
+    )
+
+
+def _dataset_avatar(org_logo: rx.Var, size: int = 28) -> rx.Component:
+    """Show org GitHub avatar if available, else HF logo."""
+    return rx.cond(
+        org_logo != "",
+        rx.image(
+            src=org_logo,
+            width=f"{size}px",
+            height=f"{size}px",
+            border_radius="6px",
+            alt="org",
+            style={"flex-shrink": "0", "object-fit": "cover"},
+        ),
+        _hf_icon(size),
+    )
+
+
+def _seg_btn(mode: str, *children, extra_event=None) -> rx.Component:
+    """Uniform segmented-control pill — all tabs same size/shape."""
     is_active = FinetuneState.data_source == mode
-    return rx.button(
-        rx.hstack(rx.icon(icon, size=14), rx.text(label), spacing="2", align="center"),
-        on_click=FinetuneState.set_data_source(mode),
-        variant=rx.cond(is_active, "solid", "soft"),
-        color_scheme="blue",
-        size="2",
+    click = (
+        [FinetuneState.set_data_source(mode), extra_event]
+        if extra_event
+        else FinetuneState.set_data_source(mode)
+    )
+    return rx.box(
+        rx.hstack(*children, spacing="2", align="center"),
+        on_click=click,
+        cursor="pointer",
+        padding="0 12px",
+        height="30px",
+        display="flex",
+        align_items="center",
+        border_radius="6px",
+        background=rx.cond(is_active, "white", "transparent"),
+        box_shadow=rx.cond(
+            is_active,
+            "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.07)",
+            "none",
+        ),
+        color=rx.cond(is_active, "var(--gray-12)", "var(--gray-11)"),
+        style={
+            "transition": "background 0.12s ease, box-shadow 0.12s ease",
+            "white-space": "nowrap",
+        },
+    )
+
+
+def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
+    return _seg_btn(
+        mode,
+        rx.icon(icon, size=13),
+        rx.text(label, font_size="0.82rem", font_weight="500"),
     )
 
 
@@ -178,20 +233,372 @@ def _hub_dataset_panel() -> rx.Component:
                     width="100%",
                 ),
                 rx.vstack(
-                    rx.text("No dataset selected yet.", color=c("text_muted"), font_size="0.86rem"),
-                    rx.text(
-                        'Go to the Datasets tab and click "Use in Fine-tune" on any dataset.',
-                        color=c("text_muted"),
-                        font_size="0.82rem",
+                    # Search bar
+                    rx.hstack(
+                        rx.icon("search", size=14, color="var(--gray-9)"),
+                        rx.input(
+                            placeholder="Search HuggingFace datasets...",
+                            value=FinetuneState.hub_search_query,
+                            on_change=FinetuneState.search_hub_datasets,
+                            border="none",
+                            outline="none",
+                            background="transparent",
+                            font_size="0.85rem",
+                            flex="1",
+                            _focus={"outline": "none", "box_shadow": "none"},
+                        ),
+                        rx.cond(
+                            FinetuneState.hub_is_searching,
+                            rx.spinner(size="1"),
+                            rx.fragment(),
+                        ),
+                        padding="8px 12px",
+                        border="1px solid var(--gray-5)",
+                        border_radius="8px",
+                        background="var(--gray-1)",
+                        align="center",
+                        width="100%",
+                        spacing="2",
                     ),
-                    rx.button(
-                        "Browse Datasets →",
-                        on_click=rx.redirect("/datasets"),
-                        color_scheme="blue",
-                        variant="soft",
-                        size="2",
+                    # Results or recommended
+                    rx.cond(
+                        FinetuneState.hub_search_query != "",
+                        # Search results
+                        rx.cond(
+                            FinetuneState.hub_search_results.length() > 0,
+                            rx.vstack(
+                                rx.foreach(
+                                    FinetuneState.hub_search_results,
+                                    lambda r: rx.box(
+                                        rx.hstack(
+                                            _dataset_avatar(r.org_logo, 28),
+                                            rx.vstack(
+                                                rx.text(
+                                                    r.id,
+                                                    font_size="0.84rem",
+                                                    font_weight="600",
+                                                    color="var(--gray-12)",
+                                                ),
+                                                rx.text(
+                                                    r.description,
+                                                    font_size="0.75rem",
+                                                    color="var(--gray-10)",
+                                                    no_of_lines=1,
+                                                ),
+                                                rx.hstack(
+                                                    rx.icon(
+                                                        "download", size=11, color="var(--gray-9)"
+                                                    ),
+                                                    rx.text(
+                                                        r.downloads.to_string(),
+                                                        font_size="0.72rem",
+                                                        color="var(--gray-9)",
+                                                    ),
+                                                    rx.icon(
+                                                        "heart", size=11, color="var(--gray-9)"
+                                                    ),
+                                                    rx.text(
+                                                        r.likes.to_string(),
+                                                        font_size="0.72rem",
+                                                        color="var(--gray-9)",
+                                                    ),
+                                                    spacing="1",
+                                                    align="center",
+                                                ),
+                                                spacing="1",
+                                                align_items="start",
+                                                flex="1",
+                                            ),
+                                            rx.cond(
+                                                FinetuneState.hub_selected_ids.contains(r.id),
+                                                rx.box(
+                                                    rx.icon("check", size=11, color="white"),
+                                                    width="20px",
+                                                    height="20px",
+                                                    border_radius="50%",
+                                                    background="var(--blue-9)",
+                                                    display="flex",
+                                                    align_items="center",
+                                                    justify_content="center",
+                                                    flex_shrink="0",
+                                                ),
+                                                rx.box(
+                                                    width="20px",
+                                                    height="20px",
+                                                    border_radius="50%",
+                                                    border="1.5px solid var(--gray-5)",
+                                                    flex_shrink="0",
+                                                ),
+                                            ),
+                                            spacing="2",
+                                            align="center",
+                                            width="100%",
+                                        ),
+                                        on_click=FinetuneState.toggle_hub_selection(r.id),
+                                        padding="10px 12px",
+                                        border=rx.cond(
+                                            FinetuneState.hub_selected_ids.contains(r.id),
+                                            "2px solid var(--blue-8)",
+                                            "1.5px solid var(--gray-4)",
+                                        ),
+                                        border_radius="8px",
+                                        background=rx.cond(
+                                            FinetuneState.hub_selected_ids.contains(r.id),
+                                            "var(--blue-2)",
+                                            "var(--gray-1)",
+                                        ),
+                                        width="100%",
+                                        cursor="pointer",
+                                        _hover={"border-color": "var(--blue-6)"},
+                                        style={"transition": "all 0.12s ease"},
+                                    ),
+                                ),
+                                # Confirm bar for search results
+                                rx.cond(
+                                    FinetuneState.hub_selected_ids.length() > 0,
+                                    rx.hstack(
+                                        rx.text(
+                                            FinetuneState.hub_selected_ids.length().to_string()
+                                            + " dataset(s) selected",
+                                            font_size="0.84rem",
+                                            font_weight="500",
+                                            color="var(--blue-11)",
+                                        ),
+                                        rx.button(
+                                            "Use selected →",
+                                            size="2",
+                                            color_scheme="blue",
+                                            on_click=FinetuneState.confirm_hub_selection,
+                                        ),
+                                        justify="between",
+                                        align="center",
+                                        width="100%",
+                                        padding="10px 14px",
+                                        border_radius="8px",
+                                        background="var(--blue-3)",
+                                        border="1px solid var(--blue-6)",
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                spacing="2",
+                                width="100%",
+                            ),
+                            rx.text(
+                                "No results found.",
+                                font_size="0.83rem",
+                                color="var(--gray-10)",
+                                padding="8px 0",
+                            ),
+                        ),
+                        # Intent-aware recommended datasets
+                        rx.vstack(
+                            rx.hstack(
+                                rx.text(
+                                    "Recommended for your intent",
+                                    font_size="0.75rem",
+                                    font_weight="600",
+                                    color="var(--gray-9)",
+                                    letter_spacing="0.04em",
+                                ),
+                                rx.cond(
+                                    FinetuneState.hub_is_loading_recs,
+                                    rx.spinner(size="1"),
+                                    rx.fragment(),
+                                ),
+                                spacing="2",
+                                align="center",
+                            ),
+                            rx.cond(
+                                FinetuneState.hub_recommended.length() > 0,
+                                rx.vstack(
+                                    rx.grid(
+                                        rx.foreach(
+                                            FinetuneState.hub_recommended,
+                                            lambda r: rx.box(
+                                                rx.vstack(
+                                                    # Header: org avatar + dataset id + check
+                                                    rx.hstack(
+                                                        _dataset_avatar(r.org_logo, 28),
+                                                        rx.vstack(
+                                                            rx.text(
+                                                                r.id,
+                                                                font_size="0.8rem",
+                                                                font_weight="700",
+                                                                color="var(--gray-12)",
+                                                                no_of_lines=1,
+                                                            ),
+                                                            rx.cond(
+                                                                r.size_category != "",
+                                                                rx.badge(
+                                                                    r.size_category,
+                                                                    size="1",
+                                                                    variant="soft",
+                                                                    color_scheme="gray",
+                                                                ),
+                                                                rx.fragment(),
+                                                            ),
+                                                            spacing="1",
+                                                            align_items="start",
+                                                            flex="1",
+                                                        ),
+                                                        rx.cond(
+                                                            FinetuneState.hub_selected_ids.contains(
+                                                                r.id
+                                                            ),
+                                                            rx.box(
+                                                                rx.icon(
+                                                                    "check",
+                                                                    size=11,
+                                                                    color="white",
+                                                                ),
+                                                                width="20px",
+                                                                height="20px",
+                                                                border_radius="50%",
+                                                                background="var(--blue-9)",
+                                                                display="flex",
+                                                                align_items="center",
+                                                                justify_content="center",
+                                                                flex_shrink="0",
+                                                            ),
+                                                            rx.box(
+                                                                width="20px",
+                                                                height="20px",
+                                                                border_radius="50%",
+                                                                border="1.5px solid var(--gray-5)",
+                                                                flex_shrink="0",
+                                                            ),
+                                                        ),
+                                                        spacing="2",
+                                                        align="center",
+                                                        width="100%",
+                                                    ),
+                                                    # Description
+                                                    rx.cond(
+                                                        r.description != "",
+                                                        rx.text(
+                                                            r.description,
+                                                            font_size="0.74rem",
+                                                            color="var(--gray-10)",
+                                                            no_of_lines=3,
+                                                            line_height="1.45",
+                                                        ),
+                                                        rx.fragment(),
+                                                    ),
+                                                    # Task tags
+                                                    rx.cond(
+                                                        r.tags.length() > 0,
+                                                        rx.hstack(
+                                                            rx.foreach(
+                                                                r.tags,
+                                                                lambda t: rx.badge(
+                                                                    t,
+                                                                    size="1",
+                                                                    variant="soft",
+                                                                    color_scheme="blue",
+                                                                ),
+                                                            ),
+                                                            spacing="1",
+                                                            wrap="wrap",
+                                                        ),
+                                                        rx.fragment(),
+                                                    ),
+                                                    # Footer: download + likes stats
+                                                    rx.hstack(
+                                                        rx.icon(
+                                                            "download",
+                                                            size=11,
+                                                            color="var(--gray-9)",
+                                                        ),
+                                                        rx.text(
+                                                            r.downloads.to_string(),
+                                                            font_size="0.72rem",
+                                                            color="var(--gray-9)",
+                                                        ),
+                                                        rx.icon(
+                                                            "heart",
+                                                            size=11,
+                                                            color="var(--gray-9)",
+                                                        ),
+                                                        rx.text(
+                                                            r.likes.to_string(),
+                                                            font_size="0.72rem",
+                                                            color="var(--gray-9)",
+                                                        ),
+                                                        spacing="1",
+                                                        align="center",
+                                                    ),
+                                                    spacing="2",
+                                                    align_items="start",
+                                                ),
+                                                on_click=FinetuneState.toggle_hub_selection(r.id),
+                                                padding="14px",
+                                                border=rx.cond(
+                                                    FinetuneState.hub_selected_ids.contains(r.id),
+                                                    "2px solid var(--blue-8)",
+                                                    "1.5px solid var(--gray-4)",
+                                                ),
+                                                border_radius="10px",
+                                                background=rx.cond(
+                                                    FinetuneState.hub_selected_ids.contains(r.id),
+                                                    "var(--blue-2)",
+                                                    "var(--gray-1)",
+                                                ),
+                                                cursor="pointer",
+                                                _hover={"border-color": "var(--blue-6)"},
+                                                style={"transition": "all 0.12s ease"},
+                                            ),
+                                        ),
+                                        columns="2",
+                                        spacing="3",
+                                        width="100%",
+                                    ),
+                                    # Floating confirm bar
+                                    rx.cond(
+                                        FinetuneState.hub_selected_ids.length() > 0,
+                                        rx.hstack(
+                                            rx.text(
+                                                FinetuneState.hub_selected_ids.length().to_string()
+                                                + " dataset(s) selected",
+                                                font_size="0.84rem",
+                                                font_weight="500",
+                                                color="var(--blue-11)",
+                                            ),
+                                            rx.button(
+                                                "Use selected →",
+                                                size="2",
+                                                color_scheme="blue",
+                                                on_click=FinetuneState.confirm_hub_selection,
+                                            ),
+                                            justify="between",
+                                            align="center",
+                                            width="100%",
+                                            padding="10px 14px",
+                                            border_radius="8px",
+                                            background="var(--blue-3)",
+                                            border="1px solid var(--blue-6)",
+                                        ),
+                                        rx.fragment(),
+                                    ),
+                                    spacing="3",
+                                    width="100%",
+                                ),
+                                rx.cond(
+                                    FinetuneState.hub_is_loading_recs,
+                                    rx.fragment(),
+                                    rx.text(
+                                        "Click the HF Hub tab to load recommendations",
+                                        font_size="0.83rem",
+                                        color="var(--gray-9)",
+                                        padding="8px 0",
+                                    ),
+                                ),
+                            ),
+                            spacing="2",
+                            width="100%",
+                        ),
                     ),
                     spacing="3",
+                    width="100%",
                 ),
             ),
             spacing="2",
@@ -531,12 +938,21 @@ def _step3() -> rx.Component:
         _section_heading("Add your training data"),
         rx.cond(FinetuneState.is_dpo, _dpo_format_card(), rx.fragment()),
         rx.hstack(
-            _data_mode_btn("upload", "Upload a file ✓", "upload"),
-            rx.badge("Recommended", color_scheme="green", size="1", variant="soft"),
-            _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
-            _data_mode_btn("generate", "Generate with AI ✨", "sparkles"),
-            spacing="2",
+            _data_mode_btn("upload", "Upload file", "upload"),
+            _seg_btn(
+                "hub_dataset",
+                _hf_icon(16),
+                rx.text("HF Hub dataset", font_size="0.82rem", font_weight="500"),
+                extra_event=FinetuneState.load_hub_recommendations,
+            ),
+            _data_mode_btn("generate", "Generate with AI", "sparkles"),
+            spacing="0",
+            padding="3px",
+            border_radius="8px",
+            border="1px solid var(--gray-5)",
+            background="var(--gray-3)",
             margin_bottom="16px",
+            display="inline-flex",
         ),
         rx.match(
             FinetuneState.data_source,

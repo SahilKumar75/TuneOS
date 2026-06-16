@@ -154,6 +154,16 @@ class DatasetRow(BaseModel):
     output: str = ""
 
 
+class HubSearchResult(BaseModel):
+    id: str = ""
+    downloads: int = 0
+    likes: int = 0
+    description: str = ""
+    tags: list[str] = []
+    size_category: str = ""
+    org_logo: str = ""  # GitHub avatar URL for the org
+
+
 class ChatMessage(BaseModel):
     role: str = "user"
     content: str = ""
@@ -241,7 +251,7 @@ class FinetuneState(rx.State):
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
     intent_description: str = ""  # project description
-    training_goal_help_error: bool = False
+    training_goal_help_error: str = ""
     intent_request_volume: str = ""  # expected request volume
     intent_accuracy_req: str = ""  # accuracy requirements
 
@@ -294,6 +304,16 @@ class FinetuneState(rx.State):
 
     # Hub column auto-detection flag
     hub_col_auto_detected: bool = False
+
+    # Hub search
+    hub_search_query: str = ""
+    hub_search_results: list[HubSearchResult] = []
+    hub_is_searching: bool = False
+    # Hub recommendations (intent-aware, fetched from HF API)
+    hub_recommended: list[HubSearchResult] = []
+    hub_is_loading_recs: bool = False
+    # Multi-select
+    hub_selected_ids: list[str] = []
 
     # DPO column mapping (used when training_mode == "dpo")
     dpo_prompt_col: str = "prompt"
@@ -1220,21 +1240,26 @@ class FinetuneState(rx.State):
 
     @rx.event
     def ask_training_goal_help(self):
-        """Validate project fields, then inject a context-rich prompt into the chat panel."""
+        """Validate all project fields are filled, then inject a context-rich prompt."""
         from app.state.app_state import AppState
 
-        has_any = bool(
-            self.intent_project_name.strip()
-            or self.intent_description.strip()
-            or self.intent_use_for
-            or self.intent_domain
-            or self.intent_task_type
-        )
-        if not has_any:
-            self.training_goal_help_error = True
+        missing = []
+        if not self.intent_project_name.strip():
+            missing.append("Project Name")
+        if not self.intent_description.strip():
+            missing.append("Description")
+        if not self.intent_use_for:
+            missing.append("Use Case")
+        if not self.intent_domain:
+            missing.append("Domain")
+        if not self.intent_task_type:
+            missing.append("Task Type")
+
+        if missing:
+            self.training_goal_help_error = "Please fill: " + ", ".join(missing)
             return
 
-        self.training_goal_help_error = False
+        self.training_goal_help_error = ""
 
         parts = []
         if self.selected_model_id:
@@ -1272,13 +1297,14 @@ class FinetuneState(rx.State):
     @rx.event
     async def intent_next_phase(self):
         if self.intent_phase == 1:
-            # Moving from Phase A to Phase B - generate personalized questions
+            # Advance to Phase B immediately so the loader renders, then generate
+            self.intent_phase = 2
+            yield
             async for update in self._generate_personalized_questions():
                 yield update
         elif self.intent_phase == 2:
             self._generate_intent_md()
-        if self.intent_phase < 3:
-            self.intent_phase += 1
+            self.intent_phase = 3
             yield
 
     @rx.event
@@ -1320,7 +1346,8 @@ class FinetuneState(rx.State):
         self.intent_is_custom = is_custom
 
         # Update live plan immediately
-        await self._update_live_plan()
+        async for _ in self._update_live_plan():
+            yield
 
         # Auto-advance focus and scroll to next question
         if self.intent_question_idx == idx and idx < len(self.intent_answers) - 1:
@@ -1502,10 +1529,11 @@ Return ONLY valid JSON, no other text:
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        "HTTP-Referer": "https://tuneos.app",
                         "X-Title": "TuneOS Intent Questions",
                     },
                     json={
-                        "model": "deepseek/deepseek-v4-flash:free",
+                        "model": "google/gemma-4-31b-it:free",
                         "messages": [
                             {
                                 "role": "system",
@@ -1620,10 +1648,11 @@ Write ONLY the summary, no other text."""
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        "HTTP-Referer": "https://tuneos.app",
                         "X-Title": "TuneOS Plan Update",
                     },
                     json={
-                        "model": "deepseek/deepseek-v4-flash:free",
+                        "model": "google/gemma-4-31b-it:free",
                         "messages": [
                             {
                                 "role": "system",
@@ -1665,6 +1694,184 @@ Write ONLY the summary, no other text."""
     def set_hub_dataset_id(self, dataset_id: str):
         self.hub_dataset_id = dataset_id
         self.data_source = "hub_dataset"
+        self.hub_search_query = ""
+        self.hub_search_results = []
+
+    @rx.event
+    async def search_hub_datasets(self, query: str):
+        self.hub_search_query = query
+        if not query.strip():
+            self.hub_search_results = []
+            self.hub_is_searching = False
+            yield
+            return
+        self.hub_is_searching = True
+        yield
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    "https://huggingface.co/api/datasets",
+                    params={"search": query, "limit": 8, "sort": "downloads"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.hub_search_results = [
+                        HubSearchResult(
+                            id=d.get("id", ""),
+                            downloads=d.get("downloads", 0),
+                            likes=d.get("likes", 0),
+                            description=(d.get("description") or "")[:120],
+                            org_logo=f"https://github.com/{d.get('id', '').split('/')[0]}.png?size=64"
+                            if "/" in (d.get("id") or "")
+                            else "",
+                        )
+                        for d in data
+                        if d.get("id")
+                    ]
+        except Exception:
+            self.hub_search_results = []
+        self.hub_is_searching = False
+        yield
+
+    @rx.event
+    async def load_hub_recommendations(self):
+        """Fetch intent-aware dataset recommendations from HF API."""
+        _DOMAIN_POOL: dict[str, list[str]] = {
+            "finance": [
+                "gbharti/finance-alpaca",
+                "nickmuchi/financial-classification",
+                "FinGPT/fingpt-sentiment-train",
+            ],
+            "healthcare": [
+                "medalpaca/medical_meadow_medical_flashcards",
+                "medalpaca/medical_meadow_wikidoc",
+                "lavita/medical-qa-datasets",
+            ],
+            "legal": ["pile-of-law/pile-of-law", "joelniklaus/legal_case_document_summarization"],
+            "education": ["HuggingFaceH4/ultrachat_200k", "camel-ai/math"],
+            "creative": ["teknium/OpenHermes-2.5", "jondurbin/airoboros-gpt4-1.4.1"],
+            "technology": [
+                "sahil2801/CodeAlpaca-20k",
+                "iamtarun/python_code_instructions_18k_alpaca",
+            ],
+            "ecommerce": ["tatsu-lab/alpaca", "databricks/databricks-dolly-15k"],
+            "customer_service": [
+                "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+                "HuggingFaceH4/ultrachat_200k",
+            ],
+        }
+        _MODE_POOL: dict[str, list[str]] = {
+            "dpo": [
+                "Anthropic/hh-rlhf",
+                "HuggingFaceH4/ultrafeedback_binarized",
+                "Intel/orca_dpo_pairs",
+            ],
+            "kd": ["microsoft/orca-math-word-problems-200k", "HuggingFaceH4/ultrachat_200k"],
+        }
+        _TASK_POOL: dict[str, list[str]] = {
+            "code": ["sahil2801/CodeAlpaca-20k", "nampdn-ai/tiny-codes"],
+            "text": ["tatsu-lab/alpaca", "teknium/OpenHermes-2.5"],
+        }
+        _FALLBACK = [
+            "tatsu-lab/alpaca",
+            "databricks/databricks-dolly-15k",
+            "teknium/OpenHermes-2.5",
+            "HuggingFaceH4/ultrachat_200k",
+            "Open-Orca/OpenOrca",
+            "sahil2801/CodeAlpaca-20k",
+        ]
+
+        self.hub_is_loading_recs = True
+        yield
+
+        # Build ordered candidate list: mode → domain → task → fallback
+        candidates: list[str] = []
+        candidates += _MODE_POOL.get(self.training_mode, [])
+        candidates += _DOMAIN_POOL.get(self.intent_domain, [])
+        task_key = "code" if "code" in (self.intent_task_type or "").lower() else "text"
+        candidates += _TASK_POOL.get(task_key, [])
+        seen: set[str] = set(candidates)
+        ordered = list(dict.fromkeys(candidates))  # deduplicate preserving order
+        for f in _FALLBACK:
+            if f not in seen and len(ordered) < 6:
+                ordered.append(f)
+                seen.add(f)
+
+        results: list[HubSearchResult] = []
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            for ds_id in ordered[:6]:
+                try:
+                    resp = await client.get(f"https://huggingface.co/api/datasets/{ds_id}")
+                    if resp.status_code == 200:
+                        d = resp.json()
+                        raw_tags: list[str] = d.get("tags") or []
+                        size_cat = next(
+                            (
+                                t.split(":")[-1]
+                                for t in raw_tags
+                                if t.startswith("size_categories:")
+                            ),
+                            "",
+                        )
+                        task_tags = [
+                            t.split(":")[-1].replace("-", " ")
+                            for t in raw_tags
+                            if t.startswith("task_categories:") or t.startswith("task_ids:")
+                        ][:3]
+                        desc = (d.get("description") or "").strip()
+                        # Trim to first sentence or 180 chars
+                        if desc:
+                            first = desc.split(". ")[0]
+                            desc = first if len(first) < 180 else desc[:180].rstrip() + "…"
+                        org = ds_id.split("/")[0] if "/" in ds_id else ""
+                        results.append(
+                            HubSearchResult(
+                                id=ds_id,
+                                downloads=d.get("downloads", 0),
+                                likes=d.get("likes", 0),
+                                description=desc,
+                                tags=task_tags,
+                                size_category=size_cat,
+                                org_logo=f"https://github.com/{org}.png?size=64" if org else "",
+                            )
+                        )
+                    else:
+                        org = ds_id.split("/")[0] if "/" in ds_id else ""
+                        results.append(
+                            HubSearchResult(
+                                id=ds_id,
+                                org_logo=f"https://github.com/{org}.png?size=64" if org else "",
+                            )
+                        )
+                except Exception:
+                    org = ds_id.split("/")[0] if "/" in ds_id else ""
+                    results.append(
+                        HubSearchResult(
+                            id=ds_id,
+                            org_logo=f"https://github.com/{org}.png?size=64" if org else "",
+                        )
+                    )
+
+        self.hub_recommended = results
+        self.hub_is_loading_recs = False
+        yield
+
+    @rx.event
+    def toggle_hub_selection(self, ds_id: str):
+        selected = list(self.hub_selected_ids)
+        if ds_id in selected:
+            selected.remove(ds_id)
+        else:
+            selected.append(ds_id)
+        self.hub_selected_ids = selected
+
+    @rx.event
+    def confirm_hub_selection(self):
+        if self.hub_selected_ids:
+            self.hub_dataset_id = self.hub_selected_ids[0]
+            self.hub_selected_ids = []
+            self.hub_search_query = ""
+            self.hub_search_results = []
 
     @rx.event
     def set_hub_instruction_col(self, value: str):

@@ -160,7 +160,7 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                rx.divider(margin="4px 0"),
+                rx.divider(margin="0"),
                 # Context filters
                 _filter_row(
                     "Use Case",
@@ -201,7 +201,7 @@ def _phase_a() -> rx.Component:
                     ],
                     "What kind of output?",
                 ),
-                spacing="5",
+                spacing="3",
                 width="100%",
             ),
             style={
@@ -246,33 +246,83 @@ _LOADING_MESSAGES = [
 ]
 
 
-def _loading_state() -> rx.Component:
-    """TuneOS brand loader shown while AI generates questions."""
-    return _card(
+def _skeleton_question_card() -> rx.Component:
+    """Placeholder skeleton card mimicking a real question card."""
+    shimmer = "linear-gradient(90deg, var(--gray-3) 25%, var(--gray-4) 50%, var(--gray-3) 75%)"
+    return rx.box(
         rx.vstack(
-            metaball_loader(80, color=True),
-            rx.text(
-                "Generating personalised questions",
-                font_size="1rem",
-                font_weight="600",
-                color="var(--gray-12)",
+            # question title bar
+            rx.box(
+                height="14px",
+                width="65%",
+                border_radius="6px",
+                background=shimmer,
+                background_size="200% 100%",
+                style={"animation": "shimmer 1.5s infinite linear"},
             ),
-            rx.text(
-                "Based on your model, technique and project context",
-                font_size="0.82rem",
-                color="var(--gray-10)",
-                text_align="center",
+            rx.vstack(
+                *[
+                    rx.box(
+                        height="38px",
+                        width="100%",
+                        border_radius="8px",
+                        background=shimmer,
+                        background_size="200% 100%",
+                        style={"animation": f"shimmer 1.5s {i * 0.15}s infinite linear"},
+                    )
+                    for i in range(3)
+                ],
+                spacing="2",
+                width="100%",
             ),
             spacing="3",
-            align="center",
-            padding="40px 24px",
             width="100%",
         ),
-        style={
-            "border-radius": "16px",
-            "border": "1px solid var(--gray-4)",
-            "box-shadow": "0 2px 12px rgba(0,0,0,0.06)",
-        },
+        padding="20px",
+        border_radius="12px",
+        border="1px solid var(--gray-4)",
+        width="100%",
+    )
+
+
+def _loading_state() -> rx.Component:
+    """Skeleton loader shown while AI generates questions."""
+    return rx.vstack(
+        # header + spinner
+        rx.hstack(
+            metaball_loader(36, color=True),
+            rx.vstack(
+                rx.text(
+                    "Generating your questions",
+                    font_size="0.95rem",
+                    font_weight="600",
+                    color="var(--gray-12)",
+                ),
+                rx.text(
+                    "Tailoring 3 questions to your model, technique & project context — please wait",
+                    font_size="0.78rem",
+                    color="var(--gray-10)",
+                ),
+                spacing="1",
+                align_items="start",
+            ),
+            align="center",
+            spacing="3",
+            width="100%",
+            padding="16px 20px",
+            border_radius="12px",
+            background="var(--gray-2)",
+            border="1px solid var(--gray-4)",
+        ),
+        # 3 skeleton question cards
+        _skeleton_question_card(),
+        _skeleton_question_card(),
+        _skeleton_question_card(),
+        rx.html(
+            "<style>@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>"
+        ),
+        spacing="3",
+        width="100%",
     )
 
 
@@ -612,8 +662,6 @@ def _phase_c() -> rx.Component:
                 rx.box(height="8px"),
                 rx.box(
                     rx.markdown(FinetuneState.intent_md),
-                    max_height="380px",
-                    overflow_y="auto",
                     padding="4px",
                     width="100%",
                 ),
@@ -735,9 +783,9 @@ def _training_goal_card() -> rx.Component:
             rx.spacer(),
             rx.hstack(
                 rx.cond(
-                    FinetuneState.training_goal_help_error,
+                    FinetuneState.training_goal_help_error != "",
                     rx.text(
-                        "Fill in project details first",
+                        FinetuneState.training_goal_help_error,
                         font_size="0.75rem",
                         font_weight="500",
                         color="var(--red-10)",

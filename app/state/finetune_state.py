@@ -1507,7 +1507,7 @@ Return ONLY valid JSON, no other text:
                         "X-Title": "TuneOS Intent Questions",
                     },
                     json={
-                        "model": "deepseek/deepseek-chat:free",
+                        "model": "deepseek/deepseek-r1:free",
                         "messages": [
                             {
                                 "role": "system",
@@ -1626,7 +1626,7 @@ Write ONLY the summary, no other text."""
                         "X-Title": "TuneOS Plan Update",
                     },
                     json={
-                        "model": "deepseek/deepseek-chat:free",
+                        "model": "deepseek/deepseek-r1:free",
                         "messages": [
                             {
                                 "role": "system",

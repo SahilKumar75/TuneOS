@@ -214,6 +214,19 @@ class FinetuneState(rx.State):
     model_bio: str = ""  # first paragraph from model README
     model_fetch_error: str = ""  # debug: last error from fetch_model_info
     is_fetching_model_info: bool = False
+    model_license: str = ""  # e.g. "Apache 2.0"
+    model_library: str = ""  # e.g. "Transformers"
+    model_safetensors: bool = False
+    model_requires_token: bool = False  # True when HF API reports model is gated
+    model_params: str = ""  # e.g. "2.5B"
+    model_formats: str = ""  # e.g. "GGUF, Safetensors"
+    model_architecture: str = ""  # e.g. "GemmaForCausalLM"
+    # Model search
+    model_search_query: str = ""
+    model_search_source: str = "hf"  # "hf" | "github"
+    model_search_results: list[dict] = []
+    is_searching_models: bool = False
+    show_local_upload: bool = False
 
     # ── Step 2: Intent ────────────────────────────────────────────
     user_intent: str = ""  # written by approve_intent() for API compat
@@ -228,6 +241,7 @@ class FinetuneState(rx.State):
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
     intent_description: str = ""  # project description
+    training_goal_help_error: bool = False
     intent_request_volume: str = ""  # expected request volume
     intent_accuracy_req: str = ""  # accuracy requirements
 
@@ -576,8 +590,94 @@ class FinetuneState(rx.State):
         self.custom_model_str = ""
         self.model_url_error = ""
         self.step1_show_picker = False
+        self.model_search_query = ""
+        self.model_search_results = []
         self._clear_model_preview()
         return FinetuneState.fetch_model_info
+
+    @rx.event
+    def set_model_search_source(self, v: str | list[str]):
+        self.model_search_source = v if isinstance(v, str) else (v[0] if v else "hf")
+        self.model_search_results = []
+        if self.model_search_query.strip():
+            return FinetuneState.do_model_search
+
+    @rx.event
+    def set_model_search_query(self, v: str):
+        self.model_search_query = v
+        if not v.strip():
+            self.model_search_results = []
+            self.is_searching_models = False
+            return
+        return FinetuneState.do_model_search
+
+    @rx.event
+    def toggle_local_upload(self):
+        self.show_local_upload = not self.show_local_upload
+
+    @rx.event(background=True)
+    async def do_model_search(self):
+        async with self:
+            query = self.model_search_query
+            source = self.model_search_source
+            if not query.strip():
+                self.is_searching_models = False
+                return
+            self.is_searching_models = True
+
+        try:
+            import httpx
+
+            results: list[dict] = []
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                if source == "hf":
+                    resp = await client.get(
+                        "https://huggingface.co/api/models",
+                        params={
+                            "search": query,
+                            "limit": 8,
+                            "sort": "downloads",
+                            "direction": -1,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        for m in resp.json()[:8]:
+                            mid = m.get("modelId") or m.get("id", "")
+                            if not mid:
+                                continue
+                            dl = m.get("downloads", 0) or 0
+                            dl_str = (
+                                f"{dl / 1_000_000:.1f}M"
+                                if dl >= 1_000_000
+                                else f"{dl // 1_000}k"
+                                if dl >= 1_000
+                                else str(dl)
+                            ) if dl else ""
+                            results.append({
+                                "id": mid,
+                                "downloads": dl_str,
+                                "pipeline": (m.get("pipeline_tag") or "").replace("-", " ").title(),
+                            })
+                elif source == "github":
+                    resp = await client.get(
+                        "https://api.github.com/search/repositories",
+                        params={"q": f"{query} topic:llm", "sort": "stars", "per_page": 8},
+                        headers={"Accept": "application/vnd.github+json"},
+                    )
+                    if resp.status_code == 200:
+                        for r in resp.json().get("items", [])[:8]:
+                            stars = r.get("stargazers_count", 0) or 0
+                            results.append({
+                                "id": r.get("full_name", ""),
+                                "downloads": f"{stars // 1_000}k" if stars >= 1_000 else str(stars),
+                                "pipeline": "GitHub",
+                            })
+        except Exception:
+            results = []
+
+        async with self:
+            self.model_search_results = results
+            self.is_searching_models = False
 
     def _clear_model_preview(self):
         self.model_downloads = ""
@@ -590,6 +690,13 @@ class FinetuneState(rx.State):
         self.model_last_updated = ""
         self.model_bio = ""
         self.model_fetch_error = ""
+        self.model_license = ""
+        self.model_library = ""
+        self.model_safetensors = False
+        self.model_requires_token = False
+        self.model_params = ""
+        self.model_formats = ""
+        self.model_architecture = ""
 
     @rx.event
     def select_preset(self, model_id: str):
@@ -740,8 +847,8 @@ class FinetuneState(rx.State):
         self.seed_examples = [s for s in self.seed_examples if s.id != seed_id]
 
     @rx.event
-    def set_quality_threshold(self, v: float):
-        self.generation_quality_threshold = v
+    def set_quality_threshold(self, v: list[float]):
+        self.generation_quality_threshold = v[0] if v else 0.0
 
     @rx.event
     def set_export_format(self, v: str):
@@ -782,11 +889,8 @@ class FinetuneState(rx.State):
             pass
 
     @rx.event
-    def set_kd_alpha(self, v: str):
-        try:
-            self.kd_alpha = float(v)
-        except ValueError:
-            pass
+    def set_kd_alpha(self, v: list[float]):
+        self.kd_alpha = v[0] if v else 0.5
 
     @rx.event
     def set_model_source(self, source: str):
@@ -951,10 +1055,43 @@ class FinetuneState(rx.State):
             raw_tags = data.get("tags") or []
             tags = [t for t in raw_tags if t.lower() in keep][:4]
 
-            # Architecture / config details
+            # Library, license from HF API
+            lib = (data.get("library_name") or "").replace("-", " ").title()
+            license_tag = next((t for t in raw_tags if t.startswith("license:")), "")
+            lic = license_tag.replace("license:", "").replace("-", " ").title() if license_tag else ""
+
+            # File formats from siblings (SafeTensors / GGUF / PyTorch)
+            siblings = data.get("siblings") or []
+            file_types: set[str] = set()
+            for s in siblings:
+                fname = s.get("rfilename", "")
+                if fname.endswith(".safetensors"):
+                    file_types.add("SafeTensors")
+                elif fname.endswith(".gguf"):
+                    file_types.add("GGUF")
+                elif fname.endswith(".bin"):
+                    file_types.add("PyTorch")
+            has_safetensors = "SafeTensors" in file_types
+            formats_str = ", ".join(sorted(file_types)) if file_types else ""
+
+            # Architecture / config details (moved up — needed below)
             cfg = data.get("config") or {}
             model_type_raw = cfg.get("model_type") or ""
             ctx = cfg.get("max_position_embeddings") or cfg.get("max_seq_len") or 0
+
+            # Architecture class (more specific than model_type)
+            arch_list = cfg.get("architectures") or []
+            architecture = arch_list[0] if arch_list else ""
+
+            # Parameter count from safetensors metadata
+            st_info = data.get("safetensors") or {}
+            params_total = st_info.get("total") or 0
+            if params_total > 1_000_000_000:
+                params_str = f"{params_total / 1_000_000_000:.1f}B params"
+            elif params_total > 1_000_000:
+                params_str = f"{params_total / 1_000_000:.0f}M params"
+            else:
+                params_str = ""
 
             # Languages from card metadata
             card = data.get("cardData") or {}
@@ -992,6 +1129,13 @@ class FinetuneState(rx.State):
                 self.model_languages = lang_str
                 self.model_last_updated = last_mod
                 self.model_bio = bio
+                self.model_license = lic
+                self.model_library = lib
+                self.model_safetensors = has_safetensors
+                self.model_formats = formats_str
+                self.model_architecture = architecture
+                self.model_params = params_str
+                self.model_requires_token = bool(data.get("gated") or data.get("private"))
                 self.model_fetch_error = ""
                 self.is_fetching_model_info = False
         except Exception as _exc:
@@ -1059,6 +1203,49 @@ class FinetuneState(rx.State):
     @rx.event
     def set_intent_description(self, v: str):
         self.intent_description = v
+
+    @rx.event
+    def ask_training_goal_help(self):
+        """Validate project fields, then inject a context-rich prompt into the chat panel."""
+        from app.state.app_state import AppState
+
+        has_any = bool(
+            self.intent_project_name.strip()
+            or self.intent_description.strip()
+            or self.intent_use_for
+            or self.intent_domain
+            or self.intent_task_type
+        )
+        if not has_any:
+            self.training_goal_help_error = True
+            return
+
+        self.training_goal_help_error = False
+
+        parts = []
+        if self.selected_model_id:
+            parts.append(f"Model: {self.selected_model_id}")
+        if self.intent_project_name.strip():
+            parts.append(f"Project: {self.intent_project_name.strip()}")
+        if self.intent_description.strip():
+            parts.append(f"Description: {self.intent_description.strip()}")
+        if self.intent_use_for:
+            parts.append(f"Use case: {self.intent_use_for}")
+        if self.intent_domain:
+            parts.append(f"Domain: {self.intent_domain}")
+        if self.intent_task_type:
+            parts.append(f"Task type: {self.intent_task_type}")
+
+        context = "\n".join(parts)
+        prompt = (
+            f"{context}\n\n"
+            "Based only on the above, tell me which single training goal — "
+            "Supervised Fine-Tuning (SFT), Preference Alignment (DPO), or Knowledge Distillation — "
+            "is best for my project, and explain why in 2–3 sentences. "
+            "Do not explain all three. Just give me the winner and the reason."
+        )
+        yield AppState.set_chat_input(prompt)
+        yield AppState.send_chat_message
 
     @rx.event
     def set_intent_request_volume(self, v: str):

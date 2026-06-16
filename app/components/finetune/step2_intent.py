@@ -35,41 +35,26 @@ def _filter_chip(
     label: str,
     current_var,
     event_handler,
-    color: str = "blue",
+    color: str = "blue",  # kept for compat, ignored
 ) -> rx.Component:
-    """iOS-style filter chip with smooth animations."""
     is_selected = current_var == value
     return rx.box(
-        rx.text(label, font_weight="500"),
+        rx.text(label, font_size="0.83rem", font_weight="500"),
         cursor="pointer",
         on_click=event_handler(value),
-        padding="10px 18px",
-        border_radius="20px",
-        background=rx.cond(
-            is_selected,
-            f"var(--{color}-9)",
-            f"var(--{color}-3)",
-        ),
-        color=rx.cond(
-            is_selected,
-            "white",
-            f"var(--{color}-11)",
-        ),
+        padding="7px 14px",
+        border_radius="8px",
+        background=rx.cond(is_selected, "var(--blue-9)", "var(--gray-3)"),
+        color=rx.cond(is_selected, "white", "var(--gray-11)"),
         border=rx.cond(
             is_selected,
-            f"2px solid var(--{color}-9)",
-            f"2px solid var(--{color}-6)",
+            "1.5px solid var(--blue-9)",
+            "1.5px solid var(--gray-5)",
         ),
         style={
-            "transition": "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            "transition": "all 0.15s ease",
             "user-select": "none",
-            ":hover": {
-                "transform": "translateY(-2px)",
-                "box-shadow": "0 4px 12px rgba(0,0,0,0.1)",
-            },
-            ":active": {
-                "transform": "translateY(0)",
-            },
+            ":hover": {"border-color": "var(--blue-7)", "color": "var(--gray-12)"},
         },
     )
 
@@ -105,34 +90,20 @@ def _filter_row(row_label: str, chips: list, subtitle: str = "") -> rx.Component
 def _phase_a() -> rx.Component:
     """Phase A: iOS-style intent collection with chips and text inputs."""
     return rx.vstack(
-        rx.hstack(
-            rx.box(
-                rx.text("1", color="white", font_weight="600", font_size="0.95rem"),
-                width="32px",
-                height="32px",
-                border_radius="50%",
-                background="var(--blue-9)",
-                display="flex",
-                align_items="center",
-                justify_content="center",
+        rx.vstack(
+            rx.text(
+                "Tell us about your project",
+                font_size="1.15rem",
+                font_weight="600",
+                color="var(--gray-12)",
             ),
-            rx.vstack(
-                rx.text(
-                    "Tell us about your project",
-                    font_size="1.15rem",
-                    font_weight="600",
-                    color="var(--gray-12)",
-                ),
-                rx.text(
-                    "All fields are optional — we'll generate personalized questions based on what you share",
-                    font_size="0.85rem",
-                    color="var(--gray-10)",
-                ),
-                spacing="1",
-                align="start",
+            rx.text(
+                "All fields are optional — we'll generate personalized questions based on what you share",
+                font_size="0.85rem",
+                color="var(--gray-10)",
             ),
-            spacing="3",
-            align="start",
+            spacing="1",
+            align_items="flex-start",
             margin_bottom="16px",
         ),
         _card(
@@ -150,9 +121,10 @@ def _phase_a() -> rx.Component:
                         value=FinetuneState.intent_project_name,
                         on_change=FinetuneState.set_intent_project_name,
                         size="3",
+                        width="100%",
                         style={
                             "border-radius": "10px",
-                            "border": "2px solid var(--gray-6)",
+                            "border": "1.5px solid var(--gray-5)",
                             ":focus": {
                                 "border-color": "var(--blue-8)",
                                 "box-shadow": "0 0 0 3px var(--blue-a3)",
@@ -174,9 +146,10 @@ def _phase_a() -> rx.Component:
                         value=FinetuneState.intent_description,
                         on_change=FinetuneState.set_intent_description,
                         rows="3",
+                        width="100%",
                         style={
                             "border-radius": "10px",
-                            "border": "2px solid var(--gray-6)",
+                            "border": "1.5px solid var(--gray-5)",
                             ":focus": {
                                 "border-color": "var(--blue-8)",
                                 "box-shadow": "0 0 0 3px var(--blue-a3)",
@@ -186,47 +159,39 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                rx.divider(margin="8px 0"),
+                rx.divider(margin="4px 0"),
                 # Context filters
                 _filter_row(
                     "Use Case",
                     [
                         _filter_chip(
-                            v,
-                            lbl,
+                            v, lbl,
                             FinetuneState.intent_use_for,
                             FinetuneState.set_intent_use_for,
-                            color="blue",
                         )
                         for v, lbl in _FILTER_USE_FOR
                     ],
                     "Who will use this model?",
                 ),
-                rx.divider(margin="8px 0"),
                 _filter_row(
                     "Domain",
                     [
                         _filter_chip(
-                            v,
-                            lbl,
+                            v, lbl,
                             FinetuneState.intent_domain,
                             FinetuneState.set_intent_domain,
-                            color="violet",
                         )
                         for v, lbl in _FILTER_DOMAIN
                     ],
                     "What industry or field?",
                 ),
-                rx.divider(margin="8px 0"),
                 _filter_row(
                     "Task Type",
                     [
                         _filter_chip(
-                            v,
-                            lbl,
+                            v, lbl,
                             FinetuneState.intent_task_type,
                             FinetuneState.set_intent_task_type,
-                            color="green",
                         )
                         for v, lbl in _FILTER_TASK
                     ],
@@ -651,67 +616,132 @@ def _mode_card(mode: str, icon: str, title: str, subtitle: str) -> rx.Component:
     selected = FinetuneState.training_mode == mode
     return rx.box(
         rx.vstack(
-            rx.hstack(
-                rx.icon(icon, size=18, color=rx.cond(selected, "white", "var(--blue-11)")),
-                rx.text(
-                    title,
-                    font_size="0.9rem",
-                    font_weight="600",
-                    color=rx.cond(selected, "white", "var(--gray-12)"),
+            # Icon badge
+            rx.box(
+                rx.icon(
+                    icon,
+                    size=20,
+                    color=rx.cond(selected, "white", "var(--gray-11)"),
                 ),
-                spacing="2",
-                align="center",
+                padding="10px",
+                border_radius="10px",
+                background=rx.cond(
+                    selected,
+                    "rgba(255,255,255,0.18)",
+                    "var(--gray-4)",
+                ),
+                display="inline-flex",
+                align_items="center",
+                justify_content="center",
+                style={"transition": "background 0.18s ease"},
             ),
+            # Title
+            rx.text(
+                title,
+                font_size="0.9rem",
+                font_weight="700",
+                color=rx.cond(selected, "white", "var(--gray-12)"),
+                line_height="1.3",
+                style={"transition": "color 0.18s ease"},
+            ),
+            # Subtitle
             rx.text(
                 subtitle,
                 font_size="0.78rem",
-                color=rx.cond(selected, "rgba(255,255,255,0.85)", "var(--gray-10)"),
+                color=rx.cond(selected, "rgba(255,255,255,0.75)", "var(--gray-10)"),
+                line_height="1.5",
+                style={"transition": "color 0.18s ease"},
             ),
-            spacing="2",
+            spacing="3",
             align_items="flex-start",
         ),
         on_click=FinetuneState.set_training_mode(mode),
         cursor="pointer",
-        padding="14px 16px",
-        border_radius="12px",
-        background=rx.cond(selected, "var(--blue-9)", "var(--blue-2)"),
-        border=rx.cond(selected, "2px solid var(--blue-9)", "2px solid var(--blue-6)"),
+        padding="20px",
+        border_radius="14px",
+        background=rx.cond(selected, "var(--blue-9)", "var(--gray-2)"),
+        border=rx.cond(
+            selected,
+            "2px solid var(--blue-9)",
+            "1.5px solid var(--gray-5)",
+        ),
         flex="1",
-        min_width="160px",
-        style={"transition": "all 0.18s ease"},
+        min_width="200px",
+        style={
+            "transition": "all 0.18s ease",
+            ":hover": {"border-color": "var(--gray-7)"},
+        },
     )
 
 
 def _training_goal_card() -> rx.Component:
     """Top-of-step-2 card: pick SFT / DPO / KD before answering intent questions."""
     return rx.vstack(
-        rx.text(
-            "Training goal",
-            font_size="0.9rem",
-            font_weight="700",
-            color="var(--gray-12)",
-        ),
-        rx.text(
-            "Pick the right paradigm — this gates which backend API and data format is used.",
-            font_size="0.8rem",
-            color="var(--gray-10)",
+        rx.hstack(
+            rx.vstack(
+                rx.text(
+                    "Training goal",
+                    font_size="0.9rem",
+                    font_weight="700",
+                    color="var(--gray-12)",
+                ),
+                rx.text(
+                    "Pick the right paradigm — this gates which backend API and data format is used.",
+                    font_size="0.78rem",
+                    color="var(--gray-10)",
+                ),
+                spacing="1",
+                align_items="flex-start",
+            ),
+            rx.spacer(),
+            rx.hstack(
+                rx.cond(
+                    FinetuneState.training_goal_help_error,
+                    rx.text(
+                        "Fill in project details first",
+                        font_size="0.75rem",
+                        font_weight="500",
+                        color="var(--red-10)",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.tooltip(
+                    rx.button(
+                        rx.text("?", font_size="0.8rem", font_weight="700"),
+                        on_click=FinetuneState.ask_training_goal_help,
+                        variant="soft",
+                        color_scheme="gray",
+                        size="1",
+                        width="26px",
+                        height="26px",
+                        border_radius="50%",
+                        cursor="pointer",
+                        style={"flex-shrink": "0"},
+                    ),
+                    content="Not sure? Ask the assistant",
+                ),
+                spacing="2",
+                align="center",
+            ),
+            width="100%",
+            align="center",
         ),
         rx.flex(
             _mode_card(
                 "sft",
-                "zap",
+                "book-open",
                 "Supervised Fine-Tuning",
                 "Teach the model new tasks with instruction/output pairs",
             ),
             _mode_card(
                 "dpo",
-                "thumbs-up",
+                "git-compare",
                 "Preference Alignment (DPO)",
                 "Align model to human preferences via chosen/rejected pairs",
             ),
             _mode_card(
                 "kd",
-                "layers",
+                "minimize-2",
                 "Knowledge Distillation",
                 "Compress a large teacher into a smaller student model",
             ),

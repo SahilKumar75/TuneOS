@@ -17,7 +17,7 @@ from app.styles import c
 
 def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
     is_active = FinetuneState.data_source == mode
-    return rx.button(
+    return rx.box(
         rx.hstack(
             rx.icon(icon, size=13),
             rx.text(label, font_size="0.82rem", font_weight="500"),
@@ -25,11 +25,21 @@ def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
             align="center",
         ),
         on_click=FinetuneState.set_data_source(mode),
-        variant=rx.cond(is_active, "solid", "ghost"),
-        color_scheme=rx.cond(is_active, "blue", "gray"),
-        size="2",
         cursor="pointer",
-        border_radius="7px",
+        padding="5px 12px",
+        height="32px",
+        display="flex",
+        align_items="center",
+        border_radius="6px",
+        background=rx.cond(is_active, "white", "transparent"),
+        box_shadow=rx.cond(
+            is_active,
+            "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
+            "none",
+        ),
+        color=rx.cond(is_active, "var(--gray-12)", "var(--gray-11)"),
+        font_weight=rx.cond(is_active, "600", "400"),
+        style={"transition": "all 0.15s ease", "white-space": "nowrap"},
     )
 
 
@@ -541,12 +551,13 @@ def _step3() -> rx.Component:
             _data_mode_btn("upload", "Upload file", "upload"),
             _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
             _data_mode_btn("generate", "Generate with AI", "sparkles"),
-            spacing="1",
-            padding="4px",
-            border_radius="10px",
-            border="1px solid var(--gray-4)",
-            background="var(--gray-2)",
+            spacing="0",
+            padding="3px",
+            border_radius="8px",
+            border="1px solid var(--gray-5)",
+            background="var(--gray-3)",
             margin_bottom="16px",
+            display="inline-flex",
         ),
         rx.match(
             FinetuneState.data_source,

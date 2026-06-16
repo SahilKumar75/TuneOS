@@ -10,10 +10,14 @@ import httpx
 import reflex as rx
 from pydantic import BaseModel
 
+# Dependency-free template helpers (no transformers/torch pulled into the app).
+from trainer.prompt_templates import PROMPT_TEMPLATES, auto_prompt_template_for
+
 
 class IntentQuestion(BaseModel):
     heading: str = ""
     options: list[str] = []
+
 
 _PRESET_META: dict[str, dict[str, str]] = {
     "mistralai/Mistral-7B-v0.1": {
@@ -173,6 +177,7 @@ class EpochLogEntry(BaseModel):
 
 
 class SeedExample(BaseModel):
+    id: str = ""
     instruction: str = ""
     output: str = ""
 
@@ -273,10 +278,24 @@ class FinetuneState(rx.State):
     dataset_avg_tokens: float = 0.0
     dataset_template_preview: list[str] = []
 
+    # Hub column auto-detection flag
+    hub_col_auto_detected: bool = False
+
     # DPO column mapping (used when training_mode == "dpo")
     dpo_prompt_col: str = "prompt"
     dpo_chosen_col: str = "chosen"
     dpo_rejected_col: str = "rejected"
+    dpo_column_error: str = ""
+
+    # Seed editor
+    seed_editor_open: bool = False
+    seed_editor_instruction: str = ""
+    seed_editor_output: str = ""
+
+    # Generation enhancements
+    generation_quality_threshold: float = 0.0
+    generation_export_format: str = "jsonl"
+    generation_alt_download_url: str = ""
 
     # ── Training mode & DPO / KD hyperparams ─────────────────────
     training_mode: str = "sft"  # "sft" | "dpo" | "kd"
@@ -306,7 +325,8 @@ class FinetuneState(rx.State):
     eval_split_ratio: float = 0.1
     early_stopping_patience: int = 0
     compute_backend: str = "local"  # "local" | "modal" | "hf_spaces"
-    prompt_template: str = "alpaca"  # alpaca | chatml | llama3 | phi3 | zephyr
+    prompt_template: str = "alpaca"  # auto-set from the model; see auto_prompt_template_for
+    prompt_template_user_set: bool = False  # True once the user overrides the auto choice
     packing: bool = False
     compose_adapters: bool = False
     overlay_technique: str = "lora"
@@ -336,6 +356,8 @@ class FinetuneState(rx.State):
             or (self.data_source == "generate" and bool(self.dataset_path))
             or self.data_source == "skip"
         )
+        if self.is_dpo and bool(self.dpo_column_error):
+            return False
         return has_data
 
     @rx.var
@@ -400,6 +422,10 @@ class FinetuneState(rx.State):
     def is_kd(self) -> bool:
         """True when the wizard is running a knowledge-distillation job."""
         return self.training_mode == "kd"
+
+    @rx.var
+    def hub_columns_str(self) -> str:
+        return ", ".join(self.hub_dataset_columns)
 
     @rx.var
     def is_sft(self) -> bool:
@@ -625,18 +651,101 @@ class FinetuneState(rx.State):
             # Reset to default PEFT technique when switching back to SFT
             self.selected_technique = "qlora"
 
+    def _validate_dpo_columns(self):
+        """Peek at first row of the loaded dataset and check DPO cols exist."""
+        if not self.is_dpo or not self.dataset_path:
+            self.dpo_column_error = ""
+            return
+        try:
+            path = self.dataset_path
+            cols: set[str] = set()
+            if path.endswith(".csv"):
+                import csv
+
+                with open(path, encoding="utf-8", newline="") as fh:
+                    reader = csv.DictReader(fh)
+                    cols = set(reader.fieldnames or [])
+            elif path.endswith(".json"):
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list) and data:
+                    cols = set(data[0].keys())
+                elif isinstance(data, dict):
+                    cols = set(data.keys())
+            else:
+                # JSONL (default)
+                with open(path, encoding="utf-8") as fh:
+                    first_line = fh.readline().strip()
+                cols = set(json.loads(first_line).keys())
+
+            missing = [
+                c
+                for c in [self.dpo_prompt_col, self.dpo_chosen_col, self.dpo_rejected_col]
+                if c not in cols
+            ]
+            if missing:
+                self.dpo_column_error = (
+                    f"Column(s) not found: {', '.join(missing)}. "
+                    f"Available: {', '.join(sorted(cols))}"
+                )
+            else:
+                self.dpo_column_error = ""
+        except Exception as exc:
+            self.dpo_column_error = f"Could not validate columns: {exc}"
+
     # DPO column setters
     @rx.event
     def set_dpo_prompt_col(self, v: str):
         self.dpo_prompt_col = v
+        self._validate_dpo_columns()
 
     @rx.event
     def set_dpo_chosen_col(self, v: str):
         self.dpo_chosen_col = v
+        self._validate_dpo_columns()
 
     @rx.event
     def set_dpo_rejected_col(self, v: str):
         self.dpo_rejected_col = v
+        self._validate_dpo_columns()
+
+    # ── Seed editor ───────────────────────────────────────────────
+    @rx.event
+    def toggle_seed_editor(self):
+        self.seed_editor_open = not self.seed_editor_open
+
+    @rx.event
+    def set_seed_instruction(self, v: str):
+        self.seed_editor_instruction = v
+
+    @rx.event
+    def set_seed_output(self, v: str):
+        self.seed_editor_output = v
+
+    @rx.event
+    def add_seed_example(self):
+        if self.seed_editor_instruction.strip():
+            self.seed_examples = self.seed_examples + [
+                SeedExample(
+                    id=uuid.uuid4().hex[:8],
+                    instruction=self.seed_editor_instruction,
+                    output=self.seed_editor_output,
+                )
+            ]
+            self.seed_editor_instruction = ""
+            self.seed_editor_output = ""
+
+    @rx.event
+    def remove_seed_example(self, seed_id: str):
+        self.seed_examples = [s for s in self.seed_examples if s.id != seed_id]
+
+    @rx.event
+    def set_quality_threshold(self, v: float):
+        self.generation_quality_threshold = v
+
+    @rx.event
+    def set_export_format(self, v: str):
+        self.generation_export_format = v
 
     # DPO hyperparam setters
     @rx.event
@@ -874,6 +983,11 @@ class FinetuneState(rx.State):
                 self.model_pipeline = pipeline
                 self.model_hf_tags = tags
                 self.model_type_hf = model_type_raw.title() if model_type_raw else ""
+                # Auto-tether the prompt template to the model's native chat
+                # format (unless the user has manually overridden it). Training
+                # with the wrong template silently degrades the adapter.
+                if not self.prompt_template_user_set:
+                    self.prompt_template = auto_prompt_template_for(model_type_raw, model_id, tags)
                 self.model_context_window = f"{ctx:,} tokens" if ctx else ""
                 self.model_languages = lang_str
                 self.model_last_updated = last_mod
@@ -1373,19 +1487,47 @@ Write ONLY the summary, no other text."""
             if resp.status_code == 200:
                 data = resp.json()
                 async with self:
-                    self.hub_dataset_columns = data.get("columns", [])
+                    cols = data.get("columns", [])
+                    self.hub_dataset_columns = cols
                     raw_rows = data.get("rows", [])
                     self.hub_dataset_preview = [
                         DatasetRow(instruction=r.get("instruction", ""), output=r.get("output", ""))
                         for r in raw_rows
                     ]
                     self.is_loading_hub_preview = False
-                    # Auto-detect instruction/output columns
-                    cols = data.get("columns", [])
+
+                    # Auto-detect instruction/output columns; flag when not exact match
+                    exact_match = "instruction" in cols and "output" in cols
+                    self.hub_col_auto_detected = not exact_match
                     if "instruction" in cols:
                         self.hub_dataset_instruction_col = "instruction"
+                    elif cols:
+                        self.hub_dataset_instruction_col = cols[0]
                     if "output" in cols:
                         self.hub_dataset_output_col = "output"
+                    elif len(cols) > 1:
+                        self.hub_dataset_output_col = cols[1]
+
+                    # Best-effort stats from preview rows
+                    n = len(raw_rows)
+                    if n > 0:
+                        total_words = sum(
+                            len(
+                                (
+                                    str(
+                                        r.get(
+                                            self.hub_dataset_instruction_col,
+                                            r.get("instruction", ""),
+                                        )
+                                    )
+                                    + " "
+                                    + str(r.get(self.hub_dataset_output_col, r.get("output", "")))
+                                ).split()
+                            )
+                            for r in raw_rows
+                        )
+                        self.dataset_row_count = n
+                        self.dataset_avg_tokens = round((total_words / n) * 1.3, 1)
             else:
                 async with self:
                     self.hub_preview_error = resp.json().get("detail", "Failed to load preview")
@@ -1436,14 +1578,15 @@ Write ONLY the summary, no other text."""
         self._validate_dataset_at(out_path)
 
     def _validate_dataset_at(self, path: str):
+        import csv as _csv
+        import json as _json
+
         import pandas as pd
 
         try:
             if path.endswith(".csv"):
                 df = pd.read_csv(path, nrows=10)
             elif path.endswith(".json") and not path.endswith(".jsonl"):
-                import json as _json
-
                 with open(path) as fh:
                     raw = _json.load(fh)
                 df = pd.DataFrame(raw if isinstance(raw, list) else [raw])
@@ -1454,7 +1597,7 @@ Write ONLY the summary, no other text."""
                         line = line.strip()
                         if not line:
                             continue
-                        rows.append(json.loads(line))
+                        rows.append(_json.loads(line))
                         if len(rows) == 10:
                             break
                 df = pd.DataFrame(rows)
@@ -1481,6 +1624,59 @@ Write ONLY the summary, no other text."""
                 DatasetRow(instruction=r.get("instruction", ""), output=r.get("output", ""))
                 for r in records
             ]
+
+            # Count total rows and estimate avg tokens (word × 1.3 approximation)
+            total_rows = 0
+            total_words = 0
+            try:
+                if path.endswith(".csv"):
+                    with open(path, newline="", encoding="utf-8", errors="replace") as fh:
+                        reader = _csv.reader(fh)
+                        header = next(reader, None)
+                        if header:
+                            cols_list = list(header)
+                            i_idx = cols_list.index(inst_col) if inst_col in cols_list else 0
+                            o_idx = cols_list.index(out_col) if out_col in cols_list else 1
+                            for row in reader:
+                                total_rows += 1
+                                i_text = row[i_idx] if i_idx < len(row) else ""
+                                o_text = row[o_idx] if o_idx < len(row) else ""
+                                total_words += len((i_text + " " + o_text).split())
+                elif path.endswith(".json") and not path.endswith(".jsonl"):
+                    with open(path, encoding="utf-8") as fh:
+                        raw_all = _json.load(fh)
+                    rows_all = raw_all if isinstance(raw_all, list) else [raw_all]
+                    total_rows = len(rows_all)
+                    for row in rows_all:
+                        i_text = str(row.get(inst_col, row.get("instruction", "")))
+                        o_text = str(row.get(out_col, row.get("output", "")))
+                        total_words += len((i_text + " " + o_text).split())
+                else:  # JSONL
+                    with open(path, encoding="utf-8") as fh:
+                        for line in fh:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                row = _json.loads(line)
+                                total_rows += 1
+                                i_text = str(row.get(inst_col, row.get("instruction", "")))
+                                o_text = str(row.get(out_col, row.get("output", "")))
+                                total_words += len((i_text + " " + o_text).split())
+                            except Exception:
+                                pass
+            except Exception:
+                total_rows = len(records)
+
+            self.dataset_row_count = total_rows
+            self.dataset_avg_tokens = (
+                round((total_words / total_rows) * 1.3, 1) if total_rows > 0 else 0.0
+            )
+
+            # Re-run DPO validation now that we have a dataset
+            if self.is_dpo:
+                self._validate_dpo_columns()
+
         except Exception as exc:
             self.dataset_error = f"Could not read file: {exc}"
             self.dataset_preview = []
@@ -1503,8 +1699,6 @@ Write ONLY the summary, no other text."""
         the trainer will receive before starting a run."""
         import csv as _csv
         import json as _json
-
-        from trainer.dataset import PROMPT_TEMPLATES
 
         path = self.dataset_path
         if not path or not os.path.exists(path):
@@ -1557,15 +1751,20 @@ Write ONLY the summary, no other text."""
             self.generated_samples = []
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 resp = await client.post(
                     f"{API_BASE}/api/datasets/generate",
                     json={
                         "user_intent": self.user_intent,
                         "method": self.generation_method,
                         "n_samples": self.generation_n,
-                        "seed_examples": self.seed_examples,
+                        "seed_examples": [
+                            {"instruction": s.instruction, "output": s.output}
+                            for s in self.seed_examples
+                        ],
                         "hf_token": self.hf_token,
+                        "quality_threshold": self.generation_quality_threshold,
+                        "export_format": self.generation_export_format,
                     },
                 )
             if resp.status_code == 200:
@@ -1584,8 +1783,22 @@ Write ONLY the summary, no other text."""
                     n = stats.get("final_count", len(samples))
                     div = stats.get("diversity_score", 0)
                     self.generation_diversity_score = div
-                    self.generation_status = f"Generated {n} examples" + (
-                        f" · diversity {div:.2f}" if div else ""
+                    self.generation_status = (
+                        f"Generated {n} examples"
+                        + (f" · diversity {div:.2f}" if div else "")
+                        + (" · quality-filtered" if stats.get("quality_filtered") else "")
+                    )
+                    self.dataset_row_count = n
+                    total_words = sum(
+                        len((s.get("instruction", "") + " " + s.get("output", "")).split())
+                        for s in samples
+                    )
+                    self.dataset_avg_tokens = (
+                        round((total_words / len(samples)) * 1.3, 1) if samples else 0.0
+                    )
+                    _alt_path = stats.get("alpaca_path") or stats.get("sharegpt_path") or ""
+                    self.generation_alt_download_url = (
+                        f"{API_BASE}/api/datasets/download?path={_alt_path}" if _alt_path else ""
                     )
                     self.is_generating = False
                     self.data_source = "generate"
@@ -1654,8 +1867,17 @@ Write ONLY the summary, no other text."""
 
     @rx.event
     def set_prompt_template(self, value: str):
-        if value in ("alpaca", "chatml", "llama3", "phi3", "zephyr"):
+        if value in PROMPT_TEMPLATES:
             self.prompt_template = value
+            self.prompt_template_user_set = True
+
+    @rx.event
+    def reset_prompt_template_auto(self):
+        """Re-enable auto-detection and re-derive from the current model."""
+        self.prompt_template_user_set = False
+        self.prompt_template = auto_prompt_template_for(
+            self.model_type_hf, self.selected_model_id, self.model_hf_tags
+        )
 
     @rx.event
     def set_packing(self, value: bool):

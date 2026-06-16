@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TuneOS">
+  <title>TuneOS</title>
+  <defs>
+    <filter id="goo" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/>
+      <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -8" result="g"/>
+      <feComposite in="g" in2="g" operator="over"/>
+    </filter>
+  </defs>
+  <g filter="url(#goo)" fill="currentColor" stroke="currentColor" stroke-width="34" stroke-linecap="round" color="#1c1c1c">
+    <line x1="176" y1="136" x2="288" y2="248"/>
+    <line x1="288" y1="136" x2="176" y2="248"/>
+    <line x1="288" y1="136" x2="400" y2="136"/>
+    <line x1="400" y1="136" x2="400" y2="248"/>
+    <line x1="400" y1="248" x2="288" y2="248"/>
+    <line x1="176" y1="248" x2="176" y2="360"/>
+    <line x1="176" y1="360" x2="288" y2="360"/>
+    <line x1="400" y1="248" x2="400" y2="360"/>
+    <circle cx="176" cy="136" r="45" stroke="none"/>
+    <circle cx="288" cy="136" r="45" stroke="none"/>
+    <circle cx="400" cy="136" r="45" stroke="none"/>
+    <circle cx="176" cy="248" r="45" stroke="none"/>
+    <circle cx="288" cy="248" r="45" stroke="none"/>
+    <circle cx="400" cy="248" r="45" stroke="none"/>
+    <circle cx="176" cy="360" r="45" stroke="none"/>
+    <circle cx="288" cy="360" r="45" stroke="none"/>
+    <circle cx="400" cy="360" r="45" stroke="none"/>
+    <circle cx="88" cy="360" r="19" stroke="none"/>
+    <circle cx="456" cy="136" r="19" stroke="none"/>
+  </g>
+</svg>

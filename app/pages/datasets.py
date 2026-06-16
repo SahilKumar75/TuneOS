@@ -8,6 +8,7 @@ import httpx
 import reflex as rx
 from pydantic import BaseModel
 
+from app.components.brand import metaball_spinner, skeleton_list
 from app.state.finetune_state import FinetuneState
 from app.styles import c
 
@@ -322,9 +323,10 @@ def _preview_panel() -> rx.Component:
                 rx.cond(
                     DatasetState.is_loading_preview,
                     rx.hstack(
-                        rx.spinner(size="2"),
+                        metaball_spinner(20),
                         rx.text("Loading preview...", font_size="0.82rem"),
                         spacing="2",
+                        align="center",
                     ),
                     rx.fragment(),
                 ),
@@ -461,7 +463,7 @@ def datasets_page() -> rx.Component:
                     rx.button(
                         rx.cond(
                             DatasetState.is_searching,
-                            rx.spinner(size="2"),
+                            metaball_spinner(18),
                             rx.hstack(rx.icon("search", size=14), rx.text("Search"), spacing="2"),
                         ),
                         on_click=DatasetState.search_datasets,
@@ -472,6 +474,12 @@ def datasets_page() -> rx.Component:
                     spacing="2",
                     width="100%",
                     max_width="560px",
+                ),
+                # Skeleton placeholders while a search is in flight.
+                rx.cond(
+                    DatasetState.is_searching & (DatasetState.search_results.length() == 0),
+                    rx.box(skeleton_list(4), width="100%", max_width="560px"),
+                    rx.fragment(),
                 ),
                 # Search results (when search has been triggered)
                 rx.cond(
@@ -490,21 +498,26 @@ def datasets_page() -> rx.Component:
                         spacing="2",
                         width="100%",
                     ),
-                    # Starter curated cards (default view)
-                    rx.vstack(
-                        rx.text(
-                            "Curated datasets for fine-tuning",
-                            font_size="0.82rem",
-                            color=c("text_muted"),
-                        ),
-                        rx.grid(
-                            *[_dataset_card(ds) for ds in STARTER_DATASETS],
-                            columns="3",
-                            spacing="3",
+                    # Starter curated cards — hidden while a search is in flight
+                    # (the skeleton list above covers that state instead).
+                    rx.cond(
+                        DatasetState.is_searching,
+                        rx.fragment(),
+                        rx.vstack(
+                            rx.text(
+                                "Curated datasets for fine-tuning",
+                                font_size="0.82rem",
+                                color=c("text_muted"),
+                            ),
+                            rx.grid(
+                                *[_dataset_card(ds) for ds in STARTER_DATASETS],
+                                columns="3",
+                                spacing="3",
+                                width="100%",
+                            ),
+                            spacing="2",
                             width="100%",
                         ),
-                        spacing="2",
-                        width="100%",
                     ),
                 ),
                 # Preview panel (shown below list when a dataset is selected)

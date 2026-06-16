@@ -2,21 +2,20 @@ import pandas as pd
 from datasets import Dataset, load_dataset
 from transformers import PreTrainedTokenizer
 
-# Prompt templates keyed by name. Each must contain {instruction} and {output}.
-PROMPT_TEMPLATES: dict[str, str] = {
-    "alpaca": "### Instruction:\n{instruction}\n\n### Response:\n{output}",
-    "chatml": (
-        "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n{output}<|im_end|>"
-    ),
-    "llama3": (
-        "<|start_header_id|>user<|end_header_id|>\n\n{instruction}<|eot_id|>"
-        "<|start_header_id|>assistant<|end_header_id|>\n\n{output}<|eot_id|>"
-    ),
-    "phi3": "<|user|>\n{instruction}<|end|>\n<|assistant|>\n{output}<|end|>",
-    "zephyr": "<|user|>\n{instruction}</s>\n<|assistant|>\n{output}</s>",
-}
-# Back-compat: callers importing PROMPT_TEMPLATE get the default (alpaca).
-PROMPT_TEMPLATE = PROMPT_TEMPLATES["alpaca"]
+# Templates live in a dependency-free module shared with the Reflex app
+# (single source of truth — see trainer/prompt_templates.py).
+from trainer.prompt_templates import PROMPT_TEMPLATE, PROMPT_TEMPLATES  # noqa: F401
+
+
+def _format_prompt_prefix(row: dict, template: str = "alpaca") -> str:
+    """Return just the instruction part of the formatted text (no output).
+
+    Used to compute prompt token length for label masking — the model should
+    only compute loss on the response, not on the repeated instruction.
+    """
+    tmpl = PROMPT_TEMPLATES.get(template, PROMPT_TEMPLATES["alpaca"])
+    prefix_tmpl = tmpl.split("{output}")[0]
+    return prefix_tmpl.format(instruction=row.get("instruction", ""))
 
 
 def format_prompt(
@@ -293,16 +292,51 @@ def load_and_tokenize(
         )
     )
 
-    raw = raw.map(lambda x: {"text": format_prompt(x, template=template)})
-    tokenized = raw.map(
-        lambda x: tokenizer(
-            x["text"],
+    raw = raw.map(
+        lambda x: {
+            "text": format_prompt(x, template=template),
+            "prefix": _format_prompt_prefix(x, template=template),
+        }
+    )
+
+    def _tokenize_and_mask(examples):
+        full_enc = tokenizer(
+            examples["text"],
             truncation=True,
             max_length=max_seq_length,
             padding="max_length",
-        ),
+        )
+        prefix_enc = tokenizer(
+            examples["prefix"],
+            truncation=True,
+            max_length=max_seq_length,
+            add_special_tokens=False,
+        )
+        labels = []
+        for input_ids, prefix_ids in zip(
+            full_enc["input_ids"], prefix_enc["input_ids"], strict=False
+        ):
+            lbl = list(input_ids)
+            # full_enc uses add_special_tokens=True (may prepend BOS); prefix_enc
+            # does not, so prefix_ids is shorter by exactly 1 when BOS is present.
+            # Shift the mask start past BOS so it stays in the loss, and the last
+            # instruction token is not accidentally included.
+            bos_offset = (
+                1
+                if tokenizer.bos_token_id is not None
+                and len(input_ids) > 0
+                and input_ids[0] == tokenizer.bos_token_id
+                else 0
+            )
+            prompt_len = min(len(prefix_ids), len(lbl) - bos_offset)
+            lbl[bos_offset : bos_offset + prompt_len] = [-100] * prompt_len
+            labels.append(lbl)
+        full_enc["labels"] = labels
+        return full_enc
+
+    tokenized = raw.map(
+        _tokenize_and_mask,
         batched=True,
         remove_columns=raw.column_names,
     )
-    tokenized = tokenized.map(lambda x: {"labels": x["input_ids"].copy()})
     return tokenized

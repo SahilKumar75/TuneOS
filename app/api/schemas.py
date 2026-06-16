@@ -66,7 +66,9 @@ class JobConfig(BaseModel):
     # Compute backend for training execution.
     compute_backend: Literal["local", "modal", "hf_spaces"] = "local"
     # Prompt formatting + sample packing.
-    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr", "gemma", "mistral"] = (
+        "alpaca"
+    )
     packing: bool = False
     # Multi-GPU FSDP option string (empty = off), e.g. "full_shard auto_wrap".
     fsdp: str = ""
@@ -134,7 +136,9 @@ class DistillJobConfig(BaseModel):
     max_seq_length: int = Field(default=512, ge=64)
     bf16: bool = False
     seed: int = Field(default=42, ge=0)
-    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr"] = "alpaca"
+    prompt_template: Literal["alpaca", "chatml", "llama3", "phi3", "zephyr", "gemma", "mistral"] = (
+        "alpaca"
+    )
     experiment_id: str = ""
 
 
@@ -173,6 +177,11 @@ class SweepRequest(BaseModel):
     grid: dict[str, list] = {}
 
 
+class SweepResponse(BaseModel):
+    count: int
+    job_ids: list[str]
+
+
 class JobStatus(BaseModel):
     job_id: str
     status: str
@@ -198,6 +207,9 @@ class DatasetGenRequest(BaseModel):
     n_samples: int = Field(default=50, ge=5, le=500)
     seed_examples: list[dict] = []
     hf_token: str = ""
+    quality_threshold: float = Field(default=0.0, ge=0.0, le=5.0)
+    personas: list[str] = []
+    export_format: Literal["jsonl", "alpaca_json", "sharegpt_json"] = "jsonl"
 
 
 class CommentaryRequest(BaseModel):
@@ -214,9 +226,9 @@ class PushHubRequest(BaseModel):
 
 
 class InferRequest(BaseModel):
-    prompt: str
-    max_new_tokens: int = 300
-    temperature: float = 0.7
+    prompt: str = Field(..., max_length=8192)
+    max_new_tokens: int = Field(default=256, ge=1, le=2048)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
 
 class MergeRequest(BaseModel):

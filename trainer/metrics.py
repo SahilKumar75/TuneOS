@@ -111,39 +111,17 @@ def compute_rouge1(predictions: list[str], references: list[str]) -> float | Non
 
 @register("bleu", greater_is_better=True, kind="reference")
 def compute_bleu(predictions: list[str], references: list[str]) -> float | None:
-    """Corpus-level unigram BLEU with brevity penalty (higher is better).
-
-    A deliberately small, dependency-free approximation — enough to track
-    relative quality without pulling in sacrebleu/nltk.
-    """
+    """Corpus-level BLEU via the HuggingFace evaluate library (sacrebleu)."""
     if not predictions or len(predictions) != len(references):
         return None
-    total_match = 0
-    total_pred = 0
-    total_ref_len = 0
-    total_pred_len = 0
-    for pred, ref in zip(predictions, references, strict=False):
-        pred_toks = _tokenize(pred)
-        ref_toks = _tokenize(ref)
-        total_pred += len(pred_toks)
-        total_pred_len += len(pred_toks)
-        total_ref_len += len(ref_toks)
-        ref_counts: dict[str, int] = {}
-        for t in ref_toks:
-            ref_counts[t] = ref_counts.get(t, 0) + 1
-        seen: dict[str, int] = {}
-        for t in pred_toks:
-            seen[t] = seen.get(t, 0) + 1
-            if seen[t] <= ref_counts.get(t, 0):
-                total_match += 1
-    if total_pred == 0:
+    try:
+        import evaluate as _evaluate
+
+        metric = _evaluate.load("bleu")
+        result = metric.compute(predictions=predictions, references=[[r] for r in references])
+        return round(float(result["bleu"]), 4) if result else None
+    except Exception:
         return None
-    precision = total_match / total_pred
-    # Brevity penalty
-    if total_pred_len == 0:
-        return 0.0
-    bp = 1.0 if total_pred_len > total_ref_len else math.exp(1 - total_ref_len / total_pred_len)
-    return round(bp * precision, 4)
 
 
 def _f1(overlap: int, n_pred: int, n_ref: int) -> float:
@@ -211,42 +189,17 @@ def compute_rougeL(predictions: list[str], references: list[str]) -> float | Non
 
 @register("meteor", greater_is_better=True, kind="reference")
 def compute_meteor(predictions: list[str], references: list[str]) -> float | None:
-    """Lightweight METEOR approximation (unigram match Fmean with a
-    fragmentation penalty) — dependency-free, tracks relative quality."""
+    """Corpus-level METEOR via the HuggingFace evaluate library."""
     if not predictions or len(predictions) != len(references):
         return None
-    scores = []
-    for pred, ref in zip(predictions, references, strict=False):
-        pt, rt = _tokenize(pred), _tokenize(ref)
-        if not pt or not rt:
-            scores.append(0.0)
-            continue
-        ref_counts: dict[str, int] = {}
-        for t in rt:
-            ref_counts[t] = ref_counts.get(t, 0) + 1
-        matches = 0
-        seen: dict[str, int] = {}
-        for t in pt:
-            seen[t] = seen.get(t, 0) + 1
-            if seen[t] <= ref_counts.get(t, 0):
-                matches += 1
-        if matches == 0:
-            scores.append(0.0)
-            continue
-        precision, recall = matches / len(pt), matches / len(rt)
-        fmean = 10 * precision * recall / (recall + 9 * precision)
-        # Fragmentation: count contiguous matched chunks in the prediction.
-        chunks, in_chunk = 0, False
-        for t in pt:
-            if t in ref_counts:
-                if not in_chunk:
-                    chunks += 1
-                    in_chunk = True
-            else:
-                in_chunk = False
-        penalty = 0.5 * (chunks / matches) ** 3
-        scores.append(fmean * (1 - penalty))
-    return round(sum(scores) / len(scores), 4)
+    try:
+        import evaluate as _evaluate
+
+        metric = _evaluate.load("meteor")
+        result = metric.compute(predictions=predictions, references=references)
+        return round(float(result["meteor"]), 4) if result else None
+    except Exception:
+        return None
 
 
 def available_metrics() -> list[str]:

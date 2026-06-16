@@ -6,6 +6,7 @@ Inherits from FinetuneState (wizard config + navigation) so all wizard fields
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -242,6 +243,22 @@ class TrainingPollerState(FinetuneState):
                 self.start_error = str(exc)
                 self.is_starting = False
 
+    async def _reconcile_status_via_rest(self, job_id: str) -> bool:
+        """Heartbeat fallback when no pub/sub event arrives — e.g. Upstash idle-
+        drops the socket. Polls the REST job status; returns True if terminal."""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"{API_BASE}/api/jobs/{job_id}")
+            if resp.status_code == 200:
+                status = resp.json().get("status", "")
+                if status in ("done", "failed"):
+                    async with self:
+                        self.training_status = status
+                    return True
+        except Exception:
+            pass
+        return False
+
     async def _poll_job_loop(self, job_id: str):
         import redis.asyncio as aioredis
 
@@ -252,7 +269,23 @@ class TrainingPollerState(FinetuneState):
         prev_epoch = 0.0
         epoch_start_loss: float | None = None
 
-        async for message in pubsub.listen():
+        # Never block forever on `pubsub.listen()`: Upstash drops idle sockets,
+        # which would freeze the dashboard with no recovery. Poll with a bounded
+        # wait and fall back to the REST job status on every gap.
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    pubsub.get_message(ignore_subscribe_messages=True, timeout=5.0),
+                    timeout=30.0,
+                )
+            except Exception:
+                if await self._reconcile_status_via_rest(job_id):
+                    break
+                continue
+            if message is None:
+                if await self._reconcile_status_via_rest(job_id):
+                    break
+                continue
             if message["type"] != "message":
                 continue
             data = json.loads(message["data"])

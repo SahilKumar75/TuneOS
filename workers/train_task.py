@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import traceback
 from datetime import datetime, timezone
@@ -9,6 +10,8 @@ from trainer.config import LoraConfig, ModelConfig, TrainingConfig
 from trainer.evaluate import evaluate_run
 from trainer.finetune import finetune
 from workers.celery_app import celery_app
+
+_logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -55,11 +58,12 @@ def _run_finetune_impl(
     started_at = datetime.now(timezone.utc).isoformat()
 
     # Retrieve the short-TTL token stored by the API before enqueue; never travels in task kwargs.
+    # Thread it through model_cfg rather than os.environ so the token doesn't
+    # leak to subsequent jobs sharing this Celery worker process.
     _stored_token = r.getdel(f"job:{job_id}:hf_token")
     if _stored_token:
-        os.environ["HF_TOKEN"] = (
-            _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
-        )
+        _decoded = _stored_token.decode() if isinstance(_stored_token, bytes) else _stored_token
+        model_cfg = {**model_cfg, "hf_token": _decoded}
 
     try:
         # Early-fail for gated models with no token — avoids a silent hang during download.
@@ -143,7 +147,7 @@ def _run_finetune_impl(
                 hub_split=hub_split,
                 instruction_col=instruction_col,
                 output_col=output_col,
-                technique=train_cfg.get("technique", "qlora"),
+                redis_client=r,
             )
 
             if compose_adapters and overlay_technique:
@@ -184,7 +188,9 @@ def _run_finetune_impl(
                 {k: v for k, v in eval_results.items() if isinstance(v, int | float)},
             )
         except Exception:
-            pass
+            _logger.warning(
+                "Failed to persist final eval metrics for job %s", job_id, exc_info=True
+            )
 
         finished_at = datetime.now(timezone.utc).isoformat()
         # Durable SQLite record — survives Redis restart
@@ -231,7 +237,7 @@ def _run_finetune_impl(
                 save_run_metrics(job_id, loss_history)
                 r.delete(key)
         except Exception:
-            pass
+            _logger.warning("Failed to persist loss history for job %s", job_id, exc_info=True)
 
 
 @celery_app.task(bind=True, name="workers.train_task.run_finetune", time_limit=7200, queue="sft")

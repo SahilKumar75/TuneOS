@@ -491,6 +491,8 @@ def _step4() -> rx.Component:
                                                 "llama3",
                                                 "phi3",
                                                 "zephyr",
+                                                "gemma",
+                                                "mistral",
                                             ]
                                         ],
                                     ),
@@ -498,7 +500,11 @@ def _step4() -> rx.Component:
                                     on_change=FinetuneState.set_prompt_template,
                                 ),
                                 rx.text(
-                                    "How prompts are wrapped for the model",
+                                    rx.cond(
+                                        FinetuneState.prompt_template_user_set,
+                                        "Overridden — should match the model's chat format",
+                                        "Auto-detected from the selected model",
+                                    ),
                                     font_size="0.72rem",
                                     color=c("text_muted"),
                                 ),

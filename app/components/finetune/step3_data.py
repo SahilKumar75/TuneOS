@@ -154,6 +154,22 @@ def _hub_dataset_panel() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
+                        FinetuneState.hub_col_auto_detected,
+                        rx.callout(
+                            rx.text(
+                                "Column names auto-detected (no exact 'instruction'/'output' match). "
+                                "Available: ",
+                                rx.text.span(
+                                    FinetuneState.hub_columns_str,
+                                    font_weight="500",
+                                ),
+                            ),
+                            color_scheme="orange",
+                            size="1",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
                         FinetuneState.hub_dataset_preview.length() > 0,
                         _preview_table(FinetuneState.hub_dataset_preview),
                         rx.fragment(),
@@ -219,9 +235,11 @@ def _generate_panel() -> rx.Component:
                 rx.vstack(
                     _label("Method"),
                     rx.select.root(
-                        rx.select.trigger(width="200px"),
+                        rx.select.trigger(width="220px"),
                         rx.select.content(
                             rx.select.item("Self-Instruct (recommended)", value="self_instruct"),
+                            rx.select.item("Evol-Instruct (WizardLM)", value="evol_instruct"),
+                            rx.select.item("Persona-Based", value="persona"),
                             rx.select.item("Few-Shot Expansion", value="few_shot"),
                             rx.select.item("Template-Based (offline)", value="template"),
                         ),
@@ -245,8 +263,156 @@ def _generate_panel() -> rx.Component:
                     ),
                     spacing="1",
                 ),
+                rx.vstack(
+                    _label("Export format"),
+                    rx.select.root(
+                        rx.select.trigger(width="160px"),
+                        rx.select.content(
+                            rx.select.item("JSONL (default)", value="jsonl"),
+                            rx.select.item("Alpaca JSON", value="alpaca_json"),
+                            rx.select.item("ShareGPT JSON", value="sharegpt_json"),
+                        ),
+                        value=FinetuneState.generation_export_format,
+                        on_change=FinetuneState.set_export_format,
+                    ),
+                    spacing="1",
+                ),
                 spacing="4",
                 wrap="wrap",
+            ),
+            # Quality filter slider
+            rx.vstack(
+                _label("Quality filter (0 = off, 3 = recommended)"),
+                rx.hstack(
+                    rx.slider(
+                        min=0,
+                        max=5,
+                        step=0.5,
+                        default_value=[FinetuneState.generation_quality_threshold],
+                        on_value_commit=FinetuneState.set_quality_threshold,
+                        width="200px",
+                    ),
+                    rx.text(
+                        FinetuneState.generation_quality_threshold.to_string(),
+                        font_size="0.82rem",
+                        color=c("text_secondary"),
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+                rx.text(
+                    "Samples scoring below this threshold are discarded after generation.",
+                    font_size="0.75rem",
+                    color=c("text_muted"),
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Seed example editor
+            rx.vstack(
+                rx.hstack(
+                    rx.text("Seed examples", font_weight="500", font_size="0.84rem"),
+                    rx.badge(
+                        FinetuneState.seed_examples.length().to_string(),
+                        color_scheme="blue",
+                        size="1",
+                    ),
+                    rx.button(
+                        rx.cond(
+                            FinetuneState.seed_editor_open,
+                            "Hide editor",
+                            "Add seeds",
+                        ),
+                        on_click=FinetuneState.toggle_seed_editor,
+                        variant="ghost",
+                        size="1",
+                        color_scheme="blue",
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.cond(
+                    FinetuneState.seed_editor_open,
+                    rx.vstack(
+                        rx.text(
+                            "Seed examples guide generation — the more specific, the better.",
+                            font_size="0.76rem",
+                            color=c("text_muted"),
+                        ),
+                        rx.hstack(
+                            rx.vstack(
+                                _label("Instruction"),
+                                rx.text_area(
+                                    value=FinetuneState.seed_editor_instruction,
+                                    on_change=FinetuneState.set_seed_instruction,
+                                    placeholder="e.g. What is insulin resistance?",
+                                    rows="3",
+                                    width="100%",
+                                ),
+                                spacing="1",
+                                flex="1",
+                            ),
+                            rx.vstack(
+                                _label("Output"),
+                                rx.text_area(
+                                    value=FinetuneState.seed_editor_output,
+                                    on_change=FinetuneState.set_seed_output,
+                                    placeholder="e.g. Insulin resistance is ...",
+                                    rows="3",
+                                    width="100%",
+                                ),
+                                spacing="1",
+                                flex="1",
+                            ),
+                            spacing="3",
+                            width="100%",
+                        ),
+                        rx.button(
+                            rx.hstack(rx.icon("plus", size=12), rx.text("Add"), spacing="1"),
+                            on_click=FinetuneState.add_seed_example,
+                            size="1",
+                            color_scheme="blue",
+                            variant="soft",
+                        ),
+                        rx.cond(
+                            FinetuneState.seed_examples.length() > 0,
+                            rx.vstack(
+                                rx.foreach(
+                                    FinetuneState.seed_examples,
+                                    lambda s: rx.hstack(
+                                        rx.text(
+                                            s.instruction,
+                                            font_size="0.76rem",
+                                            flex="1",
+                                            no_of_lines=1,
+                                        ),
+                                        rx.icon_button(
+                                            rx.icon("x", size=12),
+                                            size="1",
+                                            variant="ghost",
+                                            color_scheme="red",
+                                            on_click=FinetuneState.remove_seed_example(s.id),
+                                        ),
+                                        border="1px solid",
+                                        border_color=c("border"),
+                                        border_radius="6px",
+                                        padding="6px 10px",
+                                        width="100%",
+                                        align="center",
+                                    ),
+                                ),
+                                spacing="1",
+                                width="100%",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="1",
+                width="100%",
             ),
             rx.button(
                 rx.cond(
@@ -273,6 +439,21 @@ def _generate_panel() -> rx.Component:
             rx.cond(
                 FinetuneState.generated_samples.length() > 0,
                 _preview_table(FinetuneState.generated_samples, "Generated examples preview"),
+                rx.fragment(),
+            ),
+            rx.cond(
+                FinetuneState.generation_alt_download_url != "",
+                rx.hstack(
+                    rx.icon("download", size=14, color=c("accent")),
+                    rx.link(
+                        "Download alternate format",
+                        href=FinetuneState.generation_alt_download_url,
+                        font_size="0.82rem",
+                        color=c("accent"),
+                    ),
+                    spacing="2",
+                    margin_top="4px",
+                ),
                 rx.fragment(),
             ),
             spacing="3",
@@ -328,6 +509,15 @@ def _dpo_format_card() -> rx.Component:
                 columns="3",
                 spacing="3",
                 width="100%",
+            ),
+            rx.cond(
+                FinetuneState.dpo_column_error != "",
+                rx.callout(
+                    FinetuneState.dpo_column_error,
+                    color_scheme="red",
+                    size="1",
+                ),
+                rx.fragment(),
             ),
             spacing="3",
             width="100%",

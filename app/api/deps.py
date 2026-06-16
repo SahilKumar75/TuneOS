@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 import platform
 import subprocess
@@ -64,9 +65,28 @@ def _get_job_status_from_redis(job_id: str) -> dict:
     try:
         from workers.status import get_job_status
 
-        return get_job_status(job_id)
+        state = get_job_status(job_id)
     except Exception:
-        return {"status": "unknown", "job_id": job_id}
+        state = {"status": "unknown", "job_id": job_id}
+
+    if state.get("status") in ("not_found", "unknown"):
+        try:
+            from app.state.experiments_db import _get_conn
+
+            with _get_conn() as conn:
+                row = conn.execute(
+                    "SELECT id, status, output_path FROM runs WHERE id = ?", (job_id,)
+                ).fetchone()
+            if row:
+                return {
+                    "job_id": row["id"],
+                    "status": row["status"] or "unknown",
+                    "output_path": row["output_path"] or "",
+                }
+        except Exception:
+            pass
+
+    return state
 
 
 def _cuda_version() -> str:
@@ -79,6 +99,7 @@ def _cuda_version() -> str:
     return getattr(getattr(torch, "version", None), "cuda", "") or ""
 
 
+@functools.lru_cache(maxsize=1)
 def _detect_gpu() -> GpuInfo:
     try:
         result = subprocess.run(

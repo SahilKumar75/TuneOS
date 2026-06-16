@@ -662,8 +662,6 @@ def _phase_c() -> rx.Component:
                 rx.box(height="8px"),
                 rx.box(
                     rx.markdown(FinetuneState.intent_md),
-                    max_height="380px",
-                    overflow_y="auto",
                     padding="4px",
                     width="100%",
                 ),

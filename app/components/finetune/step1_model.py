@@ -11,14 +11,29 @@ from app.styles import c
 _QUICK_MODELS = [
     ("mistralai/Mistral-7B-v0.1", "Mistral 7B", False, "https://github.com/mistralai.png?size=32"),
     ("meta-llama/Meta-Llama-3-8B", "Llama 3 8B", True, "https://github.com/meta-llama.png?size=32"),
-    ("microsoft/Phi-3-mini-4k-instruct", "Phi-3 Mini", False, "https://github.com/microsoft.png?size=32"),
+    (
+        "microsoft/Phi-3-mini-4k-instruct",
+        "Phi-3 Mini",
+        False,
+        "https://github.com/microsoft.png?size=32",
+    ),
     ("google/gemma-2b", "Gemma 2B", False, "https://github.com/google.png?size=32"),
     ("EleutherAI/pythia-410m", "Pythia 410M", False, "https://github.com/EleutherAI.png?size=32"),
-    ("bigcode/starcoder2-3b", "StarCoder2 3B", False, "https://github.com/bigcode-project.png?size=32"),
+    (
+        "bigcode/starcoder2-3b",
+        "StarCoder2 3B",
+        False,
+        "https://github.com/bigcode-project.png?size=32",
+    ),
 ]
 
 _VLM_QUICK = [
-    ("llava-hf/llava-1.5-7b-hf", "LLaVA-1.5 7B", False, "https://github.com/haotian-liu.png?size=32"),
+    (
+        "llava-hf/llava-1.5-7b-hf",
+        "LLaVA-1.5 7B",
+        False,
+        "https://github.com/haotian-liu.png?size=32",
+    ),
     ("Qwen/Qwen2-VL-2B-Instruct", "Qwen2-VL 2B", False, "https://github.com/QwenLM.png?size=32"),
 ]
 
@@ -271,7 +286,12 @@ def _search_result_row(result: dict) -> rx.Component:
                     color=c("text_primary"),
                     text_align="left",
                 ),
-                rx.text(result["pipeline"], font_size="0.72rem", color=c("text_muted"), text_align="left"),
+                rx.text(
+                    result["pipeline"],
+                    font_size="0.72rem",
+                    color=c("text_muted"),
+                    text_align="left",
+                ),
                 spacing="0",
                 align_items="flex-start",
             ),
@@ -361,7 +381,8 @@ def _unified_card() -> rx.Component:
             ),
             # ── Search results ───────────────────────────────────────────
             rx.cond(
-                FinetuneState.is_searching_models | (FinetuneState.model_search_results.length() > 0),
+                FinetuneState.is_searching_models
+                | (FinetuneState.model_search_results.length() > 0),
                 rx.box(
                     rx.vstack(
                         rx.cond(

@@ -231,7 +231,9 @@ def _preview_panel() -> rx.Component:
                             padding_x="8px",
                             padding_y="4px",
                         ),
-                        rx.badge(AppState.preview_source_label, color_scheme="blue", variant="soft"),
+                        rx.badge(
+                            AppState.preview_source_label, color_scheme="blue", variant="soft"
+                        ),
                     ),
                 ),
                 rx.spacer(),
@@ -260,7 +262,11 @@ def _preview_panel() -> rx.Component:
                     AppState.preview_downloads != "",
                     rx.hstack(
                         rx.icon("download", size=13, color=c("text_muted")),
-                        rx.text(AppState.preview_downloads, font_size="0.8rem", color=c("text_secondary")),
+                        rx.text(
+                            AppState.preview_downloads,
+                            font_size="0.8rem",
+                            color=c("text_secondary"),
+                        ),
                         spacing="1",
                         align="center",
                     ),
@@ -270,7 +276,9 @@ def _preview_panel() -> rx.Component:
                     AppState.preview_likes != "",
                     rx.hstack(
                         rx.icon("heart", size=13, color="#E53E3E"),
-                        rx.text(AppState.preview_likes, font_size="0.8rem", color=c("text_secondary")),
+                        rx.text(
+                            AppState.preview_likes, font_size="0.8rem", color=c("text_secondary")
+                        ),
                         spacing="1",
                         align="center",
                     ),
@@ -289,17 +297,26 @@ def _preview_panel() -> rx.Component:
             rx.hstack(
                 rx.cond(
                     AppState.preview_library != "",
-                    rx.badge(AppState.preview_library, color_scheme="purple", size="1", variant="soft"),
+                    rx.badge(
+                        AppState.preview_library, color_scheme="purple", size="1", variant="soft"
+                    ),
                     rx.fragment(),
                 ),
                 rx.cond(
                     AppState.preview_formats != "",
-                    rx.badge(AppState.preview_formats, color_scheme="green", size="1", variant="soft"),
+                    rx.badge(
+                        AppState.preview_formats, color_scheme="green", size="1", variant="soft"
+                    ),
                     rx.fragment(),
                 ),
                 rx.cond(
                     AppState.preview_architecture != "",
-                    rx.badge(AppState.preview_architecture, color_scheme="gray", size="1", variant="outline"),
+                    rx.badge(
+                        AppState.preview_architecture,
+                        color_scheme="gray",
+                        size="1",
+                        variant="outline",
+                    ),
                     rx.fragment(),
                 ),
                 rx.cond(

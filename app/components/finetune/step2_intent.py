@@ -165,7 +165,8 @@ def _phase_a() -> rx.Component:
                     "Use Case",
                     [
                         _filter_chip(
-                            v, lbl,
+                            v,
+                            lbl,
                             FinetuneState.intent_use_for,
                             FinetuneState.set_intent_use_for,
                         )
@@ -177,7 +178,8 @@ def _phase_a() -> rx.Component:
                     "Domain",
                     [
                         _filter_chip(
-                            v, lbl,
+                            v,
+                            lbl,
                             FinetuneState.intent_domain,
                             FinetuneState.set_intent_domain,
                         )
@@ -189,7 +191,8 @@ def _phase_a() -> rx.Component:
                     "Task Type",
                     [
                         _filter_chip(
-                            v, lbl,
+                            v,
+                            lbl,
                             FinetuneState.intent_task_type,
                             FinetuneState.set_intent_task_type,
                         )

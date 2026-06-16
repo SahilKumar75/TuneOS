@@ -647,17 +647,25 @@ class FinetuneState(rx.State):
                                 continue
                             dl = m.get("downloads", 0) or 0
                             dl_str = (
-                                f"{dl / 1_000_000:.1f}M"
-                                if dl >= 1_000_000
-                                else f"{dl // 1_000}k"
-                                if dl >= 1_000
-                                else str(dl)
-                            ) if dl else ""
-                            results.append({
-                                "id": mid,
-                                "downloads": dl_str,
-                                "pipeline": (m.get("pipeline_tag") or "").replace("-", " ").title(),
-                            })
+                                (
+                                    f"{dl / 1_000_000:.1f}M"
+                                    if dl >= 1_000_000
+                                    else f"{dl // 1_000}k"
+                                    if dl >= 1_000
+                                    else str(dl)
+                                )
+                                if dl
+                                else ""
+                            )
+                            results.append(
+                                {
+                                    "id": mid,
+                                    "downloads": dl_str,
+                                    "pipeline": (m.get("pipeline_tag") or "")
+                                    .replace("-", " ")
+                                    .title(),
+                                }
+                            )
                 elif source == "github":
                     resp = await client.get(
                         "https://api.github.com/search/repositories",
@@ -667,11 +675,15 @@ class FinetuneState(rx.State):
                     if resp.status_code == 200:
                         for r in resp.json().get("items", [])[:8]:
                             stars = r.get("stargazers_count", 0) or 0
-                            results.append({
-                                "id": r.get("full_name", ""),
-                                "downloads": f"{stars // 1_000}k" if stars >= 1_000 else str(stars),
-                                "pipeline": "GitHub",
-                            })
+                            results.append(
+                                {
+                                    "id": r.get("full_name", ""),
+                                    "downloads": f"{stars // 1_000}k"
+                                    if stars >= 1_000
+                                    else str(stars),
+                                    "pipeline": "GitHub",
+                                }
+                            )
         except Exception:
             results = []
 
@@ -1058,7 +1070,9 @@ class FinetuneState(rx.State):
             # Library, license from HF API
             lib = (data.get("library_name") or "").replace("-", " ").title()
             license_tag = next((t for t in raw_tags if t.startswith("license:")), "")
-            lic = license_tag.replace("license:", "").replace("-", " ").title() if license_tag else ""
+            lic = (
+                license_tag.replace("license:", "").replace("-", " ").title() if license_tag else ""
+            )
 
             # File formats from siblings (SafeTensors / GGUF / PyTorch)
             siblings = data.get("siblings") or []
@@ -1259,7 +1273,8 @@ class FinetuneState(rx.State):
     async def intent_next_phase(self):
         if self.intent_phase == 1:
             # Moving from Phase A to Phase B - generate personalized questions
-            await self._generate_personalized_questions()
+            async for update in self._generate_personalized_questions():
+                yield update
         elif self.intent_phase == 2:
             self._generate_intent_md()
         if self.intent_phase < 3:

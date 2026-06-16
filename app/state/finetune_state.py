@@ -154,6 +154,13 @@ class DatasetRow(BaseModel):
     output: str = ""
 
 
+class HubSearchResult(BaseModel):
+    id: str = ""
+    downloads: int = 0
+    likes: int = 0
+    description: str = ""
+
+
 class ChatMessage(BaseModel):
     role: str = "user"
     content: str = ""
@@ -294,6 +301,11 @@ class FinetuneState(rx.State):
 
     # Hub column auto-detection flag
     hub_col_auto_detected: bool = False
+
+    # Hub search
+    hub_search_query: str = ""
+    hub_search_results: list[HubSearchResult] = []
+    hub_is_searching: bool = False
 
     # DPO column mapping (used when training_mode == "dpo")
     dpo_prompt_col: str = "prompt"
@@ -1669,6 +1681,41 @@ Write ONLY the summary, no other text."""
     def set_hub_dataset_id(self, dataset_id: str):
         self.hub_dataset_id = dataset_id
         self.data_source = "hub_dataset"
+        self.hub_search_query = ""
+        self.hub_search_results = []
+
+    @rx.event
+    async def search_hub_datasets(self, query: str):
+        self.hub_search_query = query
+        if not query.strip():
+            self.hub_search_results = []
+            self.hub_is_searching = False
+            yield
+            return
+        self.hub_is_searching = True
+        yield
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    "https://huggingface.co/api/datasets",
+                    params={"search": query, "limit": 8, "sort": "downloads"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.hub_search_results = [
+                        HubSearchResult(
+                            id=d.get("id", ""),
+                            downloads=d.get("downloads", 0),
+                            likes=d.get("likes", 0),
+                            description=(d.get("description") or "")[:120],
+                        )
+                        for d in data
+                        if d.get("id")
+                    ]
+        except Exception:
+            self.hub_search_results = []
+        self.hub_is_searching = False
+        yield
 
     @rx.event
     def set_hub_instruction_col(self, value: str):

@@ -15,17 +15,12 @@ from app.state.finetune_state import FinetuneState
 from app.styles import c
 
 
-def _data_mode_btn(mode: str, label: str, icon: str, recommended: bool = False) -> rx.Component:
+def _data_mode_btn(mode: str, label: str, icon: str) -> rx.Component:
     is_active = FinetuneState.data_source == mode
     return rx.button(
         rx.hstack(
             rx.icon(icon, size=13),
             rx.text(label, font_size="0.82rem", font_weight="500"),
-            rx.cond(
-                recommended,
-                rx.badge("Recommended", size="1", variant="soft", color_scheme="green"),
-                rx.fragment(),
-            ),
             spacing="2",
             align="center",
         ),
@@ -543,7 +538,7 @@ def _step3() -> rx.Component:
         _section_heading("Add your training data"),
         rx.cond(FinetuneState.is_dpo, _dpo_format_card(), rx.fragment()),
         rx.hstack(
-            _data_mode_btn("upload", "Upload file", "upload", recommended=True),
+            _data_mode_btn("upload", "Upload file", "upload"),
             _data_mode_btn("hub_dataset", "HF Hub dataset", "database"),
             _data_mode_btn("generate", "Generate with AI", "sparkles"),
             spacing="1",

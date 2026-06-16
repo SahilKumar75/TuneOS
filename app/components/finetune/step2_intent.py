@@ -160,7 +160,7 @@ def _phase_a() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                rx.divider(margin="4px 0"),
+                rx.divider(margin="0"),
                 # Context filters
                 _filter_row(
                     "Use Case",
@@ -201,7 +201,7 @@ def _phase_a() -> rx.Component:
                     ],
                     "What kind of output?",
                 ),
-                spacing="5",
+                spacing="3",
                 width="100%",
             ),
             style={

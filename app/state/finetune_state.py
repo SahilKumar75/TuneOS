@@ -1507,7 +1507,7 @@ Return ONLY valid JSON, no other text:
                         "X-Title": "TuneOS Intent Questions",
                     },
                     json={
-                        "model": "deepseek/deepseek-r1:free",
+                        "model": "google/gemma-4-31b-it:free",
                         "messages": [
                             {
                                 "role": "system",
@@ -1626,7 +1626,7 @@ Write ONLY the summary, no other text."""
                         "X-Title": "TuneOS Plan Update",
                     },
                     json={
-                        "model": "deepseek/deepseek-r1:free",
+                        "model": "google/gemma-4-31b-it:free",
                         "messages": [
                             {
                                 "role": "system",

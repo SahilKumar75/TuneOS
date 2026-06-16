@@ -248,7 +248,7 @@ class FinetuneState(rx.State):
     # New input fields for Phase A
     intent_project_name: str = ""  # project name
     intent_description: str = ""  # project description
-    training_goal_help_error: bool = False
+    training_goal_help_error: str = ""
     intent_request_volume: str = ""  # expected request volume
     intent_accuracy_req: str = ""  # accuracy requirements
 
@@ -1232,21 +1232,26 @@ class FinetuneState(rx.State):
 
     @rx.event
     def ask_training_goal_help(self):
-        """Validate project fields, then inject a context-rich prompt into the chat panel."""
+        """Validate all project fields are filled, then inject a context-rich prompt."""
         from app.state.app_state import AppState
 
-        has_any = bool(
-            self.intent_project_name.strip()
-            or self.intent_description.strip()
-            or self.intent_use_for
-            or self.intent_domain
-            or self.intent_task_type
-        )
-        if not has_any:
-            self.training_goal_help_error = True
+        missing = []
+        if not self.intent_project_name.strip():
+            missing.append("Project Name")
+        if not self.intent_description.strip():
+            missing.append("Description")
+        if not self.intent_use_for:
+            missing.append("Use Case")
+        if not self.intent_domain:
+            missing.append("Domain")
+        if not self.intent_task_type:
+            missing.append("Task Type")
+
+        if missing:
+            self.training_goal_help_error = "Please fill: " + ", ".join(missing)
             return
 
-        self.training_goal_help_error = False
+        self.training_goal_help_error = ""
 
         parts = []
         if self.selected_model_id:

@@ -783,9 +783,9 @@ def _training_goal_card() -> rx.Component:
             rx.spacer(),
             rx.hstack(
                 rx.cond(
-                    FinetuneState.training_goal_help_error,
+                    FinetuneState.training_goal_help_error != "",
                     rx.text(
-                        "Fill in project details first",
+                        FinetuneState.training_goal_help_error,
                         font_size="0.75rem",
                         font_weight="500",
                         color="var(--red-10)",

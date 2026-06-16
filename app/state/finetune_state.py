@@ -1272,13 +1272,14 @@ class FinetuneState(rx.State):
     @rx.event
     async def intent_next_phase(self):
         if self.intent_phase == 1:
-            # Moving from Phase A to Phase B - generate personalized questions
+            # Advance to Phase B immediately so the loader renders, then generate
+            self.intent_phase = 2
+            yield
             async for update in self._generate_personalized_questions():
                 yield update
         elif self.intent_phase == 2:
             self._generate_intent_md()
-        if self.intent_phase < 3:
-            self.intent_phase += 1
+            self.intent_phase = 3
             yield
 
     @rx.event

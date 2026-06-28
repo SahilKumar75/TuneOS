@@ -201,3 +201,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Untracked `__pycache__`, `build/`, and `dist/` from the git repository.
+- patch 179: feat: W&B tracker backend option

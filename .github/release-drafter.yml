@@ -9,7 +9,6 @@ categories:
   - title: "Bug Fixes"
     labels:
       - "bug"
-      - "fix"
   - title: "Backend"
     labels:
       - "backend"
@@ -38,7 +37,6 @@ version-resolver:
   patch:
     labels:
       - "bug"
-      - "fix"
       - "docs"
       - "dependencies"
       - "infra"

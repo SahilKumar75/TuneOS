@@ -36,3 +36,9 @@ dependencies:
       - any-glob-to-any-file:
           - "poetry.lock"
           - "pyproject.toml"
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
+          - "conftest.py"
